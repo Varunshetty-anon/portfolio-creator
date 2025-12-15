@@ -3,7 +3,9 @@ export interface Project {
   title: string;
   description: string;
   thumbnail: string;
-  link: string; // YouTube/Vimeo link or Base64 Video
+  thumbnailBlob?: Blob; // For local DB storage
+  link: string; // YouTube/Vimeo link or Blob URL
+  customVideoBlob?: Blob; // For local DB storage
   category: string;
 }
 
@@ -31,7 +33,9 @@ export interface PortfolioData {
   bio: string;
   contactEmail: string;
   profileImage: string;
+  profileImageBlob?: Blob; // For local DB storage
   showreelThumbnail: string;
+  showreelThumbnailBlob?: Blob; // For local DB storage
   showreelLink: string;
   socials: Socials;
   testimonials: Testimonial[];
@@ -89,16 +93,8 @@ export const INITIAL_DATA: PortfolioData = {
       title: "Cinematic Travel Vlog",
       description: "Documenting a journey through the Himalayas. Focus on sound design and color grading to evoke emotion.",
       thumbnail: "https://picsum.photos/id/249/600/800",
-      link: "#",
+      link: "https://www.youtube.com/watch?v=dQw4w9WgXcQ", // Placeholder valid external link for shareability
       category: "Long Form",
-    },
-    {
-      id: "3",
-      title: "Music Video Edit",
-      description: "Official music video for the indie band 'Echoes'. Used mixed media techniques and frame-by-frame animation.",
-      thumbnail: "https://picsum.photos/id/453/600/800",
-      link: "#",
-      category: "Music Video",
     },
   ],
 };

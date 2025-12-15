@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, Instagram, MapPin, Globe, ExternalLink, Play, Disc, Twitter, Linkedin, Youtube, Send, X, MessageSquare, Pause, Volume2, VolumeX, Maximize, Minimize } from 'lucide-react';
+import { Mail, Instagram, MapPin, Globe, ExternalLink, Play, Disc, Twitter, Linkedin, Youtube, Send, X, Pause, Volume2, VolumeX, Maximize, Minimize, ArrowDown } from 'lucide-react';
 import { PortfolioData, Project } from '../types';
 import { Button } from './ui/Button';
 
@@ -9,17 +9,15 @@ interface PortfolioViewProps {
   isPreview?: boolean;
 }
 
-const containerVariants = {
+// --- Animation Variants ---
+const staggerContainer = {
   hidden: { opacity: 0 },
-  visible: { 
-    opacity: 1,
-    transition: { staggerChildren: 0.1 }
-  }
+  visible: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.2 } }
 };
 
-const itemVariants = {
-  hidden: { y: 20, opacity: 0 },
-  visible: { y: 0, opacity: 1, transition: { duration: 0.5, ease: "easeOut" } }
+const fadeInUp = {
+  hidden: { y: 30, opacity: 0 },
+  visible: { y: 0, opacity: 1, transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] } }
 };
 
 // --- Helper Functions ---
@@ -29,7 +27,7 @@ const formatTime = (time: number) => {
   return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
 };
 
-// --- Custom Video Player for Direct Uploads ---
+// --- Custom Video Player (Direct Uploads) ---
 const CustomVideoPlayer = ({ src, thumbnail }: { src: string, thumbnail?: string }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -57,8 +55,6 @@ const CustomVideoPlayer = ({ src, thumbnail }: { src: string, thumbnail?: string
     };
     const onLoadedMetadata = () => {
         setDuration(video.duration);
-        // Attempt autoplay gently
-        video.play().catch(() => setIsPlaying(false));
     };
     const onEnded = () => setIsPlaying(false);
 
@@ -124,7 +120,6 @@ const CustomVideoPlayer = ({ src, thumbnail }: { src: string, thumbnail?: string
     }
   };
   
-  // Hide controls logic
   const handleMouseMove = () => {
       setShowControls(true);
       if (controlTimeoutRef.current) clearTimeout(controlTimeoutRef.current);
@@ -149,7 +144,6 @@ const CustomVideoPlayer = ({ src, thumbnail }: { src: string, thumbnail?: string
          playsInline
        />
 
-       {/* Big Center Play Button (only when paused) */}
        {!isPlaying && (
          <div className="absolute inset-0 flex items-center justify-center pointer-events-none bg-black/20 z-10">
             <div className="w-16 h-16 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center border border-white/20 shadow-xl transform transition-transform group-hover:scale-110">
@@ -158,12 +152,10 @@ const CustomVideoPlayer = ({ src, thumbnail }: { src: string, thumbnail?: string
          </div>
        )}
 
-       {/* Bottom Controls Bar */}
        <div 
           className={`absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/90 via-black/60 to-transparent transition-opacity duration-300 flex flex-col gap-2 z-20 ${showControls || !isPlaying ? 'opacity-100' : 'opacity-0'}`}
           onClick={(e) => e.stopPropagation()}
        >
-         {/* Progress Bar */}
          <div className="relative w-full h-1 group/progress cursor-pointer flex items-center">
             <input 
               type="range" 
@@ -176,7 +168,6 @@ const CustomVideoPlayer = ({ src, thumbnail }: { src: string, thumbnail?: string
             <div className="w-full h-1 bg-zinc-600/50 rounded-full overflow-hidden">
                <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${progress}%` }}></div>
             </div>
-            <div className="w-3 h-3 bg-white rounded-full absolute pointer-events-none opacity-0 group-hover/progress:opacity-100 transition-opacity shadow" style={{ left: `${progress}%`, transform: 'translateX(-50%)' }}></div>
          </div>
          
          <div className="flex items-center justify-between mt-1">
@@ -216,7 +207,6 @@ const CustomVideoPlayer = ({ src, thumbnail }: { src: string, thumbnail?: string
 
 // --- Main Video Player Switcher ---
 const VideoPlayer = ({ src, thumbnail }: { src: string, thumbnail?: string }) => {
-  // Simple heuristic for external embeds
   const isYouTube = src.includes('youtube.com') || src.includes('youtu.be');
   const isVimeo = src.includes('vimeo.com');
 
@@ -244,14 +234,11 @@ const VideoPlayer = ({ src, thumbnail }: { src: string, thumbnail?: string }) =>
     );
   }
 
-  // Direct File / Blob / Base64 -> Use Custom Player
   return <CustomVideoPlayer src={src} thumbnail={thumbnail} />;
 };
 
 export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = false }) => {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
-
-  // Contact Form State
   const [formState, setFormState] = useState({ name: '', email: '', message: '' });
 
   const handleContactSubmit = (e: React.FormEvent) => {
@@ -263,316 +250,259 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
   };
 
   return (
-    <div className={`min-h-screen bg-black text-white selection:bg-zinc-800 ${isPreview ? 'pointer-events-none select-none' : ''}`}>
+    <div className={`min-h-screen bg-black text-white selection:bg-indigo-500/30 font-sans ${isPreview ? 'pointer-events-none select-none' : ''}`}>
       
-      {/* === Project Detail Modal === */}
+      {/* Background Texture for Cinematic Feel */}
+      <div className="fixed inset-0 pointer-events-none z-0">
+         <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.03] mix-blend-overlay"></div>
+         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-purple-900/10 rounded-full blur-[120px]"></div>
+         <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-indigo-900/10 rounded-full blur-[120px]"></div>
+      </div>
+
+      {/* Project Modal */}
       <AnimatePresence>
         {selectedProject && (
           <motion.div 
             initial={{ opacity: 0 }} 
             animate={{ opacity: 1 }} 
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md"
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/95 backdrop-blur-xl"
             onClick={() => setSelectedProject(null)}
           >
             <motion.div 
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 20 }}
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-zinc-900 w-full max-w-5xl rounded-2xl overflow-hidden shadow-2xl border border-zinc-800 flex flex-col md:flex-row max-h-[90vh]"
+              className="bg-zinc-900 w-full max-w-6xl rounded-3xl overflow-hidden shadow-2xl border border-zinc-800 flex flex-col md:flex-row max-h-[90vh]"
             >
-              {/* Video Area */}
-              <div className="w-full md:w-2/3 aspect-video bg-black relative">
+              <div className="w-full md:w-3/4 aspect-video bg-black relative">
                 {selectedProject.link ? (
                   <VideoPlayer src={selectedProject.link} thumbnail={selectedProject.thumbnail} />
                 ) : (
-                   <div className="w-full h-full flex items-center justify-center text-zinc-500 flex-col gap-2">
-                      <Play size={40} className="opacity-20"/>
-                      <span className="text-sm">No video source provided</span>
+                   <div className="w-full h-full flex items-center justify-center text-zinc-500">
+                      <span className="text-sm">No source</span>
                    </div>
                 )}
               </div>
               
-              {/* Info Area */}
-              <div className="w-full md:w-1/3 p-8 flex flex-col overflow-y-auto">
-                <div className="flex justify-between items-start mb-4">
-                   <span className="inline-block px-3 py-1 bg-white/5 rounded-full text-xs font-mono text-zinc-400 border border-zinc-800">
+              <div className="w-full md:w-1/4 p-6 md:p-8 flex flex-col bg-zinc-950/50 overflow-y-auto border-l border-zinc-800">
+                <div className="flex justify-between items-start mb-6">
+                   <span className="inline-block px-3 py-1 bg-white/5 rounded-full text-[10px] font-mono uppercase tracking-wider text-zinc-400 border border-zinc-800">
                      {selectedProject.category}
                    </span>
-                   <button onClick={() => setSelectedProject(null)} className="p-1 text-zinc-500 hover:text-white transition-colors">
-                     <X size={24} />
+                   <button onClick={() => setSelectedProject(null)} className="p-2 bg-zinc-900 rounded-full text-zinc-500 hover:text-white hover:bg-zinc-800 transition-colors">
+                     <X size={16} />
                    </button>
                 </div>
                 
                 <h2 className="text-2xl font-bold font-display mb-4 leading-tight">{selectedProject.title}</h2>
-                <p className="text-zinc-400 text-sm leading-relaxed mb-6 flex-1">
+                <div className="w-10 h-1 bg-indigo-500 mb-6 rounded-full"></div>
+                <p className="text-zinc-400 text-sm leading-relaxed mb-6 flex-1 whitespace-pre-wrap">
                   {selectedProject.description || "No description available."}
                 </p>
 
-                <div className="mt-auto pt-6 border-t border-zinc-800">
-                   <p className="text-xs text-zinc-600 uppercase tracking-widest mb-2">Project Link</p>
-                   {selectedProject.link && !selectedProject.link.startsWith('data:') ? (
-                     <a href={selectedProject.link} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm text-indigo-400 hover:text-indigo-300">
-                       <ExternalLink size={14} /> Open original source
-                     </a>
-                   ) : (
-                     <span className="text-xs text-zinc-500">Direct Upload</span>
-                   )}
-                </div>
+                {selectedProject.link && !selectedProject.link.startsWith('data:') && !selectedProject.link.startsWith('blob:') && (
+                   <a href={selectedProject.link} target="_blank" rel="noreferrer" className="mt-auto w-full py-3 border border-zinc-700 rounded-xl flex items-center justify-center gap-2 text-sm text-zinc-300 hover:bg-white hover:text-black hover:border-white transition-all">
+                      <ExternalLink size={14} /> Open Source
+                   </a>
+                )}
               </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      <div className="max-w-7xl mx-auto flex flex-col lg:flex-row min-h-screen">
+      {/* Main Content */}
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-12 lg:py-20">
         
-        {/* === Left Sidebar (Profile) === */}
-        <motion.aside 
-          initial={{ x: -50, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          transition={{ duration: 0.6 }}
-          className="w-full lg:w-[400px] xl:w-[450px] lg:fixed lg:h-screen lg:overflow-y-auto p-6 lg:p-12 flex flex-col border-r border-zinc-900/50 bg-zinc-950/50 backdrop-blur-sm z-10"
+        {/* Header Grid (Bento Style) */}
+        <motion.div 
+          variants={staggerContainer}
+          initial="hidden"
+          animate="visible"
+          className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-20"
         >
-          <div className="flex-1 flex flex-col justify-center">
-            {/* Profile Image */}
-            <div className="mb-8 relative group">
-              <div className="w-32 h-32 lg:w-48 lg:h-48 rounded-full overflow-hidden border-2 border-zinc-800 ring-4 ring-black shadow-2xl mx-auto lg:mx-0">
-                <img src={data.profileImage} alt={data.name} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700 ease-in-out transform group-hover:scale-105" />
-              </div>
-              <div className="absolute -bottom-2 -right-2 bg-white text-black text-xs font-bold px-3 py-1 rounded-full hidden lg:block">
-                OPEN TO WORK
-              </div>
-            </div>
-
-            {/* Name & Role */}
-            <h1 className="text-4xl lg:text-5xl font-display font-bold mb-2 tracking-tight">
-              {data.name}
-            </h1>
-            <p className="text-xl text-zinc-400 font-light mb-8 flex items-center gap-2">
-              <span className="w-8 h-[1px] bg-zinc-600 inline-block"></span>
-              {data.role}
-            </p>
-
-            {/* Meta Info */}
-            <div className="flex flex-col gap-3 text-sm text-zinc-500 mb-8 font-mono">
-              <div className="flex items-center gap-3">
-                <MapPin size={16} />
-                <span>{data.location}</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <Globe size={16} />
-                <span>{data.languages}</span>
-              </div>
-            </div>
-
-            {/* Bio */}
-            <div className="mb-8 relative">
-               <div className="absolute -left-4 top-0 bottom-0 w-1 bg-gradient-to-b from-zinc-700 to-transparent rounded-full opacity-50"></div>
-               <p className="text-zinc-300 leading-relaxed text-lg italic pl-4">
-                "{data.bio}"
-               </p>
-            </div>
-
-            {/* Interactive Socials - Only display if linked */}
-            <div className="flex flex-wrap gap-3 mt-auto">
-              {data.socials.email && (
-                <a href={`mailto:${data.socials.email}`} className="p-3 bg-zinc-900 rounded-full hover:bg-white hover:text-black transition-colors duration-300" title="Email">
-                  <Mail size={20} />
-                </a>
-              )}
-              {data.socials.instagram && (
-                <a href={`https://instagram.com/${data.socials.instagram}`} target="_blank" rel="noreferrer" className="p-3 bg-zinc-900 rounded-full hover:bg-[#E1306C] hover:text-white transition-colors duration-300" title="Instagram">
-                  <Instagram size={20} />
-                </a>
-              )}
-              {data.socials.twitter && (
-                <a href={`https://twitter.com/${data.socials.twitter}`} target="_blank" rel="noreferrer" className="p-3 bg-zinc-900 rounded-full hover:bg-sky-500 hover:text-white transition-colors duration-300" title="Twitter/X">
-                  <Twitter size={20} />
-                </a>
-              )}
-              {data.socials.youtube && (
-                <a href={data.socials.youtube} target="_blank" rel="noreferrer" className="p-3 bg-zinc-900 rounded-full hover:bg-red-600 hover:text-white transition-colors duration-300" title="YouTube">
-                  <Youtube size={20} />
-                </a>
-              )}
-              {data.socials.linkedin && (
-                <a href={data.socials.linkedin} target="_blank" rel="noreferrer" className="p-3 bg-zinc-900 rounded-full hover:bg-[#0077b5] hover:text-white transition-colors duration-300" title="LinkedIn">
-                  <Linkedin size={20} />
-                </a>
-              )}
-              {data.socials.discord && (
-                 <div className="p-3 bg-zinc-900 rounded-full hover:bg-[#5865F2] hover:text-white transition-colors duration-300 cursor-help" title={`Discord: ${data.socials.discord}`}>
-                   <Disc size={20} />
+           {/* 1. Profile Card (Large) */}
+           <motion.div variants={fadeInUp} className="col-span-1 md:col-span-2 lg:col-span-2 row-span-2 bg-zinc-900/40 backdrop-blur-md border border-zinc-800/60 rounded-3xl p-8 flex flex-col justify-between group overflow-hidden relative">
+              <div className="absolute inset-0 bg-gradient-to-br from-zinc-800/10 to-transparent pointer-events-none"></div>
+              
+              <div className="flex items-start justify-between relative z-10">
+                 <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-zinc-700/50 shadow-lg">
+                    <img src={data.profileImage} className="w-full h-full object-cover" alt="Profile"/>
                  </div>
-              )}
-            </div>
-          </div>
-        </motion.aside>
-
-        {/* === Right Content (Scrollable) === */}
-        <div className="flex-1 lg:ml-[400px] xl:ml-[450px] p-6 lg:p-12 xl:p-16 space-y-20">
-          
-          <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
-          >
-            {/* Showreel Section */}
-            <motion.section variants={itemVariants} className="space-y-6">
-              <h2 className="text-3xl font-display font-bold">Showreels</h2>
-              <div className="relative aspect-video rounded-3xl overflow-hidden group bg-zinc-900 ring-1 ring-zinc-800">
-                 {data.showreelLink ? (
-                    <VideoPlayer src={data.showreelLink} thumbnail={data.showreelThumbnail} />
-                 ) : (
-                    <img src={data.showreelThumbnail} className="w-full h-full object-cover opacity-50"/>
-                 )}
-                 <div className="absolute bottom-6 left-6 pointer-events-none">
-                    <span className="text-xs font-mono uppercase tracking-widest text-zinc-400 mb-1 block">Featured Work</span>
-                    <h3 className="text-xl font-bold">2024 Visual Anthology</h3>
+                 <div className="bg-green-500/10 text-green-500 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border border-green-500/20 flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                    Available
                  </div>
               </div>
-            </motion.section>
 
-            {/* Editing Tools */}
-            <motion.section variants={itemVariants} className="space-y-6 mt-16">
-              <h2 className="text-3xl font-display font-bold">Editing Arsenal</h2>
-              <div className="flex flex-wrap gap-3">
-                {data.tools.map((tool, i) => (
-                  <span key={i} className="px-5 py-3 bg-zinc-900 border border-zinc-800 rounded-xl text-zinc-300 font-medium hover:border-zinc-600 hover:text-white transition-colors cursor-default flex items-center gap-2">
-                    {tool.includes('Premiere') && <span className="text-purple-500 font-bold text-xs bg-purple-500/10 px-1 rounded">Pr</span>}
-                    {tool.includes('After') && <span className="text-blue-500 font-bold text-xs bg-blue-500/10 px-1 rounded">Ae</span>}
+              <div className="mt-8 relative z-10">
+                 <h1 className="text-4xl lg:text-5xl font-display font-bold mb-2 tracking-tight leading-[0.9]">
+                    {data.name}
+                 </h1>
+                 <p className="text-xl text-indigo-400 font-medium">{data.role}</p>
+                 <p className="mt-4 text-zinc-400 text-sm max-w-md leading-relaxed">
+                    {data.bio}
+                 </p>
+              </div>
+           </motion.div>
+
+           {/* 2. Stats/Location */}
+           <motion.div variants={fadeInUp} className="col-span-1 bg-zinc-900/40 backdrop-blur-md border border-zinc-800/60 rounded-3xl p-6 flex flex-col justify-center relative overflow-hidden group hover:bg-zinc-900/60 transition-colors">
+              <MapPin className="text-zinc-600 mb-2 group-hover:text-indigo-400 transition-colors" />
+              <h3 className="text-zinc-500 text-xs uppercase tracking-widest mb-1">Based In</h3>
+              <p className="text-xl font-bold">{data.location}</p>
+           </motion.div>
+
+           {/* 3. Languages */}
+           <motion.div variants={fadeInUp} className="col-span-1 bg-zinc-900/40 backdrop-blur-md border border-zinc-800/60 rounded-3xl p-6 flex flex-col justify-center relative overflow-hidden group hover:bg-zinc-900/60 transition-colors">
+              <Globe className="text-zinc-600 mb-2 group-hover:text-indigo-400 transition-colors" />
+              <h3 className="text-zinc-500 text-xs uppercase tracking-widest mb-1">Languages</h3>
+              <p className="text-lg font-bold leading-tight">{data.languages}</p>
+           </motion.div>
+
+           {/* 4. Social Dock */}
+           <motion.div variants={fadeInUp} className="col-span-1 md:col-span-3 lg:col-span-2 bg-zinc-900/40 backdrop-blur-md border border-zinc-800/60 rounded-3xl p-6 flex items-center justify-between">
+              <span className="text-zinc-500 text-xs uppercase tracking-widest hidden sm:block">Connect</span>
+              <div className="flex gap-2 flex-wrap">
+                 {Object.entries(data.socials).map(([key, value]) => {
+                    if (!value || key === 'email') return null;
+                    const icons: any = { instagram: Instagram, twitter: Twitter, youtube: Youtube, linkedin: Linkedin, discord: Disc };
+                    const Icon = icons[key];
+                    return (
+                       <a key={key} href={key === 'discord' ? '#' : `https://${key}.com/${value}`} target="_blank" rel="noreferrer" className="w-10 h-10 bg-zinc-800 rounded-full flex items-center justify-center text-zinc-400 hover:bg-white hover:text-black hover:scale-110 transition-all">
+                          {Icon && <Icon size={18} />}
+                       </a>
+                    );
+                 })}
+                 <a href={`mailto:${data.socials.email}`} className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center text-white hover:bg-indigo-500 hover:scale-110 transition-all shadow-lg shadow-indigo-500/20">
+                    <Mail size={18} />
+                 </a>
+              </div>
+           </motion.div>
+        </motion.div>
+
+        {/* Showreel Section (Cinematic Width) */}
+        <motion.div 
+           initial={{ opacity: 0, scale: 0.95 }}
+           whileInView={{ opacity: 1, scale: 1 }}
+           viewport={{ once: true }}
+           transition={{ duration: 0.8 }}
+           className="mb-24"
+        >
+           <div className="flex items-end justify-between mb-6 px-2">
+              <h2 className="text-3xl font-display font-bold">Showreel</h2>
+              <div className="text-xs font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-2">
+                 <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                 Latest Cut
+              </div>
+           </div>
+           
+           <div className="relative aspect-[21/9] rounded-3xl overflow-hidden shadow-2xl border border-zinc-800 bg-zinc-900">
+               {data.showreelLink ? (
+                  <VideoPlayer src={data.showreelLink} thumbnail={data.showreelThumbnail} />
+               ) : (
+                  <img src={data.showreelThumbnail} className="w-full h-full object-cover opacity-50"/>
+               )}
+           </div>
+        </motion.div>
+
+        {/* Tools & Skills Marquee (Visual) */}
+        <motion.div 
+           initial={{ opacity: 0, y: 20 }}
+           whileInView={{ opacity: 1, y: 0 }}
+           viewport={{ once: true }}
+           className="mb-24"
+        >
+           <div className="flex flex-wrap justify-center gap-4 opacity-70">
+              {[...data.tools, ...data.aiTools].map((tool, i) => (
+                 <span key={i} className="px-6 py-3 rounded-full border border-zinc-800 bg-zinc-900/50 text-zinc-400 text-sm font-medium hover:border-zinc-600 hover:text-white transition-colors cursor-default">
                     {tool}
-                  </span>
-                ))}
-              </div>
-            </motion.section>
+                 </span>
+              ))}
+           </div>
+        </motion.div>
 
-            {/* AI Tools */}
-             <motion.section variants={itemVariants} className="space-y-6 mt-12">
-              <h2 className="text-3xl font-display font-bold flex items-center gap-3">
-                AI Integrations
-                <span className="text-xs bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-2 py-0.5 rounded-md font-mono">NEXT GEN</span>
-              </h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {data.aiTools.map((tool, i) => (
-                  <div key={i} className="group relative overflow-hidden bg-zinc-900 border border-zinc-800 rounded-xl p-4 hover:border-zinc-600 transition-colors">
-                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-                     <span className="relative z-10 font-medium text-zinc-300 group-hover:text-white">{tool}</span>
-                  </div>
-                ))}
-              </div>
-            </motion.section>
-
-            {/* Testimonials Section */}
-            {data.testimonials.length > 0 && (
-              <motion.section variants={itemVariants} className="space-y-8 mt-20">
-                 <h2 className="text-3xl font-display font-bold">Client Words</h2>
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {data.testimonials.map(t => (
-                       <div key={t.id} className="p-6 bg-zinc-900/50 border border-zinc-800/50 rounded-2xl relative">
-                          <div className="text-4xl text-zinc-700 font-serif absolute top-4 left-4">“</div>
-                          <p className="text-zinc-300 italic mb-4 relative z-10 pt-4">{t.quote}</p>
-                          <div>
-                             <p className="font-bold text-white">{t.name}</p>
-                             <p className="text-xs text-zinc-500 uppercase tracking-wider">{t.role}</p>
+        {/* Selected Works Grid */}
+        <div className="mb-24">
+           <h2 className="text-3xl font-display font-bold mb-10 px-2">Selected Works</h2>
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {data.projects.map((project, idx) => (
+                 <motion.div
+                    key={project.id}
+                    initial={{ opacity: 0, y: 30 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.1 }}
+                    viewport={{ once: true }}
+                    onClick={() => setSelectedProject(project)}
+                    className="group cursor-pointer"
+                 >
+                    <div className="relative aspect-video rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-800 mb-4 shadow-lg group-hover:shadow-indigo-500/10 transition-shadow">
+                       <img src={project.thumbnail} alt={project.title} className="w-full h-full object-cover opacity-90 group-hover:opacity-100 group-hover:scale-105 transition-all duration-700" />
+                       <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                          <div className="w-14 h-14 bg-white/10 backdrop-blur rounded-full flex items-center justify-center border border-white/20 opacity-0 group-hover:opacity-100 transform scale-75 group-hover:scale-100 transition-all duration-300">
+                             <Play fill="white" className="ml-1 text-white" size={24} />
                           </div>
                        </div>
-                    ))}
-                 </div>
-              </motion.section>
-            )}
+                    </div>
+                    <div className="px-1">
+                       <div className="flex justify-between items-start">
+                          <h3 className="text-xl font-bold group-hover:text-indigo-400 transition-colors">{project.title}</h3>
+                          <span className="text-[10px] font-mono border border-zinc-800 px-2 py-0.5 rounded text-zinc-500 uppercase">{project.category}</span>
+                       </div>
+                       <p className="text-zinc-500 text-sm mt-2 line-clamp-2">{project.description}</p>
+                    </div>
+                 </motion.div>
+              ))}
+           </div>
+        </div>
 
-            {/* My Work / Gallery */}
-            <motion.section variants={itemVariants} className="space-y-8 mt-20">
-              <div className="flex items-end justify-between">
-                <h2 className="text-3xl font-display font-bold">Selected Works</h2>
-                <span className="text-zinc-500 font-mono text-sm hidden sm:block">CLICK TO VIEW</span>
-              </div>
-              
+        {/* Testimonials */}
+        {data.testimonials.length > 0 && (
+           <div className="mb-24">
+              <h2 className="text-3xl font-display font-bold mb-10 px-2 text-center">Endorsements</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {data.projects.map((project) => (
-                  <div 
-                    key={project.id} 
-                    onClick={() => setSelectedProject(project)}
-                    className="group relative rounded-2xl overflow-hidden bg-zinc-900 aspect-[4/5] md:aspect-[3/4] cursor-pointer ring-1 ring-zinc-800 hover:ring-zinc-500 transition-all"
-                  >
-                    <img src={project.thumbnail} alt={project.title} className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 opacity-80 group-hover:opacity-100" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent opacity-90 group-hover:opacity-80 transition-opacity duration-300"></div>
-                    
-                    {/* Play Icon Overlay */}
-                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 transform scale-90 group-hover:scale-100">
-                       <div className="w-16 h-16 bg-white/20 backdrop-blur rounded-full flex items-center justify-center border border-white/30">
-                          <Play fill="white" className="ml-1 text-white" />
+                 {data.testimonials.map((t) => (
+                    <div key={t.id} className="bg-zinc-900/30 border border-zinc-800 p-8 rounded-3xl relative">
+                       <p className="text-lg text-zinc-300 italic mb-6">"{t.quote}"</p>
+                       <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center font-bold text-white text-sm">
+                             {t.name.charAt(0)}
+                          </div>
+                          <div>
+                             <p className="font-bold text-white text-sm">{t.name}</p>
+                             <p className="text-xs text-zinc-500">{t.role}</p>
+                          </div>
                        </div>
                     </div>
-
-                    <div className="absolute bottom-0 left-0 right-0 p-6 translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
-                      <span className="inline-block px-2 py-1 bg-white/10 backdrop-blur-md rounded text-xs font-mono mb-2">{project.category}</span>
-                      <h3 className="text-2xl font-bold leading-tight mb-2">{project.title}</h3>
-                    </div>
-                  </div>
-                ))}
+                 ))}
               </div>
-            </motion.section>
+           </div>
+        )}
 
-            {/* Contact Form */}
-            <motion.section variants={itemVariants} className="space-y-8 mt-24 pt-10 border-t border-zinc-900">
-              <div className="max-w-xl">
-                 <h2 className="text-3xl font-display font-bold mb-2">Get In Touch</h2>
-                 <p className="text-zinc-400 mb-8">Have a project in mind? Let's create something cinematic together.</p>
-                 
-                 <form onSubmit={handleContactSubmit} className="space-y-4">
-                    <div>
-                       <input 
-                         type="text" 
-                         placeholder="Your Name" 
-                         required
-                         value={formState.name}
-                         onChange={e => setFormState({...formState, name: e.target.value})}
-                         className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-zinc-600 transition-colors"
-                       />
-                    </div>
-                    <div>
-                       <input 
-                         type="email" 
-                         placeholder="Your Email" 
-                         required
-                         value={formState.email}
-                         onChange={e => setFormState({...formState, email: e.target.value})}
-                         className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-zinc-600 transition-colors"
-                       />
-                    </div>
-                    <div>
-                       <textarea 
-                         placeholder="Tell me about your project..." 
-                         required
-                         rows={4}
-                         value={formState.message}
-                         onChange={e => setFormState({...formState, message: e.target.value})}
-                         className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-zinc-600 transition-colors resize-none"
-                       ></textarea>
-                    </div>
-                    <Button type="submit" size="lg" className="w-full md:w-auto">
-                       Send Message <Send size={16} className="ml-2"/>
-                    </Button>
-                 </form>
+        {/* Contact Footer */}
+        <footer className="border-t border-zinc-900 pt-20">
+           <div className="bg-zinc-900/50 border border-zinc-800 rounded-3xl p-8 md:p-16 text-center max-w-4xl mx-auto">
+              <h2 className="text-3xl md:text-4xl font-display font-bold mb-4">Ready to collaborate?</h2>
+              <p className="text-zinc-400 mb-8 max-w-lg mx-auto">I'm currently available for freelance projects and long-term partnerships. Let's make something loud.</p>
+              
+              <div className="flex flex-col md:flex-row justify-center gap-4">
+                 <button onClick={() => document.getElementById('contact-form')?.scrollIntoView({ behavior: 'smooth' })} className="px-8 py-4 bg-white text-black font-bold rounded-xl hover:bg-zinc-200 transition-colors">
+                    Start a Project
+                 </button>
+                 <a href={`mailto:${data.contactEmail}`} className="px-8 py-4 border border-zinc-700 hover:border-zinc-500 text-white font-medium rounded-xl transition-colors">
+                    {data.contactEmail}
+                 </a>
               </div>
-            </motion.section>
+           </div>
+           
+           <div className="mt-20 flex justify-between items-center text-xs text-zinc-600 font-mono uppercase tracking-widest px-2">
+              <p>Varun Shetty © 2024</p>
+              <p>Powered by CineFolio</p>
+           </div>
+        </footer>
 
-            {/* Footer */}
-            <motion.footer variants={itemVariants} className="pt-20 pb-10 border-t border-zinc-900 mt-20 text-center md:text-left">
-              <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-                <p className="text-zinc-600 text-sm">© {new Date().getFullYear()} {data.name}. All rights reserved.</p>
-                <div className="text-zinc-700 text-xs font-mono uppercase tracking-widest">
-                  Made with CineFolio
-                </div>
-              </div>
-            </motion.footer>
-
-          </motion.div>
-        </div>
       </div>
     </div>
   );
