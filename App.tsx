@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { PortfolioView } from './components/PortfolioView';
 import { EditorPanel } from './components/EditorPanel';
 import { PortfolioData, INITIAL_DATA } from './types';
@@ -6,6 +6,23 @@ import { loadFromDB, saveToDB } from './utils';
 import { Code, Database, Lock, ArrowRight, CheckCircle, LayoutTemplate } from 'lucide-react';
 import { Button } from './components/ui/Button';
 import { Input } from './components/ui/Input';
+
+// Helper to safely manipulate hash in restricted environments (e.g. Blob URLs)
+const safeSetHash = (hash: string) => {
+  try {
+    window.location.hash = hash;
+  } catch (e) {
+    // Ignore error in restricted environments
+  }
+};
+
+const getHash = () => {
+  try {
+    return window.location.hash;
+  } catch (e) {
+    return '';
+  }
+};
 
 const App: React.FC = () => {
   // Routes: 'home' (login), 'editor', 'public'
@@ -17,27 +34,39 @@ const App: React.FC = () => {
   const [username, setUsername] = useState('');
   const [authError, setAuthError] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  
+  // Use ref to access current auth state in event listeners without re-binding
+  const authRef = useRef(isAuthenticated);
 
   // Editor State
   const [isSaving, setIsSaving] = useState(false);
   const [showMobileEditor, setShowMobileEditor] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
+  // Sync ref
+  useEffect(() => {
+    authRef.current = isAuthenticated;
+  }, [isAuthenticated]);
+
   // --- Initialization & Routing ---
   useEffect(() => {
     const handleHashChange = () => {
-      const hash = window.location.hash;
+      const hash = getHash();
       
       if (hash.startsWith('#u/')) {
         setRoute('public');
       } else if (hash === '#editor') {
-        if (isAuthenticated) {
+        if (authRef.current) {
           setRoute('editor');
         } else {
-          window.location.hash = ''; // Redirect to login if not auth
+          safeSetHash(''); // Try to clear hash if unauthorized
           setRoute('home');
         }
       } else {
+        // If hash is empty or unknown, go home
+        // Note: In strict environments where setting hash fails, the hash might remain empty 
+        // even after logging in. However, handleLogin sets route manually.
+        // We only want to force home if the EVENT fired and hash is effectively empty.
         setRoute('home');
       }
     };
@@ -49,21 +78,36 @@ const App: React.FC = () => {
       } else {
         setData(INITIAL_DATA);
       }
-      handleHashChange();
+      
+      // Initial Route Check
+      const hash = getHash();
+      if (hash.startsWith('#u/')) {
+        setRoute('public');
+      } else if (hash === '#editor' && authRef.current) {
+         setRoute('editor');
+      } else if (hash === '#editor' && !authRef.current) {
+         // Trying to access editor without auth
+         setRoute('home');
+         safeSetHash('');
+      } else {
+         // Default
+         setRoute('home');
+      }
     });
 
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
-  }, [isAuthenticated]);
+  }, []);
 
   // --- Handlers ---
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    // Simple mock authentication
     if (username.toLowerCase() === 'admin' && password === 'cinefolio') {
       setIsAuthenticated(true);
-      window.location.hash = '#editor';
+      // We manually set route because safeSetHash might fail in sandbox
+      setRoute('editor'); 
+      safeSetHash('#editor'); 
     } else {
       setAuthError('Invalid credentials. Try "admin" / "cinefolio"');
     }
@@ -75,7 +119,6 @@ const App: React.FC = () => {
     try {
       await saveToDB(data);
       setHasUnsavedChanges(false);
-      // Simulate network delay for effect
       setTimeout(() => setIsSaving(false), 800);
     } catch (e) {
       console.error("Save failed", e);
@@ -88,6 +131,12 @@ const App: React.FC = () => {
     setData(newData);
     setHasUnsavedChanges(true);
   };
+  
+  const handleCreateOwn = () => {
+      setRoute('home');
+      safeSetHash('');
+      setIsAuthenticated(false);
+  };
 
   // --- Views ---
 
@@ -95,7 +144,22 @@ const App: React.FC = () => {
 
   // 1. Public Portfolio View
   if (route === 'public') {
-    return <PortfolioView data={data} />;
+    return (
+        <>
+            <PortfolioView data={data} />
+             {/* Floating Edit Button for viewers */}
+            <div className="fixed bottom-6 right-6 z-50">
+               <Button 
+                 variant="secondary" 
+                 size="sm"
+                 onClick={handleCreateOwn}
+                 className="shadow-2xl opacity-50 hover:opacity-100"
+               >
+                 Create Your Own
+               </Button>
+            </div>
+        </>
+    );
   }
 
   // 2. Editor Dashboard

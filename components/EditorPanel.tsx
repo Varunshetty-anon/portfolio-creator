@@ -27,13 +27,24 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
 
   // --- Link Generator ---
   const getPublicLink = () => {
-    return `${window.location.origin}${window.location.pathname}#u/portfolio`;
+    try {
+        // Handle opaque origins (blob/null) gracefully
+        const origin = window.location.origin === 'null' || !window.location.origin ? 'https://cinefolio.app' : window.location.origin;
+        return `${origin}${window.location.pathname}#u/portfolio`;
+    } catch {
+        return 'https://cinefolio.app/portfolio#u/portfolio';
+    }
   };
 
   const copyLink = () => {
-    navigator.clipboard.writeText(getPublicLink());
-    setCopySuccess(true);
-    setTimeout(() => setCopySuccess(false), 2000);
+    try {
+      navigator.clipboard.writeText(getPublicLink());
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    } catch (e) {
+      console.warn('Clipboard write failed', e);
+      alert('Could not access clipboard. Please copy the link manually.');
+    }
   };
 
   // --- Project Helpers ---
