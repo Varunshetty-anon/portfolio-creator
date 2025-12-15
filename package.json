@@ -1,5 +1,5 @@
 {
-  "name": "cinefolio---portfolio-creator",
+  "name": "frames---portfolio-creator",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -12,7 +12,8 @@
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "lucide-react": "^0.561.0",
-    "framer-motion": "^12.23.26"
+    "framer-motion": "^12.23.26",
+    "react-easy-crop": "5.0.7"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

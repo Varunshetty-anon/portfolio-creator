@@ -7,6 +7,7 @@ export interface Project {
   link: string; // YouTube/Vimeo link or Blob URL
   customVideoBlob?: Blob; // For local DB storage
   category: string;
+  aspectRatio?: '16:9' | '9:16'; // Support for vertical video
 }
 
 export interface Testimonial {
@@ -37,12 +38,22 @@ export interface PortfolioData {
   showreelThumbnail: string;
   showreelThumbnailBlob?: Blob; // For local DB storage
   showreelLink: string;
+  showreelBlob?: Blob; // For local DB storage - NEW
   socials: Socials;
   testimonials: Testimonial[];
   skills: string[];
+  primaryTool: string; // New field for the hero card
   tools: string[];
   aiTools: string[];
   projects: Project[];
+  availability: {
+    status: boolean; // true = Available, false = Busy
+    link?: string;   // Optional link to current project if busy
+  };
+  settings: {
+    username: string;
+    password: string;
+  };
 }
 
 export const INITIAL_DATA: PortfolioData = {
@@ -62,6 +73,10 @@ export const INITIAL_DATA: PortfolioData = {
     linkedin: "varunshetty",
     youtube: "varunshettyvlogs"
   },
+  availability: {
+    status: true,
+    link: ""
+  },
   testimonials: [
     {
       id: "1",
@@ -77,7 +92,8 @@ export const INITIAL_DATA: PortfolioData = {
     }
   ],
   skills: ["Color Grading", "Sound Design", "Motion Graphics", "Storytelling"],
-  tools: ["Adobe Premiere Pro", "Adobe After Effects", "DaVinci Resolve"],
+  primaryTool: "DaVinci Resolve",
+  tools: ["Adobe Premiere Pro", "Adobe After Effects", "Final Cut Pro"],
   aiTools: ["RunwayML", "Google Veo", "Midjourney"],
   projects: [
     {
@@ -87,6 +103,7 @@ export const INITIAL_DATA: PortfolioData = {
       thumbnail: "https://picsum.photos/id/238/600/800",
       link: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
       category: "Reels",
+      aspectRatio: "9:16"
     },
     {
       id: "2",
@@ -95,6 +112,11 @@ export const INITIAL_DATA: PortfolioData = {
       thumbnail: "https://picsum.photos/id/249/600/800",
       link: "https://www.youtube.com/watch?v=dQw4w9WgXcQ", // Placeholder valid external link for shareability
       category: "Long Form",
+      aspectRatio: "16:9"
     },
   ],
+  settings: {
+    username: "admin",
+    password: "cinefolio"
+  }
 };
