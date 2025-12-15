@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { PortfolioView } from './components/PortfolioView';
 import { EditorPanel } from './components/EditorPanel';
 import { PortfolioData, INITIAL_DATA } from './types';
-import { loadFromDB, saveToDB, decodeState } from './utils';
-import { Code, Database, Lock, ArrowRight, CheckCircle, LayoutTemplate, Eye, EyeOff } from 'lucide-react';
+import { loadFromDB, saveToDB, decodeState, isConfigured } from './utils';
+import { Code, Database, Lock, ArrowRight, CheckCircle, LayoutTemplate, Eye, EyeOff, HardDrive } from 'lucide-react';
 import { Button } from './components/ui/Button';
 import { Input } from './components/ui/Input';
 
@@ -94,10 +94,10 @@ const App: React.FC = () => {
     };
 
     // Load DB Data only if we aren't already viewing shared data
-    // (This helps prevent overwriting shared view on hash change if we navigated internally)
     if (!isSharedView) {
         loadFromDB().then((dbData) => {
           if (dbData) {
+            // Ensure settings object exists if loading old data
             if (!dbData.settings) {
                 dbData.settings = INITIAL_DATA.settings;
             }
@@ -106,6 +106,10 @@ const App: React.FC = () => {
             setData(INITIAL_DATA);
           }
           handleRoute();
+        }).catch(err => {
+            console.error("Initialization error:", err);
+            setData(INITIAL_DATA);
+            handleRoute();
         });
     }
 
@@ -159,7 +163,7 @@ const App: React.FC = () => {
     } catch (e) {
       console.error("Save failed", e);
       setIsSaving(false);
-      alert("Failed to save to local database.");
+      alert("Failed to save. Check console for details.");
     }
   };
 
@@ -169,12 +173,11 @@ const App: React.FC = () => {
   };
   
   const handleCreateOwn = () => {
-      // Reset to home, clear hash, clear auth
       safeSetHash('');
       setRoute('home');
       setIsAuthenticated(false);
       sessionStorage.removeItem('frames_auth');
-      window.location.reload(); // Hard reload to clear state and ensure DB load
+      window.location.reload(); 
   };
 
   // --- Views ---
@@ -186,7 +189,6 @@ const App: React.FC = () => {
     return (
         <>
             <PortfolioView data={data} />
-             {/* Floating Edit Button for viewers */}
             <div className="fixed bottom-6 right-6 z-50">
                <Button 
                  variant="secondary" 
@@ -251,8 +253,8 @@ const App: React.FC = () => {
 
             <div className="flex items-center gap-4">
                <div className="hidden md:flex items-center gap-2 text-xs font-mono text-zinc-600">
-                  <Database size={12} />
-                  {isSaving ? 'Syncing...' : 'Local Storage Active'}
+                  {isConfigured ? <Database size={12} /> : <HardDrive size={12} />}
+                  {isSaving ? 'Syncing...' : (isConfigured ? 'Firestore Active' : 'Local Storage')}
                </div>
                <Button 
                  variant={hasUnsavedChanges ? "primary" : "secondary"}

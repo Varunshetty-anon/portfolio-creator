@@ -1,8 +1,12 @@
 import { PortfolioData, INITIAL_DATA } from './types';
+import { db, isConfigured } from './firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
-const DB_NAME = 'CineFolioDB';
-const DB_VERSION = 1;
-const STORE_NAME = 'portfolio_store';
+const COLLECTION_NAME = 'portfolios';
+const MAIN_DOC_ID = 'main_portfolio';
+const LOCAL_STORAGE_KEY = 'frames_portfolio_data';
+
+export { isConfigured };
 
 // --- Brand Helpers ---
 
@@ -29,19 +33,19 @@ export const getIconSlug = (name: string): string => {
     if (n.includes('lightroom')) return 'adobelightroom';
     if (n.includes('audition')) return 'adobeaudition';
     if (n.includes('creativecloud')) return 'adobecreativecloud';
-    if (n.includes('finalcut')) return 'apple'; // No specific FCP icon usually, Apple is close
+    if (n.includes('finalcut')) return 'apple';
     if (n.includes('unreal')) return 'unrealengine';
     if (n.includes('c4d') || n.includes('cinema4d')) return 'cinema4d';
     if (n.includes('substance')) return 'adobe-substance-3d-painter';
     
-    return n; // Fallback to cleaned name (often works for 'blender', 'figma', etc)
+    return n;
 };
 
 export const getBrandColor = (name: string): string => {
     const n = name.toLowerCase();
     
     // Specific Brand Colors
-    if (n.includes('davinci') || n.includes('resolve')) return '#ff4747'; // Mixed but red/blue/green usually, defaulting to a vibrant red/pink
+    if (n.includes('davinci') || n.includes('resolve')) return '#ff4747';
     if (n.includes('premiere')) return '#9999FF';
     if (n.includes('after')) return '#9999FF';
     if (n.includes('photoshop')) return '#31A8FF';
@@ -58,20 +62,16 @@ export const getBrandColor = (name: string): string => {
     if (n.includes('final')) return '#F6ADF6'; 
     if (n.includes('avid')) return '#6600cc';
 
-    // Fallback: Generate one
     return stringToColor(name);
 };
 
-
 // --- State Encoding/Decoding ---
 
-// Helper to encode state to Base64 for sharing via URL
 export const encodeState = (data: PortfolioData): string => {
   try {
-    // Clean data for sharing: remove Blobs and local-only URLs
     const cleanProjects = data.projects.map(p => {
-        const isLocal = p.link.startsWith('blob:') || p.link.length > 500; // arbitrary length check for base64 data uris
-        const isThumbLocal = p.thumbnail.startsWith('blob:') || p.thumbnail.length > 500;
+        const isLocal = p.link.startsWith('blob:') || p.link.length > 50000;
+        const isThumbLocal = p.thumbnail.startsWith('blob:') || p.thumbnail.length > 50000;
         return {
             ...p,
             link: isLocal ? '' : p.link, 
@@ -81,10 +81,9 @@ export const encodeState = (data: PortfolioData): string => {
         };
     });
     
-    // Check if showreel is local
-    const isShowreelLocal = data.showreelLink.startsWith('blob:') || data.showreelLink.length > 500;
-    const isProfileLocal = data.profileImage.startsWith('blob:') || data.profileImage.length > 500;
-    const isReelThumbLocal = data.showreelThumbnail.startsWith('blob:') || data.showreelThumbnail.length > 500;
+    const isShowreelLocal = data.showreelLink.startsWith('blob:') || data.showreelLink.length > 50000;
+    const isProfileLocal = data.profileImage.startsWith('blob:') || data.profileImage.length > 50000;
+    const isReelThumbLocal = data.showreelThumbnail.startsWith('blob:') || data.showreelThumbnail.length > 50000;
 
     const cleanData = {
         ...data,
@@ -105,13 +104,11 @@ export const encodeState = (data: PortfolioData): string => {
   }
 };
 
-// Helper to decode state from URL
 export const decodeState = (encoded: string): PortfolioData | null => {
   try {
     const json = decodeURIComponent(atob(encoded));
     const parsed = JSON.parse(json);
     
-    // Merge with structure to ensure all fields exist (migrations)
     return {
         ...INITIAL_DATA,
         ...parsed,
@@ -125,12 +122,11 @@ export const decodeState = (encoded: string): PortfolioData | null => {
   }
 };
 
-// Helper to crop image
 export const getCroppedImg = (imageSrc: string, pixelCrop: { x: number; y: number; width: number; height: number }): Promise<Blob> => {
   return new Promise((resolve, reject) => {
     const image = new Image();
     image.src = imageSrc;
-    image.crossOrigin = 'anonymous'; // helpful for external images
+    image.crossOrigin = 'anonymous'; 
     
     image.onload = () => {
       const canvas = document.createElement('canvas');
@@ -138,25 +134,10 @@ export const getCroppedImg = (imageSrc: string, pixelCrop: { x: number; y: numbe
       if (!ctx) {
         return reject(new Error('No 2d context'));
       }
-
-      // set canvas size to match the bounding box
       canvas.width = pixelCrop.width;
       canvas.height = pixelCrop.height;
+      ctx.drawImage(image, pixelCrop.x, pixelCrop.y, pixelCrop.width, pixelCrop.height, 0, 0, pixelCrop.width, pixelCrop.height);
 
-      // draw the cropped image
-      ctx.drawImage(
-        image,
-        pixelCrop.x,
-        pixelCrop.y,
-        pixelCrop.width,
-        pixelCrop.height,
-        0,
-        0,
-        pixelCrop.width,
-        pixelCrop.height
-      );
-
-      // As Blob
       canvas.toBlob((blob) => {
         if (!blob) {
           reject(new Error('Canvas is empty'));
@@ -170,7 +151,6 @@ export const getCroppedImg = (imageSrc: string, pixelCrop: { x: number; y: numbe
   });
 };
 
-// Helper to generate thumbnail from video file
 export const generateThumbnailFromVideo = (file: File): Promise<{ url: string; blob: Blob }> => {
   return new Promise((resolve, reject) => {
     const video = document.createElement("video");
@@ -178,8 +158,6 @@ export const generateThumbnailFromVideo = (file: File): Promise<{ url: string; b
     video.src = URL.createObjectURL(file);
     video.muted = true;
     video.playsInline = true;
-    
-    // Seek to 1s to avoid black frame at start
     video.currentTime = 1;
 
     const onSeeked = () => {
@@ -202,7 +180,6 @@ export const generateThumbnailFromVideo = (file: File): Promise<{ url: string; b
             } else {
                 reject(new Error("Thumbnail generation failed"));
             }
-            // Cleanup
             video.removeEventListener('seeked', onSeeked);
             URL.revokeObjectURL(video.src);
         }, 'image/jpeg', 0.85);
@@ -212,97 +189,118 @@ export const generateThumbnailFromVideo = (file: File): Promise<{ url: string; b
     };
 
     video.addEventListener('seeked', onSeeked);
-    
     video.onerror = () => {
         reject(new Error("Video load error"));
     };
   });
 };
 
-// --- IndexedDB Database Operations ---
+// --- Storage Operations ---
 
-const openDB = (): Promise<IDBDatabase> => {
+// Helper: Convert Blob to Base64 String
+const blobToBase64 = (blob: Blob): Promise<string> => {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-    
-    request.onupgradeneeded = (event) => {
-      const db = (event.target as IDBOpenDBRequest).result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME, { keyPath: 'id' });
-      }
-    };
-
-    request.onsuccess = (event) => {
-      resolve((event.target as IDBOpenDBRequest).result);
-    };
-
-    request.onerror = (event) => {
-      reject((event.target as IDBOpenDBRequest).error);
-    };
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
   });
 };
 
 export const saveToDB = async (data: PortfolioData): Promise<void> => {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(STORE_NAME, 'readwrite');
-    const store = transaction.objectStore(STORE_NAME);
-    
-    // We store the data with a fixed ID 'current'
-    // IndexedDB can store Blob objects natively.
-    const request = store.put({ id: 'current', ...data });
+  // Deep clone to prepare for serialization
+  const dataToSave: any = { ...data };
 
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-  });
+  // --- 1. IMAGE CONVERSION (Blob -> Base64) ---
+  if (dataToSave.profileImageBlob) {
+    dataToSave.profileImage = await blobToBase64(dataToSave.profileImageBlob);
+  }
+  delete dataToSave.profileImageBlob;
+
+  if (dataToSave.showreelThumbnailBlob) {
+    dataToSave.showreelThumbnail = await blobToBase64(dataToSave.showreelThumbnailBlob);
+  }
+  delete dataToSave.showreelThumbnailBlob;
+
+  // --- 2. VIDEO HANDLING ---
+  if (dataToSave.showreelBlob) {
+      if (dataToSave.showreelLink && dataToSave.showreelLink.startsWith('blob:')) {
+         dataToSave.showreelLink = ""; 
+      }
+  }
+  delete dataToSave.showreelBlob;
+
+  // Projects Processing
+  if (dataToSave.projects) {
+      dataToSave.projects = await Promise.all(dataToSave.projects.map(async (p: any) => {
+          const newP = { ...p };
+          
+          if (newP.thumbnailBlob) {
+              newP.thumbnail = await blobToBase64(newP.thumbnailBlob);
+          }
+          delete newP.thumbnailBlob;
+
+          if (newP.customVideoBlob) {
+              if (newP.link && newP.link.startsWith('blob:')) {
+                  newP.link = "";
+              }
+          }
+          delete newP.customVideoBlob;
+          
+          return newP;
+      }));
+  }
+
+  // --- 3. SAVE ---
+  
+  // Try Firestore if configured
+  if (isConfigured && db) {
+      try {
+          await setDoc(doc(db, COLLECTION_NAME, MAIN_DOC_ID), dataToSave);
+          return;
+      } catch (e) {
+          console.warn("Firestore save failed (offline?), falling back to Local Storage.", e);
+      }
+  } else {
+      console.log("Firebase not configured, saving to localStorage.");
+  }
+
+  // Local Storage Fallback
+  try {
+     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(dataToSave));
+  } catch (e: any) {
+     console.error("Local Storage save failed", e);
+     if (e.name === 'QuotaExceededError') {
+         alert("Storage Limit Reached: Please use external links for images/videos or compress them.");
+     }
+  }
 };
 
 export const loadFromDB = async (): Promise<PortfolioData | null> => {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(STORE_NAME, 'readonly');
-    const store = transaction.objectStore(STORE_NAME);
-    const request = store.get('current');
+  // Try Firestore if configured
+  if (isConfigured && db) {
+      try {
+        const docRef = doc(db, COLLECTION_NAME, MAIN_DOC_ID);
+        const docSnap = await getDoc(docRef);
 
-    request.onsuccess = () => {
-      const result = request.result;
-      if (result) {
-        // Rehydrate Blob URLs
-        const rehydratedData = { ...result };
-
-        // Profile Image
-        if (rehydratedData.profileImageBlob) {
-            rehydratedData.profileImage = URL.createObjectURL(rehydratedData.profileImageBlob);
+        if (docSnap.exists()) {
+          return docSnap.data() as PortfolioData;
         }
-
-        // Showreel Thumbnail
-        if (rehydratedData.showreelThumbnailBlob) {
-            rehydratedData.showreelThumbnail = URL.createObjectURL(rehydratedData.showreelThumbnailBlob);
-        }
-
-        // Showreel Video
-        if (rehydratedData.showreelBlob) {
-            rehydratedData.showreelLink = URL.createObjectURL(rehydratedData.showreelBlob);
-        }
-
-        // Projects
-        rehydratedData.projects = rehydratedData.projects.map((p: any) => {
-            const newP = { ...p };
-            if (newP.thumbnailBlob) {
-                newP.thumbnail = URL.createObjectURL(newP.thumbnailBlob);
-            }
-            if (newP.customVideoBlob) {
-                newP.link = URL.createObjectURL(newP.customVideoBlob);
-            }
-            return newP;
-        });
-
-        resolve(rehydratedData);
-      } else {
-        resolve(null);
+      } catch (e) {
+        console.warn("Firestore load failed, checking Local Storage.", e);
       }
-    };
-    
-    request.onerror = () => reject(request.error);
-  });
+  }
+
+  // Local Storage Fallback
+  const local = localStorage.getItem(LOCAL_STORAGE_KEY);
+  if (local) {
+      try {
+          return JSON.parse(local) as PortfolioData;
+      } catch (e) {
+          console.error("Error parsing local data", e);
+      }
+  }
+
+  console.log("No data found in DB or Local Storage.");
+  return null;
 };
