@@ -121,6 +121,9 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
   const [activeInputMethod, setActiveInputMethod] = useState<Record<string, 'upload' | 'link'>>({});
   const [showreelInputMethod, setShowreelInputMethod] = useState<'upload' | 'link'>(data.showreelLink.startsWith('blob:') ? 'upload' : 'link');
 
+  // Delete Confirmation State
+  const [deleteConfirmation, setDeleteConfirmation] = useState<string | null>(null);
+
   // Crop State
   const [cropModalOpen, setCropModalOpen] = useState(false);
   const [tempImgSrc, setTempImgSrc] = useState<string | null>(null);
@@ -214,17 +217,24 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
     setActiveInputMethod(prev => ({ ...prev, [newProject.id]: 'upload' }));
   };
 
-  const removeProject = (id: string, e: React.MouseEvent) => {
+  // Trigger modal
+  const requestDelete = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    e.nativeEvent.stopImmediatePropagation();
-    
-    if (window.confirm("Are you sure you want to delete this project? This action happens immediately.")) {
-        const updatedProjects = data.projects.filter(p => p.id !== id);
-        updateField('projects', updatedProjects);
+    e.preventDefault();
+    setDeleteConfirmation(id);
+  };
+
+  // Actual deletion logic
+  const confirmDelete = () => {
+    if (deleteConfirmation) {
+        const updatedProjects = data.projects.filter(p => p.id !== deleteConfirmation);
+        // Explicitly update parent state
+        onChange({ ...data, projects: updatedProjects });
         
-        if (expandedProject === id) {
+        if (expandedProject === deleteConfirmation) {
             setExpandedProject(null);
         }
+        setDeleteConfirmation(null);
     }
   };
 
@@ -381,6 +391,33 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
   return (
     <div className="h-full flex flex-col bg-zinc-950 border-r border-zinc-800 relative">
       
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmation && (
+        <div className="absolute inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-200">
+            <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl shadow-2xl w-full max-w-sm space-y-4 animate-in zoom-in-95 duration-200">
+                <div className="flex flex-col gap-2">
+                    <h3 className="text-lg font-display font-bold text-white flex items-center gap-2">
+                        <AlertCircle className="text-red-500" size={20} />
+                        Delete Project?
+                    </h3>
+                    <p className="text-sm text-zinc-400">
+                        Are you sure you want to remove this project? This action cannot be undone.
+                    </p>
+                </div>
+                <div className="flex gap-3 pt-2">
+                    <Button variant="secondary" className="flex-1" onClick={() => setDeleteConfirmation(null)}>Cancel</Button>
+                    <Button 
+                        variant="primary" 
+                        className="flex-1 bg-red-600 hover:bg-red-700 text-white border-none" 
+                        onClick={confirmDelete}
+                    >
+                        Yes, Delete
+                    </Button>
+                </div>
+            </div>
+        </div>
+      )}
+
       {/* Crop Modal */}
       {cropModalOpen && tempImgSrc && (
           <div className="absolute inset-0 z-50 bg-black flex flex-col">
@@ -699,11 +736,11 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
 
                    return (
                    <div key={project.id} className="bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden animate-in slide-in-from-top-2 duration-300">
-                     <div 
-                        className="flex items-center justify-between p-3 cursor-pointer hover:bg-zinc-800 transition-colors"
-                        onClick={() => setExpandedProject(expandedProject === project.id ? null : project.id)}
-                      >
-                       <div className="flex items-center gap-3 overflow-hidden">
+                     <div className="flex items-center justify-between p-3 hover:bg-zinc-800 transition-colors group relative">
+                       <div 
+                           className="flex items-center gap-3 overflow-hidden flex-1 cursor-pointer mr-2"
+                           onClick={() => setExpandedProject(expandedProject === project.id ? null : project.id)}
+                       >
                          <div className="w-10 h-10 rounded bg-zinc-800 flex-shrink-0 bg-cover bg-center" style={{backgroundImage: `url(${project.thumbnail})`}}></div>
                          <div className="flex flex-col overflow-hidden">
                             <span className="text-sm font-medium truncate text-white">{project.title}</span>
@@ -711,18 +748,22 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
                          </div>
                        </div>
                        
-                       <div className="flex items-center gap-2 relative z-30">
+                       <div className="flex items-center gap-1 relative z-20">
                          <button 
                             type="button"
-                            onClick={(e) => removeProject(project.id, e)} 
-                            className="w-8 h-8 flex items-center justify-center hover:bg-red-500/10 hover:text-red-500 text-zinc-500 transition-colors rounded-full"
+                            onClick={(e) => requestDelete(project.id, e)} 
+                            className="w-8 h-8 flex items-center justify-center bg-zinc-800 hover:bg-red-500/20 text-zinc-400 hover:text-red-500 transition-colors rounded-full z-20"
                             title="Delete Project"
                          >
                             <Trash2 size={16} />
                          </button>
-                         <div className="text-zinc-500">
+                         <button 
+                             type="button"
+                             className="w-8 h-8 flex items-center justify-center text-zinc-500 hover:text-zinc-300 transition-colors rounded-full cursor-pointer"
+                             onClick={() => setExpandedProject(expandedProject === project.id ? null : project.id)}
+                         >
                             {expandedProject === project.id ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
-                         </div>
+                         </button>
                        </div>
                      </div>
                      
