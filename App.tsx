@@ -3,7 +3,7 @@ import { PortfolioView } from './components/PortfolioView';
 import { EditorPanel } from './components/EditorPanel';
 import { PortfolioData } from './types';
 import { getInitialState, encodeState } from './utils';
-import { Eye, Code, Share2, Check } from 'lucide-react';
+import { Eye, Code, Share2, Check, AlertTriangle } from 'lucide-react';
 import { Button } from './components/ui/Button';
 
 const App: React.FC = () => {
@@ -11,6 +11,7 @@ const App: React.FC = () => {
   const [data, setData] = useState<PortfolioData | null>(null);
   const [copied, setCopied] = useState(false);
   const [showMobileEditor, setShowMobileEditor] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     const { mode: initialMode, data: initialData } = getInitialState();
@@ -21,7 +22,17 @@ const App: React.FC = () => {
   const handleDataChange = (newData: PortfolioData) => {
     setData(newData);
     if (mode === 'edit') {
-      localStorage.setItem('cinefolio_data', JSON.stringify(newData));
+      try {
+        localStorage.setItem('cinefolio_data', JSON.stringify(newData));
+        setSaveError(null);
+      } catch (e: any) {
+        // Check for QuotaExceededError
+        if (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014) {
+          setSaveError("Storage full! Use external links for videos/images.");
+        } else {
+          console.error("Failed to save to local storage", e);
+        }
+      }
     }
   };
 
@@ -100,6 +111,12 @@ const App: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-3">
+             {saveError && (
+               <div className="text-amber-500 text-xs flex items-center gap-1 font-medium bg-amber-500/10 px-2 py-1 rounded">
+                 <AlertTriangle size={12} />
+                 <span className="hidden sm:inline">{saveError}</span>
+               </div>
+             )}
              <Button 
                variant={copied ? 'secondary' : 'primary'}
                onClick={handleShare}

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { PortfolioData, Project } from '../types';
+import { PortfolioData, Project, Testimonial } from '../types';
 import { Input, TextArea } from './ui/Input';
 import { Button } from './ui/Button';
-import { Plus, Trash2, Video, Wand2, Image, Link, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Trash2, Video, Wand2, Image, Link, ChevronDown, ChevronUp, Upload, X, MessageSquare, User, AtSign } from 'lucide-react';
 
 interface EditorPanelProps {
   data: PortfolioData;
@@ -10,7 +10,7 @@ interface EditorPanelProps {
 }
 
 export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange }) => {
-  const [activeTab, setActiveTab] = useState<'profile' | 'content' | 'tools'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'content' | 'testimonials' | 'tools'>('profile');
   const [expandedProject, setExpandedProject] = useState<string | null>(null);
 
   const updateField = (field: keyof PortfolioData, value: any) => {
@@ -21,12 +21,14 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange }) => {
     onChange({ ...data, socials: { ...data.socials, [field]: value } });
   };
 
+  // --- Project Helpers ---
   const addProject = () => {
     const newProject: Project = {
       id: Date.now().toString(),
       title: "New Project",
+      description: "Brief description of the project...",
       thumbnail: `https://picsum.photos/600/800?random=${Date.now()}`,
-      link: "#",
+      link: "",
       category: "Edit"
     };
     updateField('projects', [...data.projects, newProject]);
@@ -44,10 +46,58 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange }) => {
     updateField('projects', newProjects);
   };
 
+  // --- Testimonial Helpers ---
+  const addTestimonial = () => {
+    const newTestimonial: Testimonial = {
+      id: Date.now().toString(),
+      name: "Client Name",
+      role: "Client Role",
+      quote: "They did an amazing job..."
+    };
+    updateField('testimonials', [...data.testimonials, newTestimonial]);
+  };
+
+  const removeTestimonial = (id: string) => {
+    updateField('testimonials', data.testimonials.filter(t => t.id !== id));
+  };
+
+  const updateTestimonial = (id: string, field: keyof Testimonial, value: string) => {
+    const newTestimonials = data.testimonials.map(t => 
+      t.id === id ? { ...t, [field]: value } : t
+    );
+    updateField('testimonials', newTestimonials);
+  };
+
   const handleArrayInput = (field: 'skills' | 'tools' | 'aiTools', value: string) => {
-    // Split by comma and clean up
     const arr = value.split(',').map(s => s.trim()).filter(s => s.length > 0);
     updateField(field, arr);
+  };
+
+  // --- File Upload Helper ---
+  const handleFileUpload = (accept: string, callback: (result: string) => void) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = accept;
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (file) {
+        // Limit file size to 1MB (1024 * 1024 bytes) to prevent LocalStorage QuotaExceededError
+        const limit = 1 * 1024 * 1024;
+        if (file.size > limit) {
+          alert(`File too large (${(file.size / 1024 / 1024).toFixed(2)}MB). Maximum size for direct upload is 1MB. Please use an external URL for larger files.`);
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          if (event.target?.result) {
+            callback(event.target.result as string);
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+    };
+    input.click();
   };
 
   return (
@@ -60,25 +110,16 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange }) => {
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-zinc-800">
-        <button 
-          onClick={() => setActiveTab('profile')}
-          className={`flex-1 py-3 text-sm font-medium transition-colors ${activeTab === 'profile' ? 'bg-zinc-800 text-white border-b-2 border-white' : 'text-zinc-500 hover:text-zinc-300'}`}
-        >
-          Profile
-        </button>
-        <button 
-          onClick={() => setActiveTab('content')}
-          className={`flex-1 py-3 text-sm font-medium transition-colors ${activeTab === 'content' ? 'bg-zinc-800 text-white border-b-2 border-white' : 'text-zinc-500 hover:text-zinc-300'}`}
-        >
-          Work
-        </button>
-        <button 
-          onClick={() => setActiveTab('tools')}
-          className={`flex-1 py-3 text-sm font-medium transition-colors ${activeTab === 'tools' ? 'bg-zinc-800 text-white border-b-2 border-white' : 'text-zinc-500 hover:text-zinc-300'}`}
-        >
-          Skills
-        </button>
+      <div className="flex border-b border-zinc-800 overflow-x-auto no-scrollbar">
+        {['profile', 'content', 'testimonials', 'tools'].map((tab) => (
+           <button 
+           key={tab}
+           onClick={() => setActiveTab(tab as any)}
+           className={`flex-1 py-3 px-4 text-sm font-medium transition-colors capitalize whitespace-nowrap ${activeTab === tab ? 'bg-zinc-800 text-white border-b-2 border-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+         >
+           {tab}
+         </button>
+        ))}
       </div>
 
       {/* Scrollable Form Content */}
@@ -86,13 +127,23 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange }) => {
         
         {activeTab === 'profile' && (
           <div className="space-y-5 animate-fadeIn">
+            {/* Profile Image Section */}
             <div className="space-y-4">
               <h3 className="text-sm font-bold text-white flex items-center gap-2"><Image size={14}/> Profile Image</h3>
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-full bg-zinc-800 overflow-hidden border border-zinc-700">
+                  <img src={data.profileImage} alt="Profile" className="w-full h-full object-cover" />
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="secondary" onClick={() => handleFileUpload('image/*', (res) => updateField('profileImage', res))} icon={<Upload size={14}/>}>
+                    Upload
+                  </Button>
+                </div>
+              </div>
               <Input 
-                label="Image URL" 
+                label="Or Image URL" 
                 value={data.profileImage} 
                 onChange={(e) => updateField('profileImage', e.target.value)} 
-                placeholder="https://..."
               />
             </div>
             
@@ -108,10 +159,16 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange }) => {
             </div>
 
             <div className="space-y-4 pt-4 border-t border-zinc-800">
-              <h3 className="text-sm font-bold text-white">Social Media</h3>
-              <Input label="Email" value={data.socials.email} onChange={(e) => updateSocials('email', e.target.value)} />
-              <Input label="Instagram Handle" value={data.socials.instagram} onChange={(e) => updateSocials('instagram', e.target.value)} prefix="@" />
-              <Input label="Discord ID" value={data.socials.discord} onChange={(e) => updateSocials('discord', e.target.value)} />
+              <h3 className="text-sm font-bold text-white">Contact & Socials</h3>
+              <Input label="Contact Form Email" value={data.contactEmail} onChange={(e) => updateField('contactEmail', e.target.value)} placeholder="Where you receive inquiries" />
+              <Input label="Public Email (displayed)" value={data.socials.email} onChange={(e) => updateSocials('email', e.target.value)} />
+              <div className="grid grid-cols-2 gap-3">
+                 <Input label="Instagram" value={data.socials.instagram || ''} onChange={(e) => updateSocials('instagram', e.target.value)} prefix="@" />
+                 <Input label="Twitter / X" value={data.socials.twitter || ''} onChange={(e) => updateSocials('twitter', e.target.value)} />
+                 <Input label="YouTube" value={data.socials.youtube || ''} onChange={(e) => updateSocials('youtube', e.target.value)} />
+                 <Input label="LinkedIn" value={data.socials.linkedin || ''} onChange={(e) => updateSocials('linkedin', e.target.value)} />
+                 <Input label="Discord" value={data.socials.discord || ''} onChange={(e) => updateSocials('discord', e.target.value)} />
+              </div>
             </div>
           </div>
         )}
@@ -121,8 +178,17 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange }) => {
             {/* Showreel */}
             <div className="bg-zinc-950 p-4 rounded-xl border border-zinc-800 space-y-3">
               <h3 className="text-sm font-bold text-white flex items-center gap-2"><Video size={14} className="text-purple-400"/> Main Showreel</h3>
-              <Input label="Thumbnail URL" value={data.showreelThumbnail} onChange={(e) => updateField('showreelThumbnail', e.target.value)} />
-              <Input label="Video Link" value={data.showreelLink} onChange={(e) => updateField('showreelLink', e.target.value)} />
+              <Input label="Video Link (YouTube/Vimeo)" value={data.showreelLink} onChange={(e) => updateField('showreelLink', e.target.value)} />
+              
+              <div className="space-y-2">
+                 <label className="text-xs font-medium text-zinc-500 uppercase">Thumbnail</label>
+                 <div className="flex items-center gap-3">
+                    <div className="w-20 h-12 bg-zinc-900 rounded border border-zinc-800 overflow-hidden">
+                       <img src={data.showreelThumbnail} className="w-full h-full object-cover" />
+                    </div>
+                    <Button size="sm" variant="secondary" onClick={() => handleFileUpload('image/*', (val) => updateField('showreelThumbnail', val))}>Change</Button>
+                 </div>
+              </div>
             </div>
 
             {/* Projects */}
@@ -140,8 +206,11 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange }) => {
                         onClick={() => setExpandedProject(expandedProject === project.id ? null : project.id)}
                       >
                        <div className="flex items-center gap-3 overflow-hidden">
-                         <div className="w-8 h-8 rounded bg-zinc-800 flex-shrink-0 bg-cover bg-center" style={{backgroundImage: `url(${project.thumbnail})`}}></div>
-                         <span className="text-sm font-medium truncate">{project.title}</span>
+                         <div className="w-10 h-10 rounded bg-zinc-800 flex-shrink-0 bg-cover bg-center" style={{backgroundImage: `url(${project.thumbnail})`}}></div>
+                         <div className="flex flex-col overflow-hidden">
+                            <span className="text-sm font-medium truncate text-white">{project.title}</span>
+                            <span className="text-xs text-zinc-500 truncate">{project.category}</span>
+                         </div>
                        </div>
                        <div className="flex items-center gap-2">
                          <button onClick={(e) => { e.stopPropagation(); removeProject(project.id); }} className="p-1 hover:text-red-400 text-zinc-600"><Trash2 size={14}/></button>
@@ -150,16 +219,79 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange }) => {
                      </div>
                      
                      {expandedProject === project.id && (
-                       <div className="p-3 border-t border-zinc-800 space-y-3 bg-zinc-900/50">
+                       <div className="p-4 border-t border-zinc-800 space-y-4 bg-zinc-900/50">
                          <Input label="Title" value={project.title} onChange={(e) => updateProject(project.id, 'title', e.target.value)} />
-                         <Input label="Category (e.g., Reels)" value={project.category} onChange={(e) => updateProject(project.id, 'category', e.target.value)} />
-                         <Input label="Thumbnail URL" value={project.thumbnail} onChange={(e) => updateProject(project.id, 'thumbnail', e.target.value)} />
-                         <Input label="Video URL" value={project.link} onChange={(e) => updateProject(project.id, 'link', e.target.value)} />
+                         <Input label="Category" value={project.category} onChange={(e) => updateProject(project.id, 'category', e.target.value)} />
+                         <TextArea label="Description" value={project.description || ''} onChange={(e) => updateProject(project.id, 'description', e.target.value)} rows={2} />
+                         
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                               <label className="text-xs font-medium text-zinc-500 uppercase">Thumbnail</label>
+                               <div className="flex flex-col gap-2">
+                                  {project.thumbnail && (
+                                     <img src={project.thumbnail} className="w-full aspect-video object-cover rounded border border-zinc-800 bg-black" />
+                                  )}
+                                  <div className="flex gap-2">
+                                     <Button size="sm" className="flex-1" variant="secondary" onClick={() => handleFileUpload('image/*', (val) => updateProject(project.id, 'thumbnail', val))}>
+                                        <Upload size={14} className="mr-2"/> Upload
+                                     </Button>
+                                     <Button size="sm" variant="outline" onClick={() => updateProject(project.id, 'thumbnail', '')}><X size={14}/></Button>
+                                  </div>
+                               </div>
+                            </div>
+
+                            <div className="space-y-2">
+                               <label className="text-xs font-medium text-zinc-500 uppercase">Video Source</label>
+                               <Input 
+                                  placeholder="https://..." 
+                                  value={project.link} 
+                                  onChange={(e) => updateProject(project.id, 'link', e.target.value)} 
+                               />
+                               <div className="flex items-center gap-2">
+                                 <div className="h-px bg-zinc-800 flex-1"></div>
+                                 <span className="text-[10px] text-zinc-600 uppercase">OR</span>
+                                 <div className="h-px bg-zinc-800 flex-1"></div>
+                               </div>
+                               <Button size="sm" className="w-full" variant="secondary" onClick={() => handleFileUpload('video/*', (val) => updateProject(project.id, 'link', val))}>
+                                  <Upload size={14} className="mr-2"/> Upload Video
+                               </Button>
+                               <p className="text-[10px] text-zinc-500">Video uploads increase save file size significantly.</p>
+                            </div>
+                         </div>
                        </div>
                      )}
                    </div>
                  ))}
                </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'testimonials' && (
+          <div className="space-y-6 animate-fadeIn">
+            <div className="flex justify-between items-center mb-4">
+               <h3 className="text-sm font-bold text-white">Client Testimonials</h3>
+               <Button size="sm" variant="secondary" onClick={addTestimonial} icon={<Plus size={14}/>}>Add</Button>
+            </div>
+            
+            <div className="space-y-4">
+              {data.testimonials.map((t) => (
+                <div key={t.id} className="bg-zinc-950 border border-zinc-800 p-4 rounded-xl space-y-3 relative group">
+                  <button onClick={() => removeTestimonial(t.id)} className="absolute top-4 right-4 text-zinc-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Trash2 size={14} />
+                  </button>
+                  <div className="grid grid-cols-2 gap-3 pr-6">
+                    <Input label="Client Name" value={t.name} onChange={(e) => updateTestimonial(t.id, 'name', e.target.value)} />
+                    <Input label="Role/Company" value={t.role} onChange={(e) => updateTestimonial(t.id, 'role', e.target.value)} />
+                  </div>
+                  <TextArea label="Quote" value={t.quote} onChange={(e) => updateTestimonial(t.id, 'quote', e.target.value)} rows={2} />
+                </div>
+              ))}
+              {data.testimonials.length === 0 && (
+                <div className="text-center py-8 text-zinc-600 border border-dashed border-zinc-800 rounded-xl">
+                  No testimonials added yet.
+                </div>
+              )}
             </div>
           </div>
         )}
