@@ -7,12 +7,12 @@ import { getFirestore, Firestore } from 'firebase/firestore';
 // ------------------------------------------------------------------
 const firebaseConfig = {
   // Example placeholder - replace these values
-  apiKey: "AIzaSyDOCS_KEY_PLACEHOLDER",
-  authDomain: "your-project-id.firebaseapp.com",
-  projectId: "your-project-id",
-  storageBucket: "your-project-id.appspot.com",
-  messagingSenderId: "123456789",
-  appId: "1:123456789:web:abcdef123456"
+  apiKey: "AIzaSyAic7vjNYjZN_WrYVhNGSTe6CGXJup6w6c",
+  authDomain: "video-portfolio-c38e0.firebaseapp.com",
+  projectId: "video-portfolio-c38e0",
+  storageBucket: "video-portfolio-c38e0.firebasestorage.app",
+  messagingSenderId: "165858899230",
+  appId: "1:165858899230:web:cf57e807e494a510c2c50f"
 };
 
 // Check if config is valid (not placeholder) to prevent connection errors
