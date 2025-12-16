@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
-import { Mail, Instagram, MapPin, Globe, ExternalLink, Play, Disc, Twitter, Linkedin, Youtube, Send, X, Pause, Volume2, VolumeX, Maximize, Minimize, ArrowDown, CheckCircle2, Wand2, Cpu, Laptop, Briefcase, ExternalLink as LinkIcon, Loader2 } from 'lucide-react';
+import { Mail, Instagram, MapPin, Globe, Play, Disc, Twitter, Linkedin, Youtube, X, Pause, Volume2, VolumeX, CheckCircle2, Laptop, Loader2, ExternalLink } from 'lucide-react';
 import { PortfolioData, Project } from '../types';
 import { Button } from './ui/Button';
 import { getIconSlug, getBrandColor } from '../utils';

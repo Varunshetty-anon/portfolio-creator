@@ -3,11 +3,10 @@ import { PortfolioView } from './components/PortfolioView';
 import { EditorPanel } from './components/EditorPanel';
 import { PortfolioData, INITIAL_DATA } from './types';
 import { loadFromDB, saveToDB, decodeState, isConfigured } from './utils';
-import { Code, Database, Lock, ArrowRight, CheckCircle, LayoutTemplate, Eye, EyeOff, HardDrive, Loader2 } from 'lucide-react';
+import { Code, Database, Lock, ArrowRight, LayoutTemplate, Eye, EyeOff, HardDrive, Loader2 } from 'lucide-react';
 import { Button } from './components/ui/Button';
-import { Input } from './components/ui/Input';
 
-// Helper to safely manipulate hash in restricted environments (e.g. Blob URLs)
+// Helper to safely manipulate hash in restricted environments
 const safeSetHash = (hash: string) => {
   try {
     window.location.hash = hash;
@@ -29,7 +28,6 @@ const App: React.FC = () => {
   const [route, setRoute] = useState<'home' | 'editor' | 'public'>('home');
   const [data, setData] = useState<PortfolioData | null>(null);
   const [isLoading, setIsLoading] = useState(true); // Global loading state
-  const [isSharedView, setIsSharedView] = useState(false);
   
   // Auth State
   const [password, setPassword] = useState('');
@@ -37,7 +35,7 @@ const App: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState('');
   
-  // Session Persistence: Check sessionStorage on mount
+  // Session Persistence
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     if (typeof window !== 'undefined') {
        return sessionStorage.getItem('frames_auth') === 'true';
@@ -45,7 +43,6 @@ const App: React.FC = () => {
     return false;
   });
   
-  // Use ref to access current auth state in event listeners without re-binding
   const authRef = useRef(isAuthenticated);
 
   // Editor State
@@ -53,7 +50,6 @@ const App: React.FC = () => {
   const [showMobileEditor, setShowMobileEditor] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  // Sync ref
   useEffect(() => {
     authRef.current = isAuthenticated;
   }, [isAuthenticated]);
@@ -72,7 +68,6 @@ const App: React.FC = () => {
               const decoded = decodeState(encoded);
               if (decoded) {
                   setData(decoded);
-                  setIsSharedView(true);
                   setRoute('public');
                   document.title = decoded.name ? `${decoded.name} - Portfolio` : 'Portfolio';
                   setIsLoading(false);
@@ -81,13 +76,11 @@ const App: React.FC = () => {
           }
       }
 
-      // 2. CHECK FOR SHORT LINK (#varunshetty-portfolio) or EDITOR
-      // Try to load from DB first to ensure we have the latest "Cloud" data
+      // 2. CHECK FOR SHORT LINK OR EDITOR
       try {
         const dbData = await loadFromDB();
         
         if (dbData) {
-            // Ensure settings object exists
             if (!dbData.settings) dbData.settings = INITIAL_DATA.settings;
             setData(dbData);
             
@@ -104,8 +97,7 @@ const App: React.FC = () => {
         setData(INITIAL_DATA);
       }
 
-      // Determine Route after Data Load
-      // Case-insensitive check for the specific portfolio link
+      // Determine Route
       const lowerHash = hash.toLowerCase();
       
       if (lowerHash === '#varunshetty-portfolio' || lowerHash.startsWith('#u/')) {
@@ -127,11 +119,10 @@ const App: React.FC = () => {
     initApp();
 
     const onHashChange = () => {
-        // Simple routing update on hash change without full reload if data exists
         const hash = getHash();
         const lowerHash = hash.toLowerCase();
         
-        window.scrollTo(0, 0); // Always scroll to top on route change
+        window.scrollTo(0, 0);
 
         if (lowerHash === '#varunshetty-portfolio') {
             setRoute('public');
@@ -144,14 +135,13 @@ const App: React.FC = () => {
 
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
-  }, [data?.name]); // Re-run if data name changes to update title logic
+  }, [data?.name]);
 
   // --- Handlers ---
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Check against loaded data or fallbacks
     const validUser = data?.settings?.username || 'admin';
     const validPass = data?.settings?.password || 'cinefolio';
 
@@ -224,7 +214,7 @@ const App: React.FC = () => {
       );
   }
 
-  // 1. Public Portfolio View
+  // Public View
   if (route === 'public') {
     return (
         <>
@@ -243,14 +233,12 @@ const App: React.FC = () => {
     );
   }
 
-  // 2. Editor Dashboard
+  // Editor View
   if (route === 'editor') {
     return (
       <div className="h-screen w-screen bg-black overflow-hidden flex flex-col md:flex-row">
-        {/* Mobile Sidebar Overlay */}
         <div className={`fixed inset-0 bg-black/80 z-40 md:hidden transition-opacity ${showMobileEditor ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={() => setShowMobileEditor(false)} />
 
-        {/* Editor Sidebar */}
         <div className={`
           fixed md:relative inset-y-0 left-0 z-50 bg-zinc-950 w-[85vw] md:w-[420px] border-r border-zinc-800 flex-shrink-0 transition-transform duration-300 transform shadow-2xl
           ${showMobileEditor ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
@@ -263,17 +251,10 @@ const App: React.FC = () => {
             hasUnsavedChanges={hasUnsavedChanges}
             onLogout={handleLogout}
           />
-          <button 
-            onClick={() => setShowMobileEditor(false)}
-            className="md:hidden absolute top-4 right-4 text-zinc-500"
-          >
-            ✕
-          </button>
+          <button onClick={() => setShowMobileEditor(false)} className="md:hidden absolute top-4 right-4 text-zinc-500">✕</button>
         </div>
 
-        {/* Live Preview Area */}
         <div className="flex-1 h-full relative bg-zinc-950 overflow-hidden flex flex-col">
-          {/* Top Bar */}
           <div className="h-14 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between px-6 z-30">
             <div className="flex items-center gap-3">
               <Button 
@@ -307,7 +288,6 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          {/* Canvas */}
           <div className="flex-1 overflow-y-auto relative custom-scrollbar bg-black">
              <div className="min-h-full origin-top transform scale-[0.85] md:scale-95 transition-transform duration-300 origin-top w-full h-full shadow-2xl border border-zinc-800/50">
                <PortfolioView data={data} isPreview={true} />
@@ -318,10 +298,9 @@ const App: React.FC = () => {
     );
   }
 
-  // 3. Home / Login Screen
+  // Home / Login View
   return (
     <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4 relative overflow-hidden">
-       {/* Background Aesthetics */}
        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-zinc-900 via-black to-black opacity-80"></div>
        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 brightness-100 contrast-150"></div>
        
