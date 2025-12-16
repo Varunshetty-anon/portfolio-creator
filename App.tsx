@@ -3,7 +3,7 @@ import { PortfolioView } from './components/PortfolioView';
 import { EditorPanel } from './components/EditorPanel';
 import { PortfolioData, INITIAL_DATA } from './types';
 import { loadFromDB, saveToDB, decodeState, isConfigured } from './utils';
-import { Code, Database, Lock, ArrowRight, CheckCircle, LayoutTemplate, Eye, EyeOff, HardDrive } from 'lucide-react';
+import { Code, Database, Lock, ArrowRight, CheckCircle, LayoutTemplate, Eye, EyeOff, HardDrive, Loader2 } from 'lucide-react';
 import { Button } from './components/ui/Button';
 import { Input } from './components/ui/Input';
 
@@ -28,6 +28,7 @@ const App: React.FC = () => {
   // Routes: 'home' (login), 'editor', 'public'
   const [route, setRoute] = useState<'home' | 'editor' | 'public'>('home');
   const [data, setData] = useState<PortfolioData | null>(null);
+  const [isLoading, setIsLoading] = useState(true); // Global loading state
   const [isSharedView, setIsSharedView] = useState(false);
   
   // Auth State
@@ -59,11 +60,11 @@ const App: React.FC = () => {
 
   // --- Initialization & Routing ---
   useEffect(() => {
-    const handleRoute = async () => {
+    const initApp = async () => {
+      setIsLoading(true);
       const hash = getHash();
       
-      // CHECK FOR SHARED DATA IN URL
-      // Format: #varunshetty-portfolio?data=...
+      // 1. CHECK FOR LONG ENCODED DATA (Legacy/Serverless fallback)
       if (hash.includes('?data=')) {
           const split = hash.split('?data=');
           const encoded = split[1];
@@ -73,15 +74,43 @@ const App: React.FC = () => {
                   setData(decoded);
                   setIsSharedView(true);
                   setRoute('public');
+                  document.title = decoded.name ? `${decoded.name} - Portfolio` : 'Portfolio';
+                  setIsLoading(false);
                   return;
               }
           }
       }
 
-      // Normal Routes
-      if (hash === '#varunshetty-portfolio' || hash.startsWith('#u/')) {
+      // 2. CHECK FOR SHORT LINK (#varunshetty-portfolio) or EDITOR
+      // Try to load from DB first to ensure we have the latest "Cloud" data
+      try {
+        const dbData = await loadFromDB();
+        
+        if (dbData) {
+            // Ensure settings object exists
+            if (!dbData.settings) dbData.settings = INITIAL_DATA.settings;
+            setData(dbData);
+            
+            // Set Page Title if public
+            if (hash.toLowerCase() === '#varunshetty-portfolio') {
+                document.title = dbData.name ? `${dbData.name} - Portfolio` : 'Portfolio';
+            }
+        } else {
+            console.log("No DB data found, using template");
+            setData(INITIAL_DATA);
+        }
+      } catch (err) {
+        console.error("Failed to load data:", err);
+        setData(INITIAL_DATA);
+      }
+
+      // Determine Route after Data Load
+      // Case-insensitive check for the specific portfolio link
+      const lowerHash = hash.toLowerCase();
+      
+      if (lowerHash === '#varunshetty-portfolio' || lowerHash.startsWith('#u/')) {
         setRoute('public');
-      } else if (hash === '#editor') {
+      } else if (lowerHash === '#editor') {
         if (authRef.current) {
           setRoute('editor');
         } else {
@@ -91,35 +120,31 @@ const App: React.FC = () => {
       } else {
         setRoute('home');
       }
+      
+      setIsLoading(false);
     };
 
-    // Load DB Data only if we aren't already viewing shared data
-    if (!isSharedView) {
-        loadFromDB().then((dbData) => {
-          if (dbData) {
-            // Ensure settings object exists if loading old data
-            if (!dbData.settings) {
-                dbData.settings = INITIAL_DATA.settings;
-            }
-            setData(dbData);
-          } else {
-            setData(INITIAL_DATA);
-          }
-          handleRoute();
-        }).catch(err => {
-            console.error("Initialization error:", err);
-            setData(INITIAL_DATA);
-            handleRoute();
-        });
-    }
+    initApp();
 
     const onHashChange = () => {
-        handleRoute();
+        // Simple routing update on hash change without full reload if data exists
+        const hash = getHash();
+        const lowerHash = hash.toLowerCase();
+        
+        window.scrollTo(0, 0); // Always scroll to top on route change
+
+        if (lowerHash === '#varunshetty-portfolio') {
+            setRoute('public');
+            if (data?.name) document.title = `${data.name} - Portfolio`;
+        }
+        else if (lowerHash === '#editor' && authRef.current) setRoute('editor');
+        else if (lowerHash === '#editor' && !authRef.current) setRoute('home');
+        else if (hash === '') setRoute('home');
     };
 
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
-  }, []);
+  }, [data?.name]); // Re-run if data name changes to update title logic
 
   // --- Handlers ---
 
@@ -141,13 +166,21 @@ const App: React.FC = () => {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+      if (hasUnsavedChanges) {
+         const confirmSave = window.confirm("You have unsaved changes. Save before logging out?");
+         if (confirmSave) {
+             await handleSaveAndPublish();
+         }
+      }
+
       setIsAuthenticated(false);
       sessionStorage.removeItem('frames_auth');
       setRoute('home');
       safeSetHash('');
       setUsername('');
       setPassword('');
+      document.title = "Frames - Portfolio Creator";
   };
 
   const handleSaveAndPublish = async (newData?: PortfolioData) => {
@@ -182,7 +215,14 @@ const App: React.FC = () => {
 
   // --- Views ---
 
-  if (!data) return <div className="h-screen bg-black text-white flex items-center justify-center font-mono">Initializing Frames Engine...</div>;
+  if (isLoading || !data) {
+      return (
+          <div className="h-screen bg-black text-white flex flex-col gap-4 items-center justify-center font-display">
+              <Loader2 size={40} className="text-indigo-500 animate-spin" />
+              <span className="text-zinc-400 animate-pulse tracking-widest uppercase text-sm">Loading Portfolio...</span>
+          </div>
+      );
+  }
 
   // 1. Public Portfolio View
   if (route === 'public') {
@@ -345,10 +385,6 @@ const App: React.FC = () => {
                    Enter Studio
                 </Button>
              </form>
-          </div>
-
-          <div className="mt-8 text-center text-zinc-600 text-xs">
-             <p>Default Access: <span className="font-mono text-zinc-400">admin</span> / <span className="font-mono text-zinc-400">cinefolio</span></p>
           </div>
        </div>
     </div>

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, Instagram, MapPin, Globe, ExternalLink, Play, Disc, Twitter, Linkedin, Youtube, Send, X, Pause, Volume2, VolumeX, Maximize, Minimize, ArrowDown, CheckCircle2, Wand2, Cpu, Laptop, Briefcase, ExternalLink as LinkIcon } from 'lucide-react';
+import { motion, AnimatePresence, Variants } from 'framer-motion';
+import { Mail, Instagram, MapPin, Globe, ExternalLink, Play, Disc, Twitter, Linkedin, Youtube, Send, X, Pause, Volume2, VolumeX, Maximize, Minimize, ArrowDown, CheckCircle2, Wand2, Cpu, Laptop, Briefcase, ExternalLink as LinkIcon, Loader2 } from 'lucide-react';
 import { PortfolioData, Project } from '../types';
 import { Button } from './ui/Button';
 import { getIconSlug, getBrandColor } from '../utils';
@@ -12,17 +12,17 @@ interface PortfolioViewProps {
 }
 
 // --- Animation Variants ---
-const staggerContainer = {
+const staggerContainer: Variants = {
   hidden: { opacity: 0 },
   visible: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.2 } }
 };
 
-const fadeInUp = {
+const fadeInUp: Variants = {
   hidden: { y: 30, opacity: 0 },
-  visible: { y: 0, opacity: 1, transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] } }
+  visible: { y: 0, opacity: 1, transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] } }
 };
 
-const wordContainer = {
+const wordContainer: Variants = {
     hidden: { opacity: 0 },
     visible: {
       opacity: 1,
@@ -30,7 +30,7 @@ const wordContainer = {
     }
 };
 
-const letterVariant = {
+const letterVariant: Variants = {
     hidden: { opacity: 0, y: 20, filter: 'blur(8px)' },
     visible: { 
       opacity: 1, 
@@ -40,7 +40,7 @@ const letterVariant = {
     }
 };
 
-const roleVariant = {
+const roleVariant: Variants = {
     hidden: { opacity: 0, x: -20, filter: 'blur(5px)' },
     visible: { 
       opacity: 1, 
@@ -96,7 +96,11 @@ const AmbilightCanvas = ({ videoRef }: { videoRef: React.RefObject<HTMLVideoElem
             if (videoRef.current && canvasRef.current && !videoRef.current.paused && !videoRef.current.ended) {
                 const ctx = canvasRef.current.getContext('2d');
                 if (ctx) {
-                    ctx.drawImage(videoRef.current, 0, 0, canvasRef.current.width, canvasRef.current.height);
+                    try {
+                       ctx.drawImage(videoRef.current, 0, 0, canvasRef.current.width, canvasRef.current.height);
+                    } catch (e) {
+                       // Suppress taint errors if crossOrigin fails
+                    }
                 }
             }
             animationFrameId = requestAnimationFrame(loop);
@@ -157,6 +161,8 @@ const AutoPlayVideo = ({ src, thumbnail }: { src: string, thumbnail?: string }) 
         muted={isMuted}
         loop
         playsInline
+        crossOrigin="anonymous"
+        preload="auto"
       />
       <div className="absolute bottom-6 right-6 z-30">
           <button
@@ -177,6 +183,7 @@ const CustomVideoPlayer = ({ src, thumbnail, onClose }: { src: string, thumbnail
   const containerRef = useRef<HTMLDivElement>(null);
   
   const [isPlaying, setIsPlaying] = useState(true);
+  const [isBuffering, setIsBuffering] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -207,12 +214,18 @@ const CustomVideoPlayer = ({ src, thumbnail, onClose }: { src: string, thumbnail
     const onPlay = () => setIsPlaying(true);
     const onPause = () => setIsPlaying(false);
     const onEnded = () => setIsPlaying(false);
+    const onWaiting = () => setIsBuffering(true);
+    const onPlaying = () => setIsBuffering(false);
+    const onCanPlay = () => setIsBuffering(false);
     
     video.addEventListener('timeupdate', onTimeUpdate);
     video.addEventListener('loadedmetadata', onLoadedMetadata);
     video.addEventListener('play', onPlay);
     video.addEventListener('pause', onPause);
     video.addEventListener('ended', onEnded);
+    video.addEventListener('waiting', onWaiting);
+    video.addEventListener('playing', onPlaying);
+    video.addEventListener('canplay', onCanPlay);
 
     return () => {
       video.removeEventListener('timeupdate', onTimeUpdate);
@@ -220,6 +233,9 @@ const CustomVideoPlayer = ({ src, thumbnail, onClose }: { src: string, thumbnail
       video.removeEventListener('play', onPlay);
       video.removeEventListener('pause', onPause);
       video.removeEventListener('ended', onEnded);
+      video.removeEventListener('waiting', onWaiting);
+      video.removeEventListener('playing', onPlaying);
+      video.removeEventListener('canplay', onCanPlay);
     };
   }, [src]);
 
@@ -288,6 +304,8 @@ const CustomVideoPlayer = ({ src, thumbnail, onClose }: { src: string, thumbnail
            poster={thumbnail} 
            className="w-full h-full object-contain bg-black cursor-pointer"
            playsInline
+           crossOrigin="anonymous"
+           preload="auto"
            onClick={(e) => { e.stopPropagation(); togglePlay(); }}
          />
 
@@ -298,7 +316,15 @@ const CustomVideoPlayer = ({ src, thumbnail, onClose }: { src: string, thumbnail
             <X size={24} />
          </button>
 
-         {!isPlaying && (
+         {/* Buffering Indicator */}
+         {isBuffering && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-40">
+                <Loader2 size={48} className="text-white animate-spin drop-shadow-lg" />
+            </div>
+         )}
+
+         {/* Play Overlay (Only when paused and NOT buffering) */}
+         {!isPlaying && !isBuffering && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30">
                 <div className="w-20 h-20 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center border border-white/20 animate-in fade-in zoom-in duration-200">
                     <Play fill="white" className="ml-1 text-white opacity-90" size={40} />

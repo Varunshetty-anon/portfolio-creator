@@ -2,9 +2,9 @@ import React, { useState, useCallback } from 'react';
 import { PortfolioData, Project, Testimonial } from '../types';
 import { Input, TextArea } from './ui/Input';
 import { Button } from './ui/Button';
-import { Plus, Trash2, Video, Wand2, Image, Link, ChevronDown, ChevronUp, Upload, X, LayoutDashboard, Copy, ExternalLink, FileVideo, User, MessageSquare, Loader2, CheckCircle2, Globe, Crop, Smartphone, Monitor, AlertCircle, ToggleRight, ToggleLeft, Settings, LogOut, Shield, Share2 } from 'lucide-react';
+import { Plus, Trash2, Video, Wand2, Image, ChevronDown, ChevronUp, Upload, X, LayoutDashboard, Copy, ExternalLink, FileVideo, User, MessageSquare, Loader2, CheckCircle2, Globe, Crop, Smartphone, Monitor, AlertCircle, Settings, LogOut, Shield, Share2, Eye, EyeOff, Cloud, Link } from 'lucide-react';
 import Cropper from 'react-easy-crop';
-import { getCroppedImg, generateThumbnailFromVideo, encodeState } from '../utils';
+import { getCroppedImg, generateThumbnailFromVideo, encodeState, uploadFileToStorage, isConfigured, hasCloudStorage } from '../utils';
 
 interface EditorPanelProps {
   data: PortfolioData;
@@ -120,6 +120,9 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
   const [showreelUploading, setShowreelUploading] = useState<{progress: number} | null>(null);
   const [activeInputMethod, setActiveInputMethod] = useState<Record<string, 'upload' | 'link'>>({});
   const [showreelInputMethod, setShowreelInputMethod] = useState<'upload' | 'link'>(data.showreelLink.startsWith('blob:') ? 'upload' : 'link');
+  
+  // Settings State
+  const [showSettingsPassword, setShowSettingsPassword] = useState(false);
 
   // Crop State
   const [cropModalOpen, setCropModalOpen] = useState(false);
@@ -171,10 +174,17 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
   };
 
   // --- Link Generator ---
-  const getEncodedLink = () => {
+  const getShareLink = () => {
+     const origin = window.location.origin === 'null' || !window.location.origin ? 'https://cinefolio.app' : window.location.origin;
+     
+     // STRICTLY return short link if Cloud is configured
+     if (isConfigured) {
+         return `${origin}${window.location.pathname}#varunshetty-portfolio`;
+     }
+
+     // Fallback to Encoded Link ONLY if not configured
      try {
         const encoded = encodeState(data);
-        const origin = window.location.origin === 'null' || !window.location.origin ? 'https://cinefolio.app' : window.location.origin;
         return `${origin}${window.location.pathname}#varunshetty-portfolio?data=${encoded}`;
      } catch (e) {
         return '';
@@ -183,7 +193,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
 
   const copyLink = () => {
     try {
-      const link = getEncodedLink();
+      const link = getShareLink();
       navigator.clipboard.writeText(link);
       setCopySuccess(true);
       setTimeout(() => setCopySuccess(false), 2000);
@@ -194,7 +204,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
   };
 
   const openLink = () => {
-      const link = getEncodedLink();
+      const link = getShareLink();
       window.open(link, '_blank');
   }
 
@@ -214,15 +224,13 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
     setActiveInputMethod(prev => ({ ...prev, [newProject.id]: 'upload' }));
   };
 
-  // Direct deletion using native confirm to ensure reliability
   const removeProject = (id: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
     if (window.confirm("Are you sure you want to delete this project? This action cannot be undone.")) {
         const updatedProjects = data.projects.filter(p => p.id !== id);
-        // Direct update
-        onChange({ ...data, projects: updatedProjects });
+        updateField('projects', updatedProjects);
         
         if (expandedProject === id) {
             setExpandedProject(null);
@@ -309,19 +317,41 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
     onChange({ ...data, showreelThumbnail: url, showreelThumbnailBlob: file });
   };
 
-  const handleShowreelVideoUpload = (file: File) => {
-    setShowreelUploading({ progress: 0 });
-    let progress = 0;
-    const interval = setInterval(() => {
-        progress += 5;
-        setShowreelUploading({ progress });
-        if (progress >= 100) {
-            clearInterval(interval);
-            const url = URL.createObjectURL(file);
-            onChange({ ...data, showreelLink: url, showreelBlob: file });
-            setTimeout(() => setShowreelUploading(null), 500);
+  const handleShowreelVideoUpload = async (file: File) => {
+    setShowreelUploading({ progress: 1 });
+    
+    // Check if Firebase Storage is active using availability flag
+    if (hasCloudStorage) {
+        try {
+            const downloadUrl = await uploadFileToStorage(
+                file, 
+                `showreels/${Date.now()}_${file.name}`, 
+                (progress) => setShowreelUploading({ progress })
+            );
+            
+            onChange({ ...data, showreelLink: downloadUrl, showreelBlob: undefined });
+            setShowreelUploading(null);
+            alert("Showreel uploaded successfully to cloud!");
+        } catch (e) {
+            console.error("Showreel upload failed", e);
+            alert("Upload failed. Check console.");
+            setShowreelUploading(null);
         }
-    }, 50);
+    } else {
+        // Fallback to simulated local upload (Not recommended for large files)
+        alert("Firebase Storage not configured. Video will be saved locally (Link sharing will NOT work for this video).");
+        let progress = 0;
+        const interval = setInterval(() => {
+            progress += 5;
+            setShowreelUploading({ progress });
+            if (progress >= 100) {
+                clearInterval(interval);
+                const url = URL.createObjectURL(file);
+                onChange({ ...data, showreelLink: url, showreelBlob: file });
+                setTimeout(() => setShowreelUploading(null), 500);
+            }
+        }, 50);
+    }
   };
 
   const handleProjectThumbUpload = (id: string, file: File) => {
@@ -330,9 +360,9 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
   };
 
   const handleProjectVideoUpload = async (id: string, file: File) => {
-    setUploadingState({ id, progress: 10 });
+    setUploadingState({ id, progress: 1 });
     
-    // Attempt to detect aspect ratio from video metadata
+    // Attempt to detect aspect ratio from video metadata (local read)
     const video = document.createElement('video');
     video.preload = 'metadata';
     video.src = URL.createObjectURL(file);
@@ -344,7 +374,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
         }
     };
 
-    // Start generating thumbnail
+    // Start generating thumbnail locally
     let generatedThumb: { url: string, blob: Blob } | null = null;
     try {
         generatedThumb = await generateThumbnailFromVideo(file);
@@ -352,32 +382,63 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
         console.warn("Thumbnail generation skipped:", e);
     }
 
-    // Simulate upload progress
-    let progress = 30;
-    const interval = setInterval(() => {
-      progress += 10;
-      setUploadingState({ id, progress });
-      
-      if (progress >= 100) {
-        clearInterval(interval);
-        const url = URL.createObjectURL(file);
-        
-        const updates: Partial<Project> = { 
-            link: url, 
-            customVideoBlob: file,
-            aspectRatio: detectedAspectRatio
-        };
-        
-        // Auto-set thumbnail if generated
-        if (generatedThumb) {
-            updates.thumbnail = generatedThumb.url;
-            updates.thumbnailBlob = generatedThumb.blob;
-        }
+    // Check if Firebase Storage is active using availability flag
+    if (hasCloudStorage) {
+        // REAL UPLOAD
+        try {
+            const downloadUrl = await uploadFileToStorage(
+                file, 
+                `projects/${id}/${Date.now()}_${file.name}`,
+                (progress) => setUploadingState({ id, progress })
+            );
 
-        updateProject(id, updates);
-        setTimeout(() => setUploadingState(null), 500);
-      }
-    }, 100);
+            const updates: Partial<Project> = { 
+                link: downloadUrl, 
+                customVideoBlob: undefined, // Clear local blob
+                aspectRatio: detectedAspectRatio
+            };
+            
+            if (generatedThumb) {
+                updates.thumbnail = generatedThumb.url;
+                updates.thumbnailBlob = generatedThumb.blob;
+            }
+
+            updateProject(id, updates);
+            setUploadingState(null);
+            alert("Video uploaded successfully to cloud! Don't forget to save changes.");
+        } catch (e) {
+            console.error("Project upload failed", e);
+            alert("Upload failed. Check console.");
+            setUploadingState(null);
+        }
+    } else {
+        // SIMULATED UPLOAD (Fallback)
+        alert("Firebase Storage not configured. Video will be saved locally (Link sharing will NOT work for this video).");
+        let progress = 30;
+        const interval = setInterval(() => {
+          progress += 10;
+          setUploadingState({ id, progress });
+          
+          if (progress >= 100) {
+            clearInterval(interval);
+            const url = URL.createObjectURL(file);
+            
+            const updates: Partial<Project> = { 
+                link: url, 
+                customVideoBlob: file,
+                aspectRatio: detectedAspectRatio
+            };
+            
+            if (generatedThumb) {
+                updates.thumbnail = generatedThumb.url;
+                updates.thumbnailBlob = generatedThumb.blob;
+            }
+
+            updateProject(id, updates);
+            setTimeout(() => setUploadingState(null), 500);
+          }
+        }, 100);
+    }
   };
 
   return (
@@ -422,7 +483,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
       <div className="p-6 border-b border-zinc-800 bg-zinc-950 flex justify-between items-center">
         <div>
           <h2 className="text-xl font-display font-bold text-white mb-1">Frames Studio</h2>
-          <p className="text-xs text-zinc-500">v1.2.0 • Pro Account</p>
+          <p className="text-xs text-zinc-500">v1.2.3 • Pro Account</p>
         </div>
       </div>
 
@@ -507,36 +568,43 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
                    <h3 className="text-white font-bold text-sm uppercase tracking-wider">Share Portfolio</h3>
                 </div>
                 
-                <p className="text-[10px] text-zinc-500 leading-relaxed">
-                   <strong>Note:</strong> Since this is a serverless environment, this unique link contains all your portfolio data. It may be long, but it ensures your changes are visible to others without a backend database.
-                </p>
+                {isConfigured ? (
+                    <p className="text-[10px] text-zinc-500 leading-relaxed">
+                        <Cloud size={10} className="inline mr-1 text-indigo-400" />
+                        <strong>Cloud Sync Active:</strong> Your portfolio is live via Firebase. Use the link below.
+                    </p>
+                ) : (
+                    <p className="text-[10px] text-zinc-500 leading-relaxed">
+                       <strong>Serverless Mode:</strong> Firebase is not configured. This long link contains all your data.
+                    </p>
+                )}
 
                 <div className="flex flex-col gap-2 bg-black rounded-lg p-3 border border-zinc-800">
-                   {/* Simulated Short Link for Aesthetics */}
                    <div className="flex items-center gap-2 text-zinc-500 mb-1">
-                      <Globe size={12} />
-                      <span className="text-[10px] font-mono">cinefolio.app/varunshetty-portfolio</span>
+                      <Link size={12} />
+                      <span className="text-[10px] font-mono truncate text-white">
+                          {isConfigured ? '.../#varunshetty-portfolio' : '.../?data=...'}
+                      </span>
                    </div>
 
                    <div className="flex items-center gap-2">
                       <Button size="sm" className="w-full text-xs" onClick={copyLink} icon={copySuccess ? <CheckCircle2 size={14}/> : <Copy size={14}/>}>
-                         {copySuccess ? 'Copied to Clipboard' : 'Copy Shareable Link'}
+                         {copySuccess ? 'Copied' : 'Copy Portfolio Link'}
                       </Button>
                       <Button size="sm" variant="secondary" className="px-3" onClick={openLink}>
                          <ExternalLink size={14} />
                       </Button>
                    </div>
-                   <p className="text-[10px] text-zinc-600 text-center mt-1">
-                      (Copies full data link for sharing)
-                   </p>
                 </div>
                 
-                <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-lg p-3">
-                   <p className="text-[10px] text-yellow-500/80">
-                      <AlertCircle size={10} className="inline mr-1"/>
-                      Local images/videos (uploads) cannot be shared via link. For public sharing, please use external URLs for your media.
-                   </p>
-                </div>
+                {!isConfigured && (
+                    <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-lg p-3">
+                       <p className="text-[10px] text-yellow-500/80">
+                          <AlertCircle size={10} className="inline mr-1"/>
+                          Local media cannot be shared via link. Configure Firebase for cloud hosting.
+                       </p>
+                    </div>
+                )}
              </div>
           </div>
         )}
@@ -639,21 +707,21 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
                      <div className="h-24 bg-zinc-900 border border-zinc-800 rounded-lg flex flex-col items-center justify-center p-4">
                         <div className="w-full flex justify-between text-xs text-zinc-400 mb-2">
                            <span>Uploading...</span>
-                           <span>{showreelUploading.progress}%</span>
+                           <span>{Math.round(showreelUploading.progress)}%</span>
                         </div>
                         <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
                            <div className="h-full bg-indigo-500 transition-all duration-300" style={{ width: `${showreelUploading.progress}%` }}></div>
                         </div>
                      </div>
                   ) : (
-                      data.showreelLink.startsWith('blob:') ? (
+                      data.showreelLink.startsWith('blob:') || (isConfigured && data.showreelLink.includes('firebasestorage')) ? (
                          <div className="bg-zinc-800 rounded-lg p-3 border border-zinc-700 flex items-center justify-between group">
                             <div className="flex items-center gap-3 overflow-hidden">
                                 <div className="p-2 bg-zinc-900 rounded">
                                     <FileVideo size={20} className="text-indigo-400"/>
                                 </div>
                                 <div className="flex flex-col overflow-hidden">
-                                    <span className="text-xs font-medium text-white truncate">Local File</span>
+                                    <span className="text-xs font-medium text-white truncate">{data.showreelLink.includes('firebasestorage') ? 'Cloud File' : 'Local File'}</span>
                                     <span className="text-[10px] text-zinc-500 truncate">{data.showreelLink}</span>
                                 </div>
                             </div>
@@ -666,7 +734,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
                             <Upload size={24} className="text-zinc-400"/>
                             <div className="flex flex-col items-center">
                                 <span className="text-xs font-medium text-zinc-300">Choose Video File</span>
-                                <span className="text-[10px] text-zinc-500">MP4, MOV (Local DB)</span>
+                                <span className="text-[10px] text-zinc-500">MP4, MOV (Cloud Storage)</span>
                             </div>
                          </Button>
                       )
@@ -784,7 +852,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
                                  <div className="h-24 bg-zinc-900 border border-zinc-800 rounded-lg flex flex-col items-center justify-center p-4">
                                     <div className="w-full flex justify-between text-xs text-zinc-400 mb-2">
                                        <span>Uploading...</span>
-                                       <span>{uploadProgress}%</span>
+                                       <span>{Math.round(uploadProgress)}%</span>
                                     </div>
                                     <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
                                        <div className="h-full bg-indigo-500 transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
@@ -800,7 +868,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
                                               <FileVideo size={20} className="text-indigo-400"/>
                                           </div>
                                           <div className="flex flex-col overflow-hidden">
-                                              <span className="text-xs font-medium text-white truncate">{project.link.startsWith('blob:') ? 'Local File' : 'Link'}</span>
+                                              <span className="text-xs font-medium text-white truncate">{project.link.startsWith('blob:') ? 'Local File' : 'Cloud File'}</span>
                                               <span className="text-[10px] text-zinc-500 truncate">{project.link}</span>
                                           </div>
                                       </div>
@@ -835,7 +903,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
                                             <Upload size={24} className="text-zinc-400"/>
                                             <div className="flex flex-col items-center">
                                                 <span className="text-xs font-medium text-zinc-300">Choose Video File</span>
-                                                <span className="text-[10px] text-zinc-500">MP4, MOV (Local DB)</span>
+                                                <span className="text-[10px] text-zinc-500">MP4, MOV (Cloud Storage)</span>
                                             </div>
                                          </Button>
                                       ) : (
@@ -866,58 +934,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
           </div>
         )}
 
-        {/* ... TESTIMONIALS (unchanged) ... */}
-        {(activeTab === 'testimonials' || activeTab === 'tools') && (
-           <div className="space-y-6 animate-fadeIn">
-              {activeTab === 'testimonials' && (
-                 <>
-                    <div className="flex justify-between">
-                       <h3 className="text-sm font-bold text-white">Testimonials</h3>
-                       <Button size="sm" variant="secondary" onClick={addTestimonial} icon={<Plus size={14}/>}>Add</Button>
-                    </div>
-                    {data.testimonials.map((t) => (
-                      <div key={t.id} className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl space-y-3 relative animate-in slide-in-from-top-2">
-                        <button onClick={() => removeTestimonial(t.id)} className="absolute top-4 right-4 text-zinc-600 hover:text-red-400"><Trash2 size={14} /></button>
-                        <Input label="Name" value={t.name} onChange={(e) => updateTestimonial(t.id, 'name', e.target.value)} />
-                        <Input label="Role" value={t.role} onChange={(e) => updateTestimonial(t.id, 'role', e.target.value)} />
-                        <TextArea label="Quote" value={t.quote} onChange={(e) => updateTestimonial(t.id, 'quote', e.target.value)} rows={2} />
-                      </div>
-                    ))}
-                 </>
-              )}
-
-              {activeTab === 'tools' && (
-                 <>
-                    <h3 className="text-sm font-bold text-white">Skills & Stack</h3>
-                    
-                    <div className="space-y-6">
-                        <Input 
-                            label="Primary Workflow (Main Card)" 
-                            value={data.primaryTool || ''} 
-                            onChange={(e) => updateField('primaryTool', e.target.value)} 
-                            placeholder="e.g. DaVinci Resolve"
-                        />
-                        <TagInput 
-                            label="Other Softwares" 
-                            items={data.tools} 
-                            onChange={(items) => updateField('tools', items)} 
-                        />
-                        <TagInput 
-                            label="AI Tools" 
-                            items={data.aiTools} 
-                            onChange={(items) => updateField('aiTools', items)} 
-                        />
-                        <TagInput 
-                            label="General Skills" 
-                            items={data.skills} 
-                            onChange={(items) => updateField('skills', items)} 
-                        />
-                    </div>
-                 </>
-              )}
-           </div>
-        )}
-
         {/* === ACCOUNT SETTINGS === */}
         {activeTab === 'settings' && (
            <div className="space-y-8 animate-fadeIn">
@@ -931,15 +947,38 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
                  <div className="space-y-4 pt-2">
                     <Input 
                        label="Username" 
-                       value={data.settings?.username || 'admin'} 
+                       value={data.settings.username} 
                        onChange={(e) => updateSettings('username', e.target.value)} 
+                       autoComplete="off"
                     />
-                    <Input 
-                       label="Password" 
-                       value={data.settings?.password || 'cinefolio'} 
-                       onChange={(e) => updateSettings('password', e.target.value)} 
-                       type="text" // Show password for easier editing
-                    />
+                    <div className="relative">
+                        <Input 
+                           label="Password" 
+                           value={data.settings.password} 
+                           onChange={(e) => updateSettings('password', e.target.value)} 
+                           type={showSettingsPassword ? "text" : "password"}
+                           className="pr-10"
+                           autoComplete="off"
+                        />
+                        <button 
+                            type="button"
+                            className="absolute right-3 top-[1.9rem] text-zinc-500 hover:text-white transition-colors"
+                            onClick={() => setShowSettingsPassword(!showSettingsPassword)}
+                        >
+                            {showSettingsPassword ? <EyeOff size={16}/> : <Eye size={16}/>}
+                        </button>
+                    </div>
+                 </div>
+
+                 <div className="flex justify-end pt-2">
+                    <Button 
+                        size="sm" 
+                        onClick={onPublish}
+                        icon={isSaving ? <Loader2 className="animate-spin" size={14}/> : <CheckCircle2 size={14}/>}
+                        disabled={isSaving}
+                    >
+                        {isSaving ? 'Saving...' : 'Update Credentials'}
+                    </Button>
                  </div>
               </div>
 

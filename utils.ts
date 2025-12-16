@@ -1,12 +1,16 @@
 import { PortfolioData, INITIAL_DATA } from './types';
-import { db, isConfigured } from './firebase';
+import { db, storage, isConfigured } from './firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
 const COLLECTION_NAME = 'portfolios';
 const MAIN_DOC_ID = 'main_portfolio';
 const LOCAL_STORAGE_KEY = 'frames_portfolio_data';
+const DB_TIMEOUT_MS = 2500; // Timeout for DB operations
 
 export { isConfigured };
+export const hasCloudStorage = !!storage;
+
 
 // --- Brand Helpers ---
 
@@ -70,26 +74,38 @@ export const getBrandColor = (name: string): string => {
 export const encodeState = (data: PortfolioData): string => {
   try {
     const cleanProjects = data.projects.map(p => {
-        const isLocal = p.link.startsWith('blob:') || p.link.length > 50000;
-        const isThumbLocal = p.thumbnail.startsWith('blob:') || p.thumbnail.length > 50000;
+        // PRESERVE CLOUD LINKS: Only strip if it's a blob OR extremely large non-http string (base64)
+        const isBlob = p.link.startsWith('blob:');
+        const isTooLarge = p.link.length > 50000 && !p.link.startsWith('http');
+        const isLinkLocal = isBlob || isTooLarge;
+
+        const isThumbBlob = p.thumbnail.startsWith('blob:');
+        const isThumbTooLarge = p.thumbnail.length > 50000 && !p.thumbnail.startsWith('http');
+        const isThumbLocal = isThumbBlob || isThumbTooLarge;
+
         return {
             ...p,
-            link: isLocal ? '' : p.link, 
+            link: isLinkLocal ? '' : p.link, 
             thumbnail: isThumbLocal ? '' : p.thumbnail,
             thumbnailBlob: undefined,
             customVideoBlob: undefined
         };
     });
     
-    const isShowreelLocal = data.showreelLink.startsWith('blob:') || data.showreelLink.length > 50000;
-    const isProfileLocal = data.profileImage.startsWith('blob:') || data.profileImage.length > 50000;
-    const isReelThumbLocal = data.showreelThumbnail.startsWith('blob:') || data.showreelThumbnail.length > 50000;
+    const isShowreelBlob = data.showreelLink.startsWith('blob:');
+    const isShowreelTooLarge = data.showreelLink.length > 50000 && !data.showreelLink.startsWith('http');
+    const isShowreelLocal = isShowreelBlob || isShowreelTooLarge;
+
+    const isProfileBlob = data.profileImage.startsWith('blob:');
+    const isProfileTooLarge = data.profileImage.length > 50000 && !data.profileImage.startsWith('http');
+    const isProfileLocal = isProfileBlob || isProfileTooLarge;
 
     const cleanData = {
         ...data,
         profileImage: isProfileLocal ? '' : data.profileImage,
         showreelLink: isShowreelLocal ? '' : data.showreelLink,
-        showreelThumbnail: isReelThumbLocal ? '' : data.showreelThumbnail,
+        // Thumbnails are often small enough base64, but if huge, strip them.
+        showreelThumbnail: (data.showreelThumbnail.length > 50000 && !data.showreelThumbnail.startsWith('http')) ? '' : data.showreelThumbnail,
         projects: cleanProjects,
         profileImageBlob: undefined,
         showreelThumbnailBlob: undefined,
@@ -207,6 +223,39 @@ const blobToBase64 = (blob: Blob): Promise<string> => {
   });
 };
 
+// Upload Helper for Firebase Storage
+export const uploadFileToStorage = (file: File, path: string, onProgress?: (progress: number) => void): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        if (!storage) {
+            reject(new Error("Storage not configured or unavailable"));
+            return;
+        }
+        
+        try {
+            const storageRef = ref(storage, path);
+            const uploadTask = uploadBytesResumable(storageRef, file);
+
+            uploadTask.on('state_changed', 
+                (snapshot) => {
+                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                    if (onProgress) onProgress(progress);
+                }, 
+                (error) => {
+                    console.error("Upload failed", error);
+                    reject(error);
+                }, 
+                () => {
+                    getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
+                        resolve(downloadURL);
+                    });
+                }
+            );
+        } catch (e) {
+            reject(e);
+        }
+    });
+};
+
 export const saveToDB = async (data: PortfolioData): Promise<void> => {
   // Deep clone to prepare for serialization
   const dataToSave: any = { ...data };
@@ -225,7 +274,8 @@ export const saveToDB = async (data: PortfolioData): Promise<void> => {
   // --- 2. VIDEO HANDLING ---
   if (dataToSave.showreelBlob) {
       if (dataToSave.showreelLink && dataToSave.showreelLink.startsWith('blob:')) {
-         dataToSave.showreelLink = ""; 
+           console.warn("Unsaved blob detected for showreel. Clearing to prevent DB crash.");
+           dataToSave.showreelLink = ""; 
       }
   }
   delete dataToSave.showreelBlob;
@@ -242,7 +292,8 @@ export const saveToDB = async (data: PortfolioData): Promise<void> => {
 
           if (newP.customVideoBlob) {
               if (newP.link && newP.link.startsWith('blob:')) {
-                  newP.link = "";
+                   console.warn(`Unsaved blob detected for project ${newP.id}. Clearing.`);
+                   newP.link = "";
               }
           }
           delete newP.customVideoBlob;
@@ -256,16 +307,17 @@ export const saveToDB = async (data: PortfolioData): Promise<void> => {
   // Try Firestore if configured
   if (isConfigured && db) {
       try {
-          await setDoc(doc(db, COLLECTION_NAME, MAIN_DOC_ID), dataToSave);
-          return;
+          // Race against a timeout to prevent hanging on "Connection failed"
+          const savePromise = setDoc(doc(db, COLLECTION_NAME, MAIN_DOC_ID), dataToSave);
+          const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Firestore timeout")), DB_TIMEOUT_MS));
+          
+          await Promise.race([savePromise, timeoutPromise]);
       } catch (e) {
-          console.warn("Firestore save failed (offline?), falling back to Local Storage.", e);
+          console.warn("Firestore save failed (offline or db not created), falling back to Local Storage.", e);
       }
-  } else {
-      console.log("Firebase not configured, saving to localStorage.");
   }
 
-  // Local Storage Fallback
+  // Local Storage Fallback (Always save to local as backup)
   try {
      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(dataToSave));
   } catch (e: any) {
@@ -281,9 +333,15 @@ export const loadFromDB = async (): Promise<PortfolioData | null> => {
   if (isConfigured && db) {
       try {
         const docRef = doc(db, COLLECTION_NAME, MAIN_DOC_ID);
-        const docSnap = await getDoc(docRef);
+        
+        // Race against a timeout to prevent hanging on initial load if DB is missing/offline
+        const loadPromise = getDoc(docRef);
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Firestore timeout")), DB_TIMEOUT_MS));
 
-        if (docSnap.exists()) {
+        const docSnap = await Promise.race([loadPromise, timeoutPromise]) as any;
+
+        if (docSnap && docSnap.exists()) {
+          console.log("✅ Successfully connected to Firebase.");
           return docSnap.data() as PortfolioData;
         }
       } catch (e) {
