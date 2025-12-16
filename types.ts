@@ -61,7 +61,7 @@ export interface PortfolioData {
 
 export const INITIAL_DATA: PortfolioData = {
   username: "guest",
-  name: "Your Name",
+  name: "VARUN",
   role: "Creative Director",
   location: "Earth",
   languages: "English",

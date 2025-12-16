@@ -1,8 +1,9 @@
 import React, { useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { PortfolioData, Project, Testimonial } from '../types';
 import { Input, TextArea } from './ui/Input';
 import { Button } from './ui/Button';
-import { Plus, Trash2, Video, Wand2, Image, ChevronDown, ChevronUp, Upload, X, LayoutDashboard, Copy, ExternalLink, FileVideo, User, MessageSquare, Loader2, CheckCircle2, Globe, Crop, Settings, LogOut, AlertCircle, Share2, Eye, EyeOff, Cloud, Link, Sparkles, Wrench } from 'lucide-react';
+import { Plus, Trash2, Video, Wand2, Image, ChevronDown, ChevronUp, Upload, X, LayoutDashboard, Copy, ExternalLink, FileVideo, User, MessageSquare, Loader2, CheckCircle2, Globe, Crop, Settings, LogOut, AlertCircle, Share2, Eye, EyeOff, Cloud, Link, Sparkles, Wrench, ZoomIn, ZoomOut } from 'lucide-react';
 import Cropper from 'react-easy-crop';
 import { getCroppedImg, generateThumbnailFromVideo, encodeState, uploadFileToStorage, isConfigured, hasCloudStorage, generateAiBio, generateAiDescription } from '../utils';
 
@@ -308,29 +309,44 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
   return (
     <div className="h-full flex flex-col bg-zinc-950 border-r border-zinc-900 relative">
       
-      {/* Crop Modal */}
-      {cropModalOpen && tempImgSrc && (
-          <div className="absolute inset-0 z-50 bg-black flex flex-col">
-              <div className="relative flex-1 bg-zinc-900">
+      {/* Crop Modal - Moved to Portal */}
+      {cropModalOpen && tempImgSrc && createPortal(
+          <div className="fixed inset-0 z-[100] bg-black flex flex-col animate-in fade-in duration-200">
+              <div className="relative flex-1 bg-zinc-900 w-full h-full overflow-hidden">
                  <Cropper
                     image={tempImgSrc}
                     crop={crop}
                     zoom={zoom}
                     aspect={1}
                     onCropChange={setCrop}
-                    onCropComplete={useCallback((_, px) => setCroppedAreaPixels(px), [])}
+                    onCropComplete={(_, px) => setCroppedAreaPixels(px)}
                     onZoomChange={setZoom}
+                    objectFit="contain"
                  />
               </div>
-              <div className="p-4 bg-zinc-950 border-t border-zinc-800 flex flex-col gap-4">
+              <div className="p-6 bg-zinc-950 border-t border-zinc-800 flex flex-col gap-6 safe-area-pb">
+                 <div className="flex items-center gap-4 px-2">
+                     <ZoomOut size={16} className="text-zinc-500"/>
+                     <input 
+                        type="range" 
+                        min={1} 
+                        max={3} 
+                        step={0.1} 
+                        value={zoom} 
+                        onChange={(e) => setZoom(Number(e.target.value))} 
+                        className="flex-1 h-1 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-white"
+                     />
+                     <ZoomIn size={16} className="text-zinc-500"/>
+                 </div>
                  <div className="flex gap-3">
-                     <Button variant="secondary" className="flex-1" onClick={() => setCropModalOpen(false)}>Cancel</Button>
-                     <Button variant="primary" className="flex-1" onClick={saveCroppedImage} icon={profileImageUploading ? <Loader2 className="animate-spin" size={14}/> : <Crop size={14}/>}>
+                     <Button variant="secondary" className="flex-1 py-3" onClick={() => { setCropModalOpen(false); setTempImgSrc(null); setZoom(1); }}>Cancel</Button>
+                     <Button variant="primary" className="flex-1 py-3" onClick={saveCroppedImage} icon={profileImageUploading ? <Loader2 className="animate-spin" size={14}/> : <Crop size={14}/>}>
                         {profileImageUploading ? 'Uploading...' : 'Save & Upload'}
                      </Button>
                  </div>
               </div>
-          </div>
+          </div>,
+          document.body
       )}
 
       {/* Header */}

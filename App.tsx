@@ -3,7 +3,7 @@ import { PortfolioView } from './components/PortfolioView';
 import { EditorPanel } from './components/EditorPanel';
 import { PortfolioData, INITIAL_DATA } from './types';
 import { loadFromDB, saveToDB, isConfigured, auth, loginWithEmail, signupWithEmail, loginWithGoogle, checkUsernameAvailable } from './utils';
-import { Database, HardDrive, Loader2, Code, Eye } from 'lucide-react';
+import { Database, HardDrive, Loader2, Code, Eye, AlertCircle, X } from 'lucide-react';
 import { Button } from './components/ui/Button';
 import { onAuthStateChanged } from 'firebase/auth';
 
@@ -96,7 +96,7 @@ const App: React.FC = () => {
                 uid: cred.user.uid,
                 username: username.toLowerCase().replace(/\s/g, ''),
                 contactEmail: email,
-                name: "Your Name"
+                name: "VARUN"
             };
             await saveToDB(newProfile);
             setData(newProfile);
@@ -111,15 +111,19 @@ const App: React.FC = () => {
   };
 
   const handleGoogleAuth = async () => {
+      setAuthError('');
       try {
           await loginWithGoogle();
           // State change handled by onAuthStateChanged
       } catch (e: any) {
           console.error("Google Auth Error:", e);
           if (e.code === 'auth/unauthorized-domain') {
-              setAuthError("Domain not authorized in Firebase Console. Please add this domain.");
+              const currentDomain = window.location.hostname;
+              setAuthError(`Domain "${currentDomain}" is not authorized. Add it to Firebase Console > Authentication > Settings > Authorized Domains.`);
+          } else if (e.code === 'auth/popup-closed-by-user') {
+              setAuthError("Sign-in cancelled.");
           } else {
-              setAuthError("Google Sign-in failed. Please try again.");
+              setAuthError(e.message || "Google Sign-in failed. Please try again.");
           }
       }
   }
@@ -273,7 +277,18 @@ const App: React.FC = () => {
                    </div>
                 </div>
 
-                {authError && <div className="text-red-400 text-xs text-center py-2 bg-red-900/10 rounded border border-red-500/20">{authError}</div>}
+                {authError && (
+                    <div className="w-full bg-red-500/10 border border-red-500/20 rounded-lg p-3 flex items-start gap-2">
+                        <AlertCircle size={16} className="text-red-500 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1 text-red-400 text-xs text-left">
+                            <span className="font-bold block mb-1">Authentication Error</span>
+                            {authError}
+                        </div>
+                        <button type="button" onClick={() => setAuthError('')} className="text-red-500 hover:text-red-400">
+                            <X size={14}/>
+                        </button>
+                    </div>
+                )}
 
                 <Button className="w-full py-4 text-sm tracking-wide" size="lg" disabled={isAuthProcessing}>
                    {isAuthProcessing ? <Loader2 className="animate-spin"/> : (authMode === 'login' ? 'Enter Studio' : 'Create Account')}

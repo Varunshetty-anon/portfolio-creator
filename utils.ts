@@ -12,6 +12,7 @@ export { isConfigured, auth };
 export const hasCloudStorage = !!storage;
 
 // --- AI Integration ---
+// API Key is strictly from process.env.API_KEY
 const genAI = process.env.API_KEY ? new GoogleGenAI({ apiKey: process.env.API_KEY }) : null;
 
 export const generateAiBio = async (role: string, skills: string[], tone: string = "professional"): Promise<string> => {
