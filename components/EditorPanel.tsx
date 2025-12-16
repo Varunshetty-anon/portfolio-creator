@@ -2,9 +2,9 @@ import React, { useState, useCallback } from 'react';
 import { PortfolioData, Project, Testimonial } from '../types';
 import { Input, TextArea } from './ui/Input';
 import { Button } from './ui/Button';
-import { Plus, Trash2, Video, Wand2, Image, ChevronDown, ChevronUp, Upload, X, LayoutDashboard, Copy, ExternalLink, FileVideo, User, MessageSquare, Loader2, CheckCircle2, Globe, Crop, Smartphone, Monitor, AlertCircle, Settings, LogOut, Shield, Share2, Eye, EyeOff, Cloud, Link } from 'lucide-react';
+import { Plus, Trash2, Video, Wand2, Image, ChevronDown, ChevronUp, Upload, X, LayoutDashboard, Copy, ExternalLink, FileVideo, User, MessageSquare, Loader2, CheckCircle2, Globe, Crop, Smartphone, Monitor, AlertCircle, Settings, LogOut, Shield, Share2, Eye, EyeOff, Cloud, Link, Sparkles, Wrench } from 'lucide-react';
 import Cropper from 'react-easy-crop';
-import { getCroppedImg, generateThumbnailFromVideo, encodeState, uploadFileToStorage, isConfigured, hasCloudStorage } from '../utils';
+import { getCroppedImg, generateThumbnailFromVideo, encodeState, uploadFileToStorage, isConfigured, hasCloudStorage, generateAiBio } from '../utils';
 
 interface EditorPanelProps {
   data: PortfolioData;
@@ -25,54 +25,6 @@ const isValidUrl = (string: string) => {
     return false;
   }
 };
-
-const TagInput = ({ label, items, onChange }: { label: string, items: string[], onChange: (items: string[]) => void }) => {
-    const [input, setInput] = useState('');
-
-    const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter' || e.key === ',') {
-            e.preventDefault();
-            addTag();
-        }
-    };
-
-    const addTag = () => {
-        const trimmed = input.trim();
-        if (trimmed && !items.includes(trimmed)) {
-            onChange([...items, trimmed]);
-            setInput('');
-        }
-    };
-
-    const removeTag = (index: number) => {
-        onChange(items.filter((_, i) => i !== index));
-    };
-
-    return (
-        <div className="w-full space-y-2">
-            <label className="block text-xs font-medium text-zinc-500 uppercase tracking-wider">{label}</label>
-            <div className="flex flex-wrap gap-2 mb-2">
-                {items.map((item, i) => (
-                    <div key={i} className="flex items-center gap-1 bg-zinc-800 text-zinc-200 text-xs px-2 py-1 rounded-md border border-zinc-700">
-                        <span>{item}</span>
-                        <button onClick={() => removeTag(i)} className="hover:text-red-400"><X size={12}/></button>
-                    </div>
-                ))}
-            </div>
-            <div className="flex gap-2">
-                <input 
-                    type="text" 
-                    value={input} 
-                    onChange={e => setInput(e.target.value)} 
-                    onKeyDown={handleKeyDown}
-                    className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-zinc-200 text-sm focus:outline-none focus:border-indigo-500 transition-colors"
-                    placeholder="Type and press Enter..."
-                />
-                <Button size="sm" variant="secondary" onClick={addTag} icon={<Plus size={14}/>}>Add</Button>
-            </div>
-        </div>
-    );
-}
 
 const SocialInput = ({ 
     label, 
@@ -120,10 +72,9 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
   const [showreelUploading, setShowreelUploading] = useState<{progress: number} | null>(null);
   const [activeInputMethod, setActiveInputMethod] = useState<Record<string, 'upload' | 'link'>>({});
   const [showreelInputMethod, setShowreelInputMethod] = useState<'upload' | 'link'>(data.showreelLink.startsWith('blob:') ? 'upload' : 'link');
+  const [isGeneratingBio, setIsGeneratingBio] = useState(false);
+  const [profileImageUploading, setProfileImageUploading] = useState(false);
   
-  // Settings State
-  const [showSettingsPassword, setShowSettingsPassword] = useState(false);
-
   // Crop State
   const [cropModalOpen, setCropModalOpen] = useState(false);
   const [tempImgSrc, setTempImgSrc] = useState<string | null>(null);
@@ -142,71 +93,39 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
   const updateAvailability = (status: boolean) => {
      const newData = { 
          ...data, 
-         availability: { 
-             ...data.availability, 
-             status 
-         } 
+         availability: { ...data.availability, status } 
      };
      onChange(newData);
-     setTimeout(() => {
-        onPublish();
-     }, 100);
+     setTimeout(onPublish, 100);
   };
 
-  const updateAvailabilityLink = (link: string) => {
-      onChange({ 
-          ...data, 
-          availability: { 
-              ...data.availability, 
-              link 
-          } 
-      });
-  };
-  
-  const updateSettings = (field: 'username' | 'password', value: string) => {
-     onChange({
-        ...data,
-        settings: {
-           ...data.settings,
-           [field]: value
-        }
-     });
+  const handleAiBio = async () => {
+      setIsGeneratingBio(true);
+      const bio = await generateAiBio(data.role || "Creative", data.skills || []);
+      updateField('bio', bio);
+      setIsGeneratingBio(false);
   };
 
   // --- Link Generator ---
   const getShareLink = () => {
      const origin = window.location.origin === 'null' || !window.location.origin ? 'https://cinefolio.app' : window.location.origin;
-     
-     // STRICTLY return short link if Cloud is configured
      if (isConfigured) {
-         return `${origin}${window.location.pathname}#varunshetty-portfolio`;
+         return `${origin}${window.location.pathname}#${data.username}`;
      }
-
-     // Fallback to Encoded Link ONLY if not configured
-     try {
-        const encoded = encodeState(data);
-        return `${origin}${window.location.pathname}#varunshetty-portfolio?data=${encoded}`;
-     } catch (e) {
-        return '';
-     }
+     return `${origin}${window.location.pathname}#${data.username}`;
   };
 
   const copyLink = () => {
     try {
-      const link = getShareLink();
-      navigator.clipboard.writeText(link);
+      navigator.clipboard.writeText(getShareLink());
       setCopySuccess(true);
       setTimeout(() => setCopySuccess(false), 2000);
     } catch (e) {
-      console.warn('Clipboard write failed', e);
       alert('Could not access clipboard.');
     }
   };
 
-  const openLink = () => {
-      const link = getShareLink();
-      window.open(link, '_blank');
-  }
+  const openLink = () => window.open(getShareLink(), '_blank');
 
   // --- Project Helpers ---
   const addProject = () => {
@@ -216,8 +135,9 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
       description: "Brief description...",
       thumbnail: `https://picsum.photos/600/800?random=${Date.now()}`,
       link: "",
-      category: "Edit",
-      aspectRatio: "16:9"
+      category: "Work",
+      aspectRatio: "16:9",
+      type: 'video'
     };
     updateField('projects', [...data.projects, newProject]);
     setExpandedProject(newProject.id);
@@ -227,48 +147,14 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
   const removeProject = (id: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-
-    if (window.confirm("Are you sure you want to delete this project? This action cannot be undone.")) {
-        const updatedProjects = data.projects.filter(p => p.id !== id);
-        updateField('projects', updatedProjects);
-        
-        if (expandedProject === id) {
-            setExpandedProject(null);
-        }
+    if (window.confirm("Delete this project?")) {
+        updateField('projects', data.projects.filter(p => p.id !== id));
+        if (expandedProject === id) setExpandedProject(null);
     }
   };
 
   const updateProject = (id: string, updates: Partial<Project>) => {
-    const newProjects = data.projects.map(p => 
-      p.id === id ? { ...p, ...updates } : p
-    );
-    updateField('projects', newProjects);
-  };
-
-  const toggleInputMethod = (projectId: string, method: 'upload' | 'link') => {
-      setActiveInputMethod(prev => ({ ...prev, [projectId]: method }));
-  };
-
-  // --- Testimonial Helpers ---
-  const addTestimonial = () => {
-    const newTestimonial: Testimonial = {
-      id: Date.now().toString(),
-      name: "Client Name",
-      role: "Role",
-      quote: "Great work..."
-    };
-    updateField('testimonials', [...data.testimonials, newTestimonial]);
-  };
-
-  const removeTestimonial = (id: string) => {
-    updateField('testimonials', data.testimonials.filter(t => t.id !== id));
-  };
-
-  const updateTestimonial = (id: string, field: keyof Testimonial, value: string) => {
-    const newTestimonials = data.testimonials.map(t => 
-      t.id === id ? { ...t, [field]: value } : t
-    );
-    updateField('testimonials', newTestimonials);
+    updateField('projects', data.projects.map(p => p.id === id ? { ...p, ...updates } : p));
   };
 
   // --- File Upload ---
@@ -278,9 +164,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
     input.accept = accept;
     input.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
-      if (file) {
-        callback(file);
-      }
+      if (file) callback(file);
     };
     input.click();
   };
@@ -294,151 +178,128 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
     reader.readAsDataURL(file);
   };
 
-  const onCropComplete = useCallback((croppedArea: any, croppedAreaPixels: any) => {
-    setCroppedAreaPixels(croppedAreaPixels);
-  }, []);
-
   const saveCroppedImage = async () => {
       if (!tempImgSrc || !croppedAreaPixels) return;
       try {
+          setProfileImageUploading(true);
           const croppedBlob = await getCroppedImg(tempImgSrc, croppedAreaPixels);
-          const url = URL.createObjectURL(croppedBlob);
           const file = new File([croppedBlob], "profile_cropped.jpg", { type: "image/jpeg" });
-          onChange({ ...data, profileImage: url, profileImageBlob: file });
+          
+          if (hasCloudStorage) {
+             const url = await uploadFileToStorage(file, `users/${data.uid || 'guest'}/profile/${Date.now()}.jpg`);
+             onChange({ ...data, profileImage: url, profileImageBlob: undefined });
+          } else {
+             // Fallback for offline/demo
+             const url = URL.createObjectURL(croppedBlob);
+             onChange({ ...data, profileImage: url, profileImageBlob: file });
+          }
+          
           setCropModalOpen(false);
           setTempImgSrc(null);
+          setProfileImageUploading(false);
       } catch (e) {
           console.error(e);
+          setProfileImageUploading(false);
       }
-  };
-
-  const handleShowreelThumbUpload = (file: File) => {
-    const url = URL.createObjectURL(file);
-    onChange({ ...data, showreelThumbnail: url, showreelThumbnailBlob: file });
   };
 
   const handleShowreelVideoUpload = async (file: File) => {
     setShowreelUploading({ progress: 1 });
-    
-    // Check if Firebase Storage is active using availability flag
     if (hasCloudStorage) {
         try {
             const downloadUrl = await uploadFileToStorage(
                 file, 
-                `showreels/${Date.now()}_${file.name}`, 
+                `users/${data.uid || 'guest'}/showreels/${Date.now()}_${file.name}`, 
                 (progress) => setShowreelUploading({ progress })
             );
-            
             onChange({ ...data, showreelLink: downloadUrl, showreelBlob: undefined });
             setShowreelUploading(null);
-            alert("Showreel uploaded successfully to cloud!");
         } catch (e) {
-            console.error("Showreel upload failed", e);
-            alert("Upload failed. Check console.");
+            console.error(e);
             setShowreelUploading(null);
         }
-    } else {
-        // Fallback to simulated local upload (Not recommended for large files)
-        alert("Firebase Storage not configured. Video will be saved locally (Link sharing will NOT work for this video).");
-        let progress = 0;
-        const interval = setInterval(() => {
-            progress += 5;
-            setShowreelUploading({ progress });
-            if (progress >= 100) {
-                clearInterval(interval);
-                const url = URL.createObjectURL(file);
-                onChange({ ...data, showreelLink: url, showreelBlob: file });
-                setTimeout(() => setShowreelUploading(null), 500);
-            }
-        }, 50);
     }
-  };
-
-  const handleProjectThumbUpload = (id: string, file: File) => {
-    const url = URL.createObjectURL(file);
-    updateProject(id, { thumbnail: url, thumbnailBlob: file });
   };
 
   const handleProjectVideoUpload = async (id: string, file: File) => {
     setUploadingState({ id, progress: 1 });
     
-    // Attempt to detect aspect ratio from video metadata (local read)
+    // Detect Aspect Ratio
     const video = document.createElement('video');
     video.preload = 'metadata';
     video.src = URL.createObjectURL(file);
     let detectedAspectRatio: '16:9' | '9:16' = '16:9';
-    
     video.onloadedmetadata = () => {
-        if (video.videoHeight > video.videoWidth) {
-            detectedAspectRatio = '9:16';
-        }
+        if (video.videoHeight > video.videoWidth) detectedAspectRatio = '9:16';
     };
 
-    // Start generating thumbnail locally
     let generatedThumb: { url: string, blob: Blob } | null = null;
-    try {
-        generatedThumb = await generateThumbnailFromVideo(file);
-    } catch (e) {
-        console.warn("Thumbnail generation skipped:", e);
-    }
+    try { generatedThumb = await generateThumbnailFromVideo(file); } catch (e) {}
 
-    // Check if Firebase Storage is active using availability flag
     if (hasCloudStorage) {
-        // REAL UPLOAD
         try {
             const downloadUrl = await uploadFileToStorage(
                 file, 
-                `projects/${id}/${Date.now()}_${file.name}`,
+                `users/${data.uid || 'guest'}/projects/${id}/${Date.now()}_${file.name}`,
                 (progress) => setUploadingState({ id, progress })
             );
 
             const updates: Partial<Project> = { 
                 link: downloadUrl, 
-                customVideoBlob: undefined, // Clear local blob
+                customVideoBlob: undefined, 
                 aspectRatio: detectedAspectRatio
             };
             
             if (generatedThumb) {
-                updates.thumbnail = generatedThumb.url;
-                updates.thumbnailBlob = generatedThumb.blob;
+                // Upload thumbnail too
+                const thumbUrl = await uploadFileToStorage(
+                    new File([generatedThumb.blob], "thumb.jpg", { type: "image/jpeg" }), 
+                    `users/${data.uid || 'guest'}/projects/${id}/thumb_${Date.now()}.jpg`
+                );
+                updates.thumbnail = thumbUrl;
+                updates.thumbnailBlob = undefined;
             }
 
             updateProject(id, updates);
             setUploadingState(null);
-            alert("Video uploaded successfully to cloud! Don't forget to save changes.");
         } catch (e) {
-            console.error("Project upload failed", e);
-            alert("Upload failed. Check console.");
+            console.error(e);
             setUploadingState(null);
         }
-    } else {
-        // SIMULATED UPLOAD (Fallback)
-        alert("Firebase Storage not configured. Video will be saved locally (Link sharing will NOT work for this video).");
-        let progress = 30;
-        const interval = setInterval(() => {
-          progress += 10;
-          setUploadingState({ id, progress });
-          
-          if (progress >= 100) {
-            clearInterval(interval);
-            const url = URL.createObjectURL(file);
-            
-            const updates: Partial<Project> = { 
-                link: url, 
-                customVideoBlob: file,
-                aspectRatio: detectedAspectRatio
-            };
-            
-            if (generatedThumb) {
-                updates.thumbnail = generatedThumb.url;
-                updates.thumbnailBlob = generatedThumb.blob;
-            }
-
-            updateProject(id, updates);
-            setTimeout(() => setUploadingState(null), 500);
-          }
-        }, 100);
     }
+  };
+
+  const handleThumbnailUpload = async (id: string, file: File) => {
+      // Upload directly
+      if (hasCloudStorage) {
+         try {
+            const url = await uploadFileToStorage(file, `users/${data.uid || 'guest'}/projects/${id}/custom_thumb_${Date.now()}.jpg`);
+            updateProject(id, { thumbnail: url, thumbnailBlob: undefined });
+         } catch(e) {
+             console.error(e);
+         }
+      } else {
+         updateProject(id, { thumbnail: URL.createObjectURL(file), thumbnailBlob: file });
+      }
+  }
+
+  // --- Testimonials ---
+  const addTestimonial = () => {
+      const newT: Testimonial = {
+          id: Date.now().toString(),
+          name: "Client Name",
+          role: "Director",
+          quote: "Working with them was an absolute game changer."
+      };
+      updateField('testimonials', [...data.testimonials, newT]);
+  };
+
+  const removeTestimonial = (id: string) => {
+      updateField('testimonials', data.testimonials.filter(t => t.id !== id));
+  };
+
+  const updateTestimonial = (id: string, field: keyof Testimonial, val: string) => {
+      updateField('testimonials', data.testimonials.map(t => t.id === id ? { ...t, [field]: val } : t));
   };
 
   return (
@@ -454,26 +315,16 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
                     zoom={zoom}
                     aspect={1}
                     onCropChange={setCrop}
-                    onCropComplete={onCropComplete}
+                    onCropComplete={useCallback((_, px) => setCroppedAreaPixels(px), [])}
                     onZoomChange={setZoom}
                  />
               </div>
               <div className="p-4 bg-zinc-950 border-t border-zinc-800 flex flex-col gap-4">
-                 <div className="flex items-center gap-2 px-2">
-                    <span className="text-xs text-zinc-500 font-medium">Zoom</span>
-                    <input 
-                       type="range"
-                       min={1}
-                       max={3}
-                       step={0.1}
-                       value={zoom}
-                       onChange={(e) => setZoom(Number(e.target.value))}
-                       className="w-full h-1 bg-zinc-800 rounded-full appearance-none accent-indigo-500"
-                    />
-                 </div>
                  <div className="flex gap-3">
                      <Button variant="secondary" className="flex-1" onClick={() => setCropModalOpen(false)}>Cancel</Button>
-                     <Button variant="primary" className="flex-1" onClick={saveCroppedImage} icon={<Crop size={14}/>}>Save Crop</Button>
+                     <Button variant="primary" className="flex-1" onClick={saveCroppedImage} icon={profileImageUploading ? <Loader2 className="animate-spin" size={14}/> : <Crop size={14}/>}>
+                        {profileImageUploading ? 'Uploading...' : 'Save & Upload'}
+                     </Button>
                  </div>
               </div>
           </div>
@@ -482,8 +333,8 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
       {/* Header */}
       <div className="p-6 border-b border-zinc-800 bg-zinc-950 flex justify-between items-center">
         <div>
-          <h2 className="text-xl font-display font-bold text-white mb-1">Frames Studio</h2>
-          <p className="text-xs text-zinc-500">v1.2.3 • Pro Account</p>
+          <h2 className="text-xl font-display font-bold text-white mb-1">Editor</h2>
+          <p className="text-xs text-zinc-500">Logged in as {data.username}</p>
         </div>
       </div>
 
@@ -493,17 +344,18 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
            { id: 'dashboard', icon: LayoutDashboard },
            { id: 'profile', icon: User },
            { id: 'content', icon: Video },
+           { id: 'tools', icon: Wrench },
            { id: 'testimonials', icon: MessageSquare },
-           { id: 'tools', icon: Wand2 },
            { id: 'settings', icon: Settings }
         ].map((tab) => (
            <button 
            key={tab.id}
            onClick={() => setActiveTab(tab.id as any)}
-           className={`flex-1 py-4 px-3 text-xs font-medium transition-all flex flex-col items-center gap-1 ${activeTab === tab.id ? 'bg-zinc-800 text-white border-b-2 border-indigo-500' : 'text-zinc-500 hover:text-zinc-300'}`}
+           className={`flex-1 py-4 px-3 text-xs font-medium transition-all flex flex-col items-center gap-1 min-w-[70px] ${activeTab === tab.id ? 'bg-zinc-800 text-white border-b-2 border-indigo-500' : 'text-zinc-500 hover:text-zinc-300'}`}
          >
            <tab.icon size={16} />
-           <span className="capitalize">{tab.id === 'settings' ? 'Account' : tab.id}</span>
+           <span className="capitalize hidden md:block">{tab.id === 'settings' ? 'Account' : tab.id}</span>
+           <span className="capitalize md:hidden">{tab.id === 'testimonials' ? 'Endorse' : (tab.id === 'settings' ? 'Acct' : tab.id)}</span>
          </button>
         ))}
       </div>
@@ -514,32 +366,19 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
         {/* === DASHBOARD TAB === */}
         {activeTab === 'dashboard' && (
           <div className="space-y-6 animate-fadeIn">
-             {/* Availability Toggle */}
              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
                 <div className="flex items-center justify-between mb-4">
                     <div>
                         <h3 className="text-white font-bold text-sm">Work Availability</h3>
-                        <p className="text-xs text-zinc-500">Status shown on your profile</p>
+                        <p className="text-xs text-zinc-500">Show on profile</p>
                     </div>
                     <button 
                        onClick={() => updateAvailability(!data.availability.status)}
-                       className={`relative w-12 h-6 rounded-full transition-colors duration-200 ease-in-out ${data.availability.status ? 'bg-green-500' : 'bg-zinc-700'}`}
+                       className={`relative w-12 h-6 rounded-full transition-colors ${data.availability.status ? 'bg-green-500' : 'bg-zinc-700'}`}
                     >
-                        <span className={`absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full transition-transform duration-200 shadow-md ${data.availability.status ? 'translate-x-6' : 'translate-x-0'}`} />
+                        <span className={`absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full transition-transform ${data.availability.status ? 'translate-x-6' : 'translate-x-0'}`} />
                     </button>
                 </div>
-
-                {!data.availability.status && (
-                    <div className="space-y-3 pt-4 border-t border-zinc-800 animate-in fade-in slide-in-from-top-2">
-                        <Input 
-                            label="Current Project Link (Optional)"
-                            placeholder="https://..."
-                            value={data.availability.link || ''}
-                            onChange={(e) => updateAvailabilityLink(e.target.value)}
-                        />
-                        <p className="text-[10px] text-zinc-500">Visitors will see "Currently Working" and can click this link.</p>
-                    </div>
-                )}
              </div>
 
              <div className="bg-gradient-to-br from-indigo-900/30 to-purple-900/10 border border-indigo-500/30 rounded-2xl p-6">
@@ -551,60 +390,32 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
                    </span>
                 </div>
 
-                <Button 
-                   onClick={onPublish} 
-                   className="w-full mb-2" 
-                   variant={hasUnsavedChanges ? 'primary' : 'secondary'}
-                >
-                   {isSaving ? 'Publishing...' : 'Save & Publish Changes'}
+                <Button onClick={onPublish} className="w-full mb-2" variant={hasUnsavedChanges ? 'primary' : 'secondary'}>
+                   {isSaving ? 'Publishing...' : 'Save & Publish'}
                 </Button>
-                {hasUnsavedChanges && <p className="text-xs text-center text-zinc-500 mt-2">You have unsaved edits.</p>}
              </div>
              
-             {/* Link generator */}
              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-4">
                 <div className="flex items-center gap-2">
                    <Share2 size={16} className="text-indigo-500"/>
                    <h3 className="text-white font-bold text-sm uppercase tracking-wider">Share Portfolio</h3>
                 </div>
                 
-                {isConfigured ? (
-                    <p className="text-[10px] text-zinc-500 leading-relaxed">
-                        <Cloud size={10} className="inline mr-1 text-indigo-400" />
-                        <strong>Cloud Sync Active:</strong> Your portfolio is live via Firebase. Use the link below.
-                    </p>
-                ) : (
-                    <p className="text-[10px] text-zinc-500 leading-relaxed">
-                       <strong>Serverless Mode:</strong> Firebase is not configured. This long link contains all your data.
-                    </p>
-                )}
-
                 <div className="flex flex-col gap-2 bg-black rounded-lg p-3 border border-zinc-800">
                    <div className="flex items-center gap-2 text-zinc-500 mb-1">
                       <Link size={12} />
-                      <span className="text-[10px] font-mono truncate text-white">
-                          {isConfigured ? '.../#varunshetty-portfolio' : '.../?data=...'}
-                      </span>
+                      <span className="text-[10px] font-mono truncate text-white">.../#{data.username}</span>
                    </div>
 
                    <div className="flex items-center gap-2">
                       <Button size="sm" className="w-full text-xs" onClick={copyLink} icon={copySuccess ? <CheckCircle2 size={14}/> : <Copy size={14}/>}>
-                         {copySuccess ? 'Copied' : 'Copy Portfolio Link'}
+                         {copySuccess ? 'Copied' : 'Copy Link'}
                       </Button>
                       <Button size="sm" variant="secondary" className="px-3" onClick={openLink}>
                          <ExternalLink size={14} />
                       </Button>
                    </div>
                 </div>
-                
-                {!isConfigured && (
-                    <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-lg p-3">
-                       <p className="text-[10px] text-yellow-500/80">
-                          <AlertCircle size={10} className="inline mr-1"/>
-                          Local media cannot be shared via link. Configure Firebase for cloud hosting.
-                       </p>
-                    </div>
-                )}
              </div>
           </div>
         )}
@@ -617,65 +428,37 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
               <div className="flex items-center gap-4">
                 <div className="w-16 h-16 rounded-full bg-zinc-800 overflow-hidden border border-zinc-700 relative group">
                   <img src={data.profileImage} alt="Profile" className="w-full h-full object-cover" />
+                  {profileImageUploading && <div className="absolute inset-0 bg-black/50 flex items-center justify-center"><Loader2 className="animate-spin text-white"/></div>}
                 </div>
-                <div className="flex flex-col gap-2">
-                    <Button size="sm" variant="secondary" onClick={() => handleFileUpload('image/*', handleProfileImageUpload)} icon={<Upload size={14}/>}>
-                        Upload & Crop
-                    </Button>
-                </div>
+                <Button size="sm" variant="secondary" onClick={() => handleFileUpload('image/*', handleProfileImageUpload)} icon={<Upload size={14}/>}>
+                    Upload
+                </Button>
               </div>
-              <p className="text-[10px] text-zinc-500">Recommended: Square aspect ratio (1:1)</p>
             </div>
             
             <div className="space-y-4 pt-4 border-t border-zinc-800">
               <h3 className="text-sm font-bold text-white">Identity</h3>
               <Input label="Full Name" value={data.name} onChange={(e) => updateField('name', e.target.value)} />
               <Input label="Job Title" value={data.role} onChange={(e) => updateField('role', e.target.value)} />
-              <TextArea label="Bio / Intro" value={data.bio} onChange={(e) => updateField('bio', e.target.value)} rows={4} />
+              <div className="relative">
+                 <TextArea label="Bio / Intro" value={data.bio} onChange={(e) => updateField('bio', e.target.value)} rows={4} />
+                 <button onClick={handleAiBio} className="absolute bottom-3 right-3 text-indigo-400 hover:text-white transition-colors" title="Generate with AI">
+                     {isGeneratingBio ? <Loader2 size={16} className="animate-spin"/> : <Sparkles size={16} />}
+                 </button>
+              </div>
               <div className="grid grid-cols-2 gap-3">
-                <Input label="Base Location" value={data.location} onChange={(e) => updateField('location', e.target.value)} />
+                <Input label="Location" value={data.location} onChange={(e) => updateField('location', e.target.value)} />
                 <Input label="Languages" value={data.languages} onChange={(e) => updateField('languages', e.target.value)} />
               </div>
             </div>
 
             <div className="space-y-4 pt-4 border-t border-zinc-800">
               <h3 className="text-sm font-bold text-white">Socials</h3>
-              <p className="text-[10px] text-zinc-500 mb-2">Links will only appear on your portfolio if verified as valid.</p>
-              
-              <SocialInput 
-                label="Email" 
-                value={data.socials.email} 
-                onChange={(e) => updateSocials('email', e.target.value)} 
-                placeholder="you@example.com"
-              />
-              <SocialInput 
-                label="Instagram" 
-                value={data.socials.instagram || ''} 
-                onChange={(e) => updateSocials('instagram', e.target.value)} 
-                placeholder="https://instagram.com/username"
-                platformDomain="instagram.com"
-              />
-              <SocialInput 
-                label="Twitter / X" 
-                value={data.socials.twitter || ''} 
-                onChange={(e) => updateSocials('twitter', e.target.value)} 
-                placeholder="https://x.com/username"
-                platformDomain="x.com"
-              />
-              <SocialInput 
-                label="YouTube" 
-                value={data.socials.youtube || ''} 
-                onChange={(e) => updateSocials('youtube', e.target.value)} 
-                placeholder="https://youtube.com/@channel"
-                platformDomain="youtube.com"
-              />
-              <SocialInput 
-                label="LinkedIn" 
-                value={data.socials.linkedin || ''} 
-                onChange={(e) => updateSocials('linkedin', e.target.value)} 
-                placeholder="https://linkedin.com/in/username"
-                platformDomain="linkedin.com"
-              />
+              <SocialInput label="Email" value={data.socials.email} onChange={(e) => updateSocials('email', e.target.value)} placeholder="you@example.com"/>
+              <SocialInput label="Instagram" value={data.socials.instagram || ''} onChange={(e) => updateSocials('instagram', e.target.value)} placeholder="https://instagram.com/username"/>
+              <SocialInput label="LinkedIn" value={data.socials.linkedin || ''} onChange={(e) => updateSocials('linkedin', e.target.value)} placeholder="https://linkedin.com/in/username"/>
+              <SocialInput label="Twitter / X" value={data.socials.twitter || ''} onChange={(e) => updateSocials('twitter', e.target.value)} placeholder="https://x.com/username"/>
+              <SocialInput label="YouTube" value={data.socials.youtube || ''} onChange={(e) => updateSocials('youtube', e.target.value)} placeholder="https://youtube.com/@channel"/>
             </div>
           </div>
         )}
@@ -683,120 +466,52 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
         {/* ... CONTENT TAB ... */}
         {activeTab === 'content' && (
           <div className="space-y-6 animate-fadeIn">
-            {/* Showreel (unchanged) */}
+            {/* Showreel */}
             <div className="bg-zinc-900/50 p-4 rounded-xl border border-zinc-800 space-y-3">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2"><Video size={14} className="text-purple-400"/> Featured Showreel</h3>
+              <h3 className="text-sm font-bold text-white flex items-center gap-2"><Video size={14} className="text-purple-400"/> Showreel</h3>
               
               <div className="flex p-1 bg-zinc-900 rounded-lg mb-2">
-                 <button 
-                    onClick={() => setShowreelInputMethod('upload')}
-                    className={`flex-1 text-xs py-1.5 rounded-md transition-colors ${showreelInputMethod === 'upload' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
-                 >
-                    Upload File
-                 </button>
-                 <button 
-                    onClick={() => setShowreelInputMethod('link')}
-                    className={`flex-1 text-xs py-1.5 rounded-md transition-colors ${showreelInputMethod === 'link' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
-                 >
-                    External URL
-                 </button>
+                 <button onClick={() => setShowreelInputMethod('upload')} className={`flex-1 text-xs py-1.5 rounded-md transition-colors ${showreelInputMethod === 'upload' ? 'bg-zinc-800 text-white' : 'text-zinc-500'}`}>Upload</button>
+                 <button onClick={() => setShowreelInputMethod('link')} className={`flex-1 text-xs py-1.5 rounded-md transition-colors ${showreelInputMethod === 'link' ? 'bg-zinc-800 text-white' : 'text-zinc-500'}`}>Link</button>
               </div>
 
               {showreelInputMethod === 'upload' ? (
                   showreelUploading ? (
                      <div className="h-24 bg-zinc-900 border border-zinc-800 rounded-lg flex flex-col items-center justify-center p-4">
-                        <div className="w-full flex justify-between text-xs text-zinc-400 mb-2">
-                           <span>Uploading...</span>
-                           <span>{Math.round(showreelUploading.progress)}%</span>
-                        </div>
-                        <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
-                           <div className="h-full bg-indigo-500 transition-all duration-300" style={{ width: `${showreelUploading.progress}%` }}></div>
-                        </div>
+                        <Loader2 className="animate-spin mb-2" />
+                        <span className="text-xs">Uploading...</span>
                      </div>
                   ) : (
-                      data.showreelLink.startsWith('blob:') || (isConfigured && data.showreelLink.includes('firebasestorage')) ? (
-                         <div className="bg-zinc-800 rounded-lg p-3 border border-zinc-700 flex items-center justify-between group">
-                            <div className="flex items-center gap-3 overflow-hidden">
-                                <div className="p-2 bg-zinc-900 rounded">
-                                    <FileVideo size={20} className="text-indigo-400"/>
-                                </div>
-                                <div className="flex flex-col overflow-hidden">
-                                    <span className="text-xs font-medium text-white truncate">{data.showreelLink.includes('firebasestorage') ? 'Cloud File' : 'Local File'}</span>
-                                    <span className="text-[10px] text-zinc-500 truncate">{data.showreelLink}</span>
-                                </div>
-                            </div>
-                            <Button size="sm" variant="ghost" className="text-zinc-400 hover:text-red-400 p-1" onClick={() => updateField('showreelLink', '')}>
-                                <Trash2 size={16}/>
-                            </Button>
-                         </div>
-                      ) : (
-                         <Button size="sm" className="w-full h-24 border-2 border-dashed border-zinc-700 bg-zinc-900/50 hover:bg-zinc-900 hover:border-zinc-500 flex flex-col gap-2" variant="ghost" onClick={() => handleFileUpload('video/*', handleShowreelVideoUpload)}>
-                            <Upload size={24} className="text-zinc-400"/>
-                            <div className="flex flex-col items-center">
-                                <span className="text-xs font-medium text-zinc-300">Choose Video File</span>
-                                <span className="text-[10px] text-zinc-500">MP4, MOV (Cloud Storage)</span>
-                            </div>
-                         </Button>
-                      )
+                     <Button size="sm" className="w-full h-24 border-2 border-dashed border-zinc-700 bg-zinc-900/50 hover:bg-zinc-900" variant="ghost" onClick={() => handleFileUpload('video/*', handleShowreelVideoUpload)}>
+                        <Upload size={24} className="text-zinc-400 mb-2"/>
+                        <span className="text-xs">Select Video</span>
+                     </Button>
                   )
               ) : (
-                  <Input label="Video Link" value={data.showreelLink.startsWith('blob:') ? '' : data.showreelLink} onChange={(e) => updateField('showreelLink', e.target.value)} placeholder="https://youtube.com/..." />
+                  <Input label="Link" value={data.showreelLink} onChange={(e) => updateField('showreelLink', e.target.value)} />
               )}
-              
-              <div className="space-y-2">
-                 <label className="text-xs font-medium text-zinc-500 uppercase">Poster Frame</label>
-                 <div className="flex items-center gap-3">
-                    <div className="w-20 h-12 bg-zinc-900 rounded border border-zinc-800 overflow-hidden">
-                       <img src={data.showreelThumbnail} className="w-full h-full object-cover" />
-                    </div>
-                    <Button size="sm" variant="secondary" onClick={() => handleFileUpload('image/*', handleShowreelThumbUpload)}>Change</Button>
-                 </div>
-              </div>
             </div>
 
             {/* Projects */}
             <div className="space-y-3">
                <div className="flex justify-between items-center">
-                 <h3 className="text-sm font-bold text-white">Selected Works</h3>
+                 <h3 className="text-sm font-bold text-white">Works</h3>
                  <Button size="sm" variant="secondary" onClick={addProject} icon={<Plus size={14}/>}>Add</Button>
                </div>
                
                <div className="space-y-3">
-                 {data.projects.map((project, idx) => {
+                 {data.projects.map((project) => {
                    const isUploading = uploadingState?.id === project.id;
-                   const uploadProgress = uploadingState?.progress || 0;
-                   const currentInputMethod = activeInputMethod[project.id] || (project.link && !project.link.startsWith('blob:') ? 'link' : 'upload');
-
                    return (
-                   <div key={project.id} className="bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden animate-in slide-in-from-top-2 duration-300">
-                     <div className="flex items-center justify-between p-3 hover:bg-zinc-800 transition-colors group relative">
-                       <div 
-                           className="flex items-center gap-3 overflow-hidden flex-1 cursor-pointer mr-2"
-                           onClick={() => setExpandedProject(expandedProject === project.id ? null : project.id)}
-                       >
-                         <div className="w-10 h-10 rounded bg-zinc-800 flex-shrink-0 bg-cover bg-center" style={{backgroundImage: `url(${project.thumbnail})`}}></div>
-                         <div className="flex flex-col overflow-hidden">
-                            <span className="text-sm font-medium truncate text-white">{project.title}</span>
-                            <span className="text-xs text-zinc-500 truncate">{project.category}</span>
-                         </div>
+                   <div key={project.id} className="bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden">
+                     <div className="flex items-center justify-between p-3 hover:bg-zinc-800 cursor-pointer" onClick={() => setExpandedProject(expandedProject === project.id ? null : project.id)}>
+                       <div className="flex items-center gap-3">
+                         <div className="w-10 h-10 rounded bg-zinc-800 bg-cover bg-center" style={{backgroundImage: `url(${project.thumbnail})`}}></div>
+                         <span className="text-sm font-medium text-white">{project.title}</span>
                        </div>
-                       
-                       <div className="flex items-center gap-1 relative z-20">
-                         <button 
-                            type="button"
-                            onClick={(e) => removeProject(project.id, e)} 
-                            className="w-8 h-8 flex items-center justify-center bg-zinc-800 hover:bg-red-500/20 text-zinc-400 hover:text-red-500 transition-colors rounded-full z-20 cursor-pointer"
-                            title="Delete Project"
-                         >
-                            <Trash2 size={16} />
-                         </button>
-                         <button 
-                             type="button"
-                             className="w-8 h-8 flex items-center justify-center text-zinc-500 hover:text-zinc-300 transition-colors rounded-full cursor-pointer"
-                             onClick={() => setExpandedProject(expandedProject === project.id ? null : project.id)}
-                         >
-                            {expandedProject === project.id ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
-                         </button>
+                       <div className="flex gap-2">
+                           <button onClick={(e) => removeProject(project.id, e)} className="p-1 hover:text-red-500"><Trash2 size={16}/></button>
+                           {expandedProject === project.id ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
                        </div>
                      </div>
                      
@@ -806,123 +521,35 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
                          
                          <div className="grid grid-cols-2 gap-3">
                             <Input label="Category" value={project.category} onChange={(e) => updateProject(project.id, { category: e.target.value })} />
-                            
-                            {/* Aspect Ratio Toggle */}
-                            <div className="w-full">
-                                <label className="block text-xs font-medium text-zinc-500 mb-1 uppercase tracking-wider">Format</label>
-                                <div className="flex bg-zinc-900 border border-zinc-800 rounded-lg p-1">
-                                    <button 
-                                      onClick={() => updateProject(project.id, { aspectRatio: '16:9' })}
-                                      className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded text-[10px] font-medium transition-colors ${!project.aspectRatio || project.aspectRatio === '16:9' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
-                                      title="Landscape 16:9"
-                                    >
-                                        <Monitor size={12}/> Landscape
-                                    </button>
-                                    <button 
-                                      onClick={() => updateProject(project.id, { aspectRatio: '9:16' })}
-                                      className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded text-[10px] font-medium transition-colors ${project.aspectRatio === '9:16' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
-                                      title="Portrait 9:16"
-                                    >
-                                        <Smartphone size={12}/> Vertical
-                                    </button>
+                            <div className="space-y-1">
+                                <label className="text-xs font-medium text-zinc-500 uppercase">Type</label>
+                                <div className="flex bg-zinc-900 rounded border border-zinc-800 p-1">
+                                    <button onClick={() => updateProject(project.id, { type: 'video' })} className={`flex-1 text-xs py-1 rounded ${project.type !== 'image' ? 'bg-zinc-800 text-white' : 'text-zinc-500'}`}>Video</button>
+                                    <button onClick={() => updateProject(project.id, { type: 'image' })} className={`flex-1 text-xs py-1 rounded ${project.type === 'image' ? 'bg-zinc-800 text-white' : 'text-zinc-500'}`}>Image</button>
                                 </div>
                             </div>
                          </div>
 
-                         <TextArea label="Description" value={project.description || ''} onChange={(e) => updateProject(project.id, { description: e.target.value })} rows={2} />
-                         
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                               <label className="text-xs font-medium text-zinc-500 uppercase">Thumbnail</label>
-                               <div className="flex flex-col gap-2">
-                                  {project.thumbnail && <img src={project.thumbnail} className="w-full aspect-video object-cover rounded border border-zinc-800 bg-black" />}
-                                  <div className="flex gap-2">
-                                     <Button size="sm" className="flex-1" variant="secondary" onClick={() => handleFileUpload('image/*', (file) => handleProjectThumbUpload(project.id, file))}>
-                                        <Upload size={14} className="mr-2"/> Upload
-                                     </Button>
-                                  </div>
-                               </div>
-                            </div>
-
-                            <div className="space-y-2">
-                               <label className="text-xs font-medium text-zinc-500 uppercase">Video Asset</label>
-                               
-                               {/* Uploading State */}
-                               {isUploading && (
-                                 <div className="h-24 bg-zinc-900 border border-zinc-800 rounded-lg flex flex-col items-center justify-center p-4">
-                                    <div className="w-full flex justify-between text-xs text-zinc-400 mb-2">
-                                       <span>Uploading...</span>
-                                       <span>{Math.round(uploadProgress)}%</span>
+                         {project.type !== 'image' && (
+                             <div className="space-y-2">
+                                <label className="text-xs font-medium text-zinc-500 uppercase">Video Source</label>
+                                {isUploading ? (
+                                    <div className="text-xs text-center py-4">Uploading...</div>
+                                ) : (
+                                    <div className="flex gap-2">
+                                        <Button size="sm" variant="secondary" onClick={() => handleFileUpload('video/*', (f) => handleProjectVideoUpload(project.id, f))} className="flex-1">Upload File</Button>
+                                        <Input placeholder="Or paste URL" value={project.link} onChange={(e) => updateProject(project.id, { link: e.target.value })} className="flex-[2]"/>
                                     </div>
-                                    <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
-                                       <div className="h-full bg-indigo-500 transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
-                                    </div>
-                                 </div>
-                               )}
+                                )}
+                             </div>
+                         )}
 
-                               {/* File Active State */}
-                               {!isUploading && project.link && (
-                                   <div className="bg-zinc-800 rounded-lg p-3 border border-zinc-700 flex items-center justify-between group">
-                                      <div className="flex items-center gap-3 overflow-hidden">
-                                          <div className="p-2 bg-zinc-900 rounded">
-                                              <FileVideo size={20} className="text-indigo-400"/>
-                                          </div>
-                                          <div className="flex flex-col overflow-hidden">
-                                              <span className="text-xs font-medium text-white truncate">{project.link.startsWith('blob:') ? 'Local File' : 'Cloud File'}</span>
-                                              <span className="text-[10px] text-zinc-500 truncate">{project.link}</span>
-                                          </div>
-                                      </div>
-                                      <Button size="sm" variant="ghost" className="text-zinc-400 hover:text-red-400 p-1" onClick={() => updateProject(project.id, { link: '', customVideoBlob: undefined })}>
-                                          <Trash2 size={16}/>
-                                      </Button>
-                                   </div>
-                               )}
-
-                               {/* Empty State - Choice */}
-                               {!isUploading && !project.link && (
-                                   <div className="space-y-3">
-                                      {/* Tabs */}
-                                      <div className="flex p-1 bg-zinc-900 rounded-lg">
-                                         <button 
-                                            onClick={() => toggleInputMethod(project.id, 'upload')}
-                                            className={`flex-1 text-xs py-1.5 rounded-md transition-colors ${currentInputMethod === 'upload' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
-                                         >
-                                            Upload File
-                                         </button>
-                                         <button 
-                                            onClick={() => toggleInputMethod(project.id, 'link')}
-                                            className={`flex-1 text-xs py-1.5 rounded-md transition-colors ${currentInputMethod === 'link' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
-                                         >
-                                            External URL
-                                         </button>
-                                      </div>
-
-                                      {/* Content based on Tab */}
-                                      {currentInputMethod === 'upload' ? (
-                                         <Button size="sm" className="w-full h-24 border-2 border-dashed border-zinc-700 bg-zinc-900/50 hover:bg-zinc-900 hover:border-zinc-500 flex flex-col gap-2" variant="ghost" onClick={() => handleFileUpload('video/*', (file) => handleProjectVideoUpload(project.id, file))}>
-                                            <Upload size={24} className="text-zinc-400"/>
-                                            <div className="flex flex-col items-center">
-                                                <span className="text-xs font-medium text-zinc-300">Choose Video File</span>
-                                                <span className="text-[10px] text-zinc-500">MP4, MOV (Cloud Storage)</span>
-                                            </div>
-                                         </Button>
-                                      ) : (
-                                         <div className="space-y-2">
-                                            <div className="flex items-center gap-2 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg focus-within:border-indigo-500 transition-colors">
-                                               <Globe size={14} className="text-zinc-500"/>
-                                               <input 
-                                                  placeholder="https://youtube.com/..." 
-                                                  value={project.link} 
-                                                  onChange={(e) => updateProject(project.id, { link: e.target.value })} 
-                                                  className="bg-transparent border-none text-xs text-white placeholder-zinc-600 focus:outline-none w-full"
-                                               />
-                                            </div>
-                                            <p className="text-[10px] text-zinc-600 px-1">Supports YouTube, Vimeo, or direct video links.</p>
-                                         </div>
-                                      )}
-                                   </div>
-                               )}
-                            </div>
+                         <div className="space-y-2">
+                            <label className="text-xs font-medium text-zinc-500 uppercase">{project.type === 'image' ? 'Image Upload' : 'Thumbnail'}</label>
+                            {project.thumbnail && <img src={project.thumbnail} className="w-full aspect-video object-cover rounded mb-2" />}
+                            <Button size="sm" variant="secondary" onClick={() => handleFileUpload('image/*', (f) => handleThumbnailUpload(project.id, f))} className="w-full">
+                                {project.type === 'image' ? 'Upload Image' : 'Change Thumbnail'}
+                            </Button>
                          </div>
                        </div>
                      )}
@@ -934,63 +561,68 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
           </div>
         )}
 
-        {/* === ACCOUNT SETTINGS === */}
+        {/* ... TOOLS TAB ... */}
+        {activeTab === 'tools' && (
+            <div className="space-y-6 animate-fadeIn">
+                <div className="space-y-4">
+                    <Input label="Primary Workflow Tool" value={data.primaryTool} onChange={e => updateField('primaryTool', e.target.value)} placeholder="e.g. DaVinci Resolve"/>
+                    <p className="text-xs text-zinc-500">This will be highlighted in your portfolio header.</p>
+                </div>
+                
+                <div className="space-y-2 pt-4 border-t border-zinc-800">
+                    <label className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Other Tools (Comma separated)</label>
+                    <TextArea 
+                        rows={3}
+                        value={data.tools.join(', ')} 
+                        onChange={e => updateField('tools', e.target.value.split(',').map(s => s.trim()).filter(Boolean))} 
+                        placeholder="Premiere Pro, After Effects, Photoshop..."
+                    />
+                </div>
+
+                <div className="space-y-2 pt-4 border-t border-zinc-800">
+                    <label className="text-xs font-medium text-zinc-500 uppercase tracking-wider">AI Tools (Comma separated)</label>
+                    <TextArea 
+                        rows={2}
+                        value={data.aiTools.join(', ')} 
+                        onChange={e => updateField('aiTools', e.target.value.split(',').map(s => s.trim()).filter(Boolean))} 
+                        placeholder="Midjourney, RunwayML..."
+                    />
+                </div>
+            </div>
+        )}
+
+        {/* ... TESTIMONIALS TAB ... */}
+        {activeTab === 'testimonials' && (
+            <div className="space-y-6 animate-fadeIn">
+                 <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-sm font-bold text-white">Endorsements</h3>
+                    <Button size="sm" variant="secondary" onClick={addTestimonial} icon={<Plus size={14}/>}>Add</Button>
+                </div>
+
+                <div className="space-y-4">
+                    {data.testimonials.map((t) => (
+                        <div key={t.id} className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 space-y-3 relative group">
+                            <button onClick={() => removeTestimonial(t.id)} className="absolute top-2 right-2 text-zinc-600 hover:text-red-500 p-1"><Trash2 size={14}/></button>
+                            <Input label="Client Name" value={t.name} onChange={e => updateTestimonial(t.id, 'name', e.target.value)} />
+                            <Input label="Role" value={t.role} onChange={e => updateTestimonial(t.id, 'role', e.target.value)} />
+                            <TextArea label="Quote" value={t.quote} onChange={e => updateTestimonial(t.id, 'quote', e.target.value)} rows={3}/>
+                        </div>
+                    ))}
+                    {data.testimonials.length === 0 && (
+                        <div className="text-center py-8 border border-dashed border-zinc-800 rounded-xl">
+                            <p className="text-zinc-500 text-xs">No endorsements yet.</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        )}
+
+        {/* === SETTINGS TAB === */}
         {activeTab === 'settings' && (
            <div className="space-y-8 animate-fadeIn">
-              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-4">
-                 <h3 className="text-white font-bold text-sm flex items-center gap-2">
-                    <Shield size={16} className="text-indigo-500" />
-                    Frames Account Access
-                 </h3>
-                 <p className="text-xs text-zinc-500">Update the credentials used to log in to this editor.</p>
-                 
-                 <div className="space-y-4 pt-2">
-                    <Input 
-                       label="Username" 
-                       value={data.settings.username} 
-                       onChange={(e) => updateSettings('username', e.target.value)} 
-                       autoComplete="off"
-                    />
-                    <div className="relative">
-                        <Input 
-                           label="Password" 
-                           value={data.settings.password} 
-                           onChange={(e) => updateSettings('password', e.target.value)} 
-                           type={showSettingsPassword ? "text" : "password"}
-                           className="pr-10"
-                           autoComplete="off"
-                        />
-                        <button 
-                            type="button"
-                            className="absolute right-3 top-[1.9rem] text-zinc-500 hover:text-white transition-colors"
-                            onClick={() => setShowSettingsPassword(!showSettingsPassword)}
-                        >
-                            {showSettingsPassword ? <EyeOff size={16}/> : <Eye size={16}/>}
-                        </button>
-                    </div>
-                 </div>
-
-                 <div className="flex justify-end pt-2">
-                    <Button 
-                        size="sm" 
-                        onClick={onPublish}
-                        icon={isSaving ? <Loader2 className="animate-spin" size={14}/> : <CheckCircle2 size={14}/>}
-                        disabled={isSaving}
-                    >
-                        {isSaving ? 'Saving...' : 'Update Credentials'}
-                    </Button>
-                 </div>
-              </div>
-
               <div className="bg-red-500/5 border border-red-500/20 rounded-2xl p-6">
-                 <h3 className="text-red-500 font-bold text-sm mb-2">Session Management</h3>
-                 <p className="text-xs text-zinc-500 mb-4">Log out of the editor to return to the public view.</p>
-                 <Button 
-                    variant="outline" 
-                    className="w-full border-red-500/30 text-red-500 hover:bg-red-500/10 hover:border-red-500/50 hover:text-red-400"
-                    onClick={onLogout}
-                    icon={<LogOut size={16}/>}
-                 >
+                 <h3 className="text-red-500 font-bold text-sm mb-2">Session</h3>
+                 <Button variant="outline" className="w-full border-red-500/30 text-red-500" onClick={onLogout} icon={<LogOut size={16}/>}>
                     Log Out
                  </Button>
               </div>

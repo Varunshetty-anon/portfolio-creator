@@ -1,6 +1,7 @@
 import { initializeApp, FirebaseApp } from 'firebase/app';
 import { getFirestore, Firestore } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
+import { getAuth, Auth, GoogleAuthProvider } from 'firebase/auth';
 
 // Configuration updated with user provided credentials
 const firebaseConfig = {
@@ -18,6 +19,8 @@ export const isConfigured = !!firebaseConfig.apiKey;
 let app: FirebaseApp | undefined;
 let db: Firestore | undefined;
 let storage: FirebaseStorage | undefined;
+let auth: Auth | undefined;
+let googleProvider: GoogleAuthProvider | undefined;
 
 if (isConfigured) {
     try {
@@ -30,15 +33,22 @@ if (isConfigured) {
         try {
             db = getFirestore(app);
         } catch (e) {
-            console.warn("Firestore initialization failed (Database might not exist):", e);
+            console.warn("Firestore initialization failed:", e);
         }
 
         try {
             storage = getStorage(app);
         } catch (e) {
-            console.warn("Firebase Storage initialization failed (Service might not be enabled):", e);
+            console.warn("Firebase Storage initialization failed:", e);
+        }
+
+        try {
+            auth = getAuth(app);
+            googleProvider = new GoogleAuthProvider();
+        } catch (e) {
+            console.warn("Firebase Auth initialization failed:", e);
         }
     }
 }
 
-export { db, storage };
+export { db, storage, auth, googleProvider };

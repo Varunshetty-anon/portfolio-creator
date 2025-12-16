@@ -19,6 +19,15 @@
                 850: '#1f1f22',
                 950: '#09090b', // Deep rich black
               }
+            },
+            animation: {
+              'wiggle': 'wiggle 0.5s ease-in-out', // Removed infinite, increased duration slightly for subtlety
+            },
+            keyframes: {
+              wiggle: {
+                '0%, 100%': { transform: 'rotate(-3deg)' }, // Reduced angle
+                '50%': { transform: 'rotate(3deg)' },
+              }
             }
           }
         }
@@ -54,7 +63,8 @@
     "firebase/": "https://esm.sh/firebase@^12.7.0/",
     "framer-motion": "https://esm.sh/framer-motion@^12.23.26",
     "lucide-react": "https://esm.sh/lucide-react@^0.561.0",
-    "react-easy-crop": "https://esm.sh/react-easy-crop@^5.5.6"
+    "react-easy-crop": "https://esm.sh/react-easy-crop@^5.5.6",
+    "@google/genai": "https://esm.sh/@google/genai@^1.33.0"
   }
 }
 </script>

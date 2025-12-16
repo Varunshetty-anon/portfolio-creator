@@ -2,175 +2,134 @@ import React, { useState, useEffect, useRef } from 'react';
 import { PortfolioView } from './components/PortfolioView';
 import { EditorPanel } from './components/EditorPanel';
 import { PortfolioData, INITIAL_DATA } from './types';
-import { loadFromDB, saveToDB, decodeState, isConfigured } from './utils';
-import { Code, Database, Lock, ArrowRight, LayoutTemplate, Eye, EyeOff, HardDrive, Loader2 } from 'lucide-react';
+import { loadFromDB, saveToDB, decodeState, isConfigured, auth, loginWithEmail, signupWithEmail, loginWithGoogle, checkUsernameAvailable } from './utils';
+import { Code, Database, Lock, ArrowRight, LayoutTemplate, Eye, EyeOff, HardDrive, Loader2, UserPlus, LogIn } from 'lucide-react';
 import { Button } from './components/ui/Button';
+import { onAuthStateChanged } from 'firebase/auth';
 
-// Helper to safely manipulate hash in restricted environments
 const safeSetHash = (hash: string) => {
-  try {
-    window.location.hash = hash;
-  } catch (e) {
-    // Ignore error in restricted environments
-  }
+  try { window.location.hash = hash; } catch (e) {}
 };
 
 const getHash = () => {
-  try {
-    return window.location.hash;
-  } catch (e) {
-    return '';
-  }
+  try { return window.location.hash; } catch (e) { return ''; }
 };
 
 const App: React.FC = () => {
-  // Routes: 'home' (login), 'editor', 'public'
   const [route, setRoute] = useState<'home' | 'editor' | 'public'>('home');
   const [data, setData] = useState<PortfolioData | null>(null);
-  const [isLoading, setIsLoading] = useState(true); // Global loading state
+  const [isLoading, setIsLoading] = useState(true);
   
-  // Auth State
+  // Auth Form State
+  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState('');
+  const [isAuthProcessing, setIsAuthProcessing] = useState(false);
   
-  // Session Persistence
-  const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    if (typeof window !== 'undefined') {
-       return sessionStorage.getItem('frames_auth') === 'true';
-    }
-    return false;
-  });
-  
-  const authRef = useRef(isAuthenticated);
+  const [authUser, setAuthUser] = useState<any>(null);
 
   // Editor State
   const [isSaving, setIsSaving] = useState(false);
   const [showMobileEditor, setShowMobileEditor] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
+  // --- Initialization ---
   useEffect(() => {
-    authRef.current = isAuthenticated;
-  }, [isAuthenticated]);
+    // Listen for Firebase Auth State
+    const unsubscribe = isConfigured && auth ? onAuthStateChanged(auth, async (user) => {
+        setAuthUser(user);
+        if (user) {
+             // If logged in, load THEIR data
+             const userPortfolio = await loadFromDB(user.uid);
+             if (userPortfolio) {
+                 setData(userPortfolio);
+                 setRoute('editor');
+             } else {
+                 // New user via Google Auth potentially, or data missing
+                 const newProfile = { ...INITIAL_DATA, uid: user.uid, contactEmail: user.email || '' };
+                 setData(newProfile);
+                 setRoute('editor');
+             }
+        }
+    }) : () => {};
 
-  // --- Initialization & Routing ---
-  useEffect(() => {
     const initApp = async () => {
       setIsLoading(true);
       const hash = getHash();
       
-      // 1. CHECK FOR LONG ENCODED DATA (Legacy/Serverless fallback)
-      if (hash.includes('?data=')) {
-          const split = hash.split('?data=');
-          const encoded = split[1];
-          if (encoded) {
-              const decoded = decodeState(encoded);
-              if (decoded) {
-                  setData(decoded);
-                  setRoute('public');
-                  document.title = decoded.name ? `${decoded.name} - Portfolio` : 'Portfolio';
-                  setIsLoading(false);
-                  return;
-              }
+      // Public Route Check (#username)
+      if (hash && hash !== '#editor' && hash !== '#' && !hash.startsWith('#access_token')) {
+          const slug = hash.replace('#', '');
+          const publicData = await loadFromDB(slug);
+          if (publicData) {
+              setData(publicData);
+              setRoute('public');
+              document.title = `${publicData.name} - Portfolio`;
+              setIsLoading(false);
+              return;
           }
       }
 
-      // 2. CHECK FOR SHORT LINK OR EDITOR
-      try {
-        const dbData = await loadFromDB();
-        
-        if (dbData) {
-            if (!dbData.settings) dbData.settings = INITIAL_DATA.settings;
-            setData(dbData);
-            
-            // Set Page Title if public
-            if (hash.toLowerCase() === '#varunshetty-portfolio') {
-                document.title = dbData.name ? `${dbData.name} - Portfolio` : 'Portfolio';
-            }
-        } else {
-            console.log("No DB data found, using template");
-            setData(INITIAL_DATA);
-        }
-      } catch (err) {
-        console.error("Failed to load data:", err);
-        setData(INITIAL_DATA);
-      }
-
-      // Determine Route
-      const lowerHash = hash.toLowerCase();
-      
-      if (lowerHash === '#varunshetty-portfolio' || lowerHash.startsWith('#u/')) {
-        setRoute('public');
-      } else if (lowerHash === '#editor') {
-        if (authRef.current) {
-          setRoute('editor');
-        } else {
-          safeSetHash('');
-          setRoute('home');
-        }
-      } else {
-        setRoute('home');
-      }
-      
+      // If no public route, and not logged in via Firebase listener above
       setIsLoading(false);
     };
 
     initApp();
+    return () => unsubscribe();
+  }, []);
 
-    const onHashChange = () => {
-        const hash = getHash();
-        const lowerHash = hash.toLowerCase();
-        
-        window.scrollTo(0, 0);
+  // --- Auth Handlers ---
 
-        if (lowerHash === '#varunshetty-portfolio') {
-            setRoute('public');
-            if (data?.name) document.title = `${data.name} - Portfolio`;
-        }
-        else if (lowerHash === '#editor' && authRef.current) setRoute('editor');
-        else if (lowerHash === '#editor' && !authRef.current) setRoute('home');
-        else if (hash === '') setRoute('home');
-    };
-
-    window.addEventListener('hashchange', onHashChange);
-    return () => window.removeEventListener('hashchange', onHashChange);
-  }, [data?.name]);
-
-  // --- Handlers ---
-
-  const handleLogin = (e: React.FormEvent) => {
+  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    const validUser = data?.settings?.username || 'admin';
-    const validPass = data?.settings?.password || 'cinefolio';
+    setAuthError('');
+    setIsAuthProcessing(true);
 
-    if (username.toLowerCase() === validUser.toLowerCase() && password === validPass) {
-      setIsAuthenticated(true);
-      sessionStorage.setItem('frames_auth', 'true');
-      setAuthError('');
-      setRoute('editor'); 
-      safeSetHash('#editor'); 
-    } else {
-      setAuthError('Invalid credentials.');
+    try {
+        if (authMode === 'signup') {
+            // Check username availability first
+            const available = await checkUsernameAvailable(username);
+            if (!available) throw new Error("Username already taken.");
+
+            const cred = await signupWithEmail(email, password);
+            const newProfile: PortfolioData = {
+                ...INITIAL_DATA,
+                uid: cred.user.uid,
+                username: username.toLowerCase().replace(/\s/g, ''),
+                contactEmail: email,
+                name: "Your Name"
+            };
+            await saveToDB(newProfile);
+            setData(newProfile);
+            setRoute('editor');
+        } else {
+            await loginWithEmail(email, password);
+            // State change handled by onAuthStateChanged
+        }
+    } catch (err: any) {
+        setAuthError(err.message.replace('Firebase:', '').trim());
+        setIsAuthProcessing(false);
     }
   };
 
-  const handleLogout = async () => {
-      if (hasUnsavedChanges) {
-         const confirmSave = window.confirm("You have unsaved changes. Save before logging out?");
-         if (confirmSave) {
-             await handleSaveAndPublish();
-         }
+  const handleGoogleAuth = async () => {
+      try {
+          await loginWithGoogle();
+          // State change handled by onAuthStateChanged
+      } catch (e: any) {
+          setAuthError("Google Sign-in failed");
       }
+  }
 
-      setIsAuthenticated(false);
-      sessionStorage.removeItem('frames_auth');
+  const handleLogout = async () => {
+      if (auth) await auth.signOut();
+      setAuthUser(null);
       setRoute('home');
+      setData(null);
       safeSetHash('');
-      setUsername('');
-      setPassword('');
-      document.title = "Frames - Portfolio Creator";
   };
 
   const handleSaveAndPublish = async (newData?: PortfolioData) => {
@@ -186,46 +145,25 @@ const App: React.FC = () => {
     } catch (e) {
       console.error("Save failed", e);
       setIsSaving(false);
-      alert("Failed to save. Check console for details.");
+      alert("Failed to save.");
     }
   };
 
-  const handleEditorChange = (newData: PortfolioData) => {
-    setData(newData);
-    setHasUnsavedChanges(true);
-  };
-  
-  const handleCreateOwn = () => {
-      safeSetHash('');
-      setRoute('home');
-      setIsAuthenticated(false);
-      sessionStorage.removeItem('frames_auth');
-      window.location.reload(); 
-  };
-
-  // --- Views ---
-
-  if (isLoading || !data) {
+  if (isLoading) {
       return (
           <div className="h-screen bg-black text-white flex flex-col gap-4 items-center justify-center font-display">
               <Loader2 size={40} className="text-indigo-500 animate-spin" />
-              <span className="text-zinc-400 animate-pulse tracking-widest uppercase text-sm">Loading Portfolio...</span>
           </div>
       );
   }
 
-  // Public View
-  if (route === 'public') {
+  // --- VIEW: PUBLIC ---
+  if (route === 'public' && data) {
     return (
         <>
             <PortfolioView data={data} />
             <div className="fixed bottom-6 right-6 z-50">
-               <Button 
-                 variant="secondary" 
-                 size="sm"
-                 onClick={handleCreateOwn}
-                 className="shadow-2xl opacity-50 hover:opacity-100 backdrop-blur-md bg-black/50"
-               >
+               <Button variant="secondary" size="sm" onClick={() => { safeSetHash(''); window.location.reload(); }} className="shadow-2xl opacity-50 hover:opacity-100 backdrop-blur-md bg-black/50">
                  Create Your Own
                </Button>
             </div>
@@ -233,19 +171,18 @@ const App: React.FC = () => {
     );
   }
 
-  // Editor View
-  if (route === 'editor') {
+  // --- VIEW: EDITOR ---
+  if (route === 'editor' && data) {
     return (
       <div className="h-screen w-screen bg-black overflow-hidden flex flex-col md:flex-row">
+        {/* Mobile Overlay */}
         <div className={`fixed inset-0 bg-black/80 z-40 md:hidden transition-opacity ${showMobileEditor ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={() => setShowMobileEditor(false)} />
 
-        <div className={`
-          fixed md:relative inset-y-0 left-0 z-50 bg-zinc-950 w-[85vw] md:w-[420px] border-r border-zinc-800 flex-shrink-0 transition-transform duration-300 transform shadow-2xl
-          ${showMobileEditor ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
-        `}>
+        {/* Sidebar */}
+        <div className={`fixed md:relative inset-y-0 left-0 z-50 bg-zinc-950 w-[85vw] md:w-[420px] border-r border-zinc-800 flex-shrink-0 transition-transform duration-300 transform shadow-2xl ${showMobileEditor ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
           <EditorPanel 
             data={data} 
-            onChange={handleEditorChange} 
+            onChange={(d) => { setData(d); setHasUnsavedChanges(true); }} 
             onPublish={() => handleSaveAndPublish()}
             isSaving={isSaving}
             hasUnsavedChanges={hasUnsavedChanges}
@@ -254,42 +191,20 @@ const App: React.FC = () => {
           <button onClick={() => setShowMobileEditor(false)} className="md:hidden absolute top-4 right-4 text-zinc-500">✕</button>
         </div>
 
+        {/* Preview */}
         <div className="flex-1 h-full relative bg-zinc-950 overflow-hidden flex flex-col">
           <div className="h-14 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between px-6 z-30">
-            <div className="flex items-center gap-3">
-              <Button 
-                variant="secondary" 
-                size="sm"
-                className="md:hidden" 
-                onClick={() => setShowMobileEditor(true)}
-                icon={<Code size={14}/>}
-              >
-                Edit
-              </Button>
-              <div className="flex items-center gap-2 text-zinc-400">
-                 <LayoutTemplate size={16} />
-                 <span className="text-sm font-medium hidden sm:inline">Live Canvas</span>
-              </div>
+            <Button variant="secondary" size="sm" className="md:hidden" onClick={() => setShowMobileEditor(true)} icon={<Code size={14}/>}>Edit</Button>
+            <div className="hidden md:flex items-center gap-2 text-xs font-mono text-zinc-600">
+                {isConfigured ? <Database size={12} /> : <HardDrive size={12} />}
+                {isSaving ? 'Syncing...' : 'Live Preview'}
             </div>
-
-            <div className="flex items-center gap-4">
-               <div className="hidden md:flex items-center gap-2 text-xs font-mono text-zinc-600">
-                  {isConfigured ? <Database size={12} /> : <HardDrive size={12} />}
-                  {isSaving ? 'Syncing...' : (isConfigured ? 'Firestore Active' : 'Local Storage')}
-               </div>
-               <Button 
-                 variant={hasUnsavedChanges ? "primary" : "secondary"}
-                 size="sm"
-                 onClick={() => handleSaveAndPublish()}
-                 className={hasUnsavedChanges ? "animate-pulse" : ""}
-               >
-                 {isSaving ? 'Publishing...' : (hasUnsavedChanges ? 'Save Changes' : 'Published')}
-               </Button>
-            </div>
+            <Button variant={hasUnsavedChanges ? "primary" : "secondary"} size="sm" onClick={() => handleSaveAndPublish()} className={hasUnsavedChanges ? "animate-pulse" : ""}>
+                 {isSaving ? 'Publishing...' : 'Save Changes'}
+            </Button>
           </div>
-
           <div className="flex-1 overflow-y-auto relative custom-scrollbar bg-black">
-             <div className="min-h-full origin-top transform scale-[0.85] md:scale-95 transition-transform duration-300 origin-top w-full h-full shadow-2xl border border-zinc-800/50">
+             <div className="min-h-full w-full h-full shadow-2xl">
                <PortfolioView data={data} isPreview={true} />
              </div>
           </div>
@@ -298,71 +213,59 @@ const App: React.FC = () => {
     );
   }
 
-  // Home / Login View
+  // --- VIEW: LOGIN / HOME ---
   return (
     <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4 relative overflow-hidden">
        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-zinc-900 via-black to-black opacity-80"></div>
        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 brightness-100 contrast-150"></div>
        
        <div className="relative z-10 w-full max-w-md flex flex-col items-center">
-          <div className="mb-12 text-center relative group cursor-default">
-             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-indigo-500/20 blur-[80px] rounded-full pointer-events-none"></div>
-             <h1 className="text-7xl md:text-8xl font-display font-black text-white tracking-tighter select-none relative z-10 drop-shadow-2xl">
-                FRAMES
-             </h1>
-             <div className="absolute -bottom-3 -right-4 md:-right-8 transform -rotate-6 group-hover:rotate-0 transition-transform duration-500 ease-out">
-                 <span className="bg-white text-black text-[10px] font-bold font-mono px-2 py-0.5 border border-zinc-400 tracking-widest shadow-[4px_4px_0px_0px_rgba(255,255,255,0.2)]">
-                    BY VARUN
-                 </span>
+          <div className="mb-10 text-center">
+             <div className="relative inline-block">
+                <h1 className="text-6xl md:text-8xl font-display font-black text-white tracking-tighter mb-2">FRAMES</h1>
+                <span className="absolute -bottom-4 right-0 md:right-0 -rotate-3 hover:animate-wiggle cursor-default bg-white text-black text-[10px] md:text-xs font-bold tracking-widest px-3 py-1 font-mono shadow-[4px_4px_0px_0px_#52525b] transition-all">
+                   BY VARUN
+                </span>
              </div>
           </div>
 
           <div className="bg-zinc-900/50 backdrop-blur-xl border border-zinc-800 p-8 rounded-2xl shadow-2xl w-full">
-             <div className="flex items-center gap-2 mb-6 text-white">
-                <Lock size={18} className="text-indigo-500" />
-                <h2 className="font-bold">Editor Access</h2>
+             <div className="flex gap-4 mb-6 border-b border-zinc-800 pb-2">
+                 <button onClick={() => setAuthMode('login')} className={`flex-1 pb-2 text-sm font-bold transition-colors ${authMode === 'login' ? 'text-white border-b-2 border-indigo-500' : 'text-zinc-500'}`}>Log In</button>
+                 <button onClick={() => setAuthMode('signup')} className={`flex-1 pb-2 text-sm font-bold transition-colors ${authMode === 'signup' ? 'text-white border-b-2 border-indigo-500' : 'text-zinc-500'}`}>Sign Up</button>
              </div>
              
-             <form onSubmit={handleLogin} className="space-y-4">
+             <form onSubmit={handleAuth} className="space-y-4">
+                {authMode === 'signup' && (
+                    <div className="space-y-2">
+                        <label className="text-xs text-zinc-500 uppercase font-bold">Username</label>
+                        <input type="text" value={username} onChange={e => setUsername(e.target.value)} className="w-full bg-black/50 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:border-indigo-500 focus:outline-none" placeholder="unique_handle" required />
+                    </div>
+                )}
                 <div className="space-y-2">
-                   <label className="text-xs text-zinc-500 uppercase font-bold">Username</label>
-                   <input 
-                      type="text" 
-                      value={username}
-                      onChange={e => setUsername(e.target.value)}
-                      className="w-full bg-black/50 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:border-indigo-500 focus:outline-none transition-colors"
-                      placeholder="Enter username"
-                   />
+                   <label className="text-xs text-zinc-500 uppercase font-bold">Email</label>
+                   <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-black/50 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:border-indigo-500 focus:outline-none" placeholder="hello@example.com" required />
                 </div>
                 <div className="space-y-2">
                    <label className="text-xs text-zinc-500 uppercase font-bold">Password</label>
                    <div className="relative">
-                       <input 
-                          type={showPassword ? "text" : "password"}
-                          value={password}
-                          onChange={e => setPassword(e.target.value)}
-                          className="w-full bg-black/50 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:border-indigo-500 focus:outline-none transition-colors pr-10"
-                          placeholder="••••••••"
-                       />
-                       <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-zinc-500 hover:text-white transition-colors"
-                       >
-                          {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                       </button>
+                       <input type={showPassword ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-black/50 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:border-indigo-500 focus:outline-none pr-10" placeholder="••••••••" required />
+                       <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white">{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button>
                    </div>
                 </div>
 
-                {authError && (
-                   <div className="text-red-500 text-xs text-center py-2 bg-red-500/10 rounded border border-red-500/20">
-                      {authError}
-                   </div>
-                )}
+                {authError && <div className="text-red-500 text-xs text-center py-2 bg-red-500/10 rounded border border-red-500/20">{authError}</div>}
 
-                <Button className="w-full mt-4" size="lg" icon={<ArrowRight size={16}/>}>
-                   Enter Studio
+                <Button className="w-full mt-4" size="lg" disabled={isAuthProcessing}>
+                   {isAuthProcessing ? <Loader2 className="animate-spin"/> : (authMode === 'login' ? 'Enter Studio' : 'Create Account')}
                 </Button>
+
+                <div className="relative py-2">
+                    <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-zinc-800"></span></div>
+                    <div className="relative flex justify-center text-xs uppercase"><span className="bg-zinc-900 px-2 text-zinc-500">Or continue with</span></div>
+                </div>
+
+                <Button type="button" variant="secondary" className="w-full" onClick={handleGoogleAuth}>Google</Button>
              </form>
           </div>
        </div>

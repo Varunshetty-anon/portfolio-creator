@@ -1,20 +1,43 @@
 import { PortfolioData, INITIAL_DATA } from './types';
-import { db, storage, isConfigured } from './firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db, storage, auth, googleProvider, isConfigured } from './firebase';
+import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, User } from 'firebase/auth';
+import { GoogleGenAI } from "@google/genai";
 
 const COLLECTION_NAME = 'portfolios';
-const MAIN_DOC_ID = 'main_portfolio';
+// Removed MAIN_DOC_ID const as we now use dynamic IDs
 const LOCAL_STORAGE_KEY = 'frames_portfolio_data';
-const DB_TIMEOUT_MS = 2500; // Timeout for DB operations
 
-export { isConfigured };
+export { isConfigured, auth };
 export const hasCloudStorage = !!storage;
+
+// --- AI Integration ---
+// Assuming API_KEY is available in process.env.API_KEY as per instructions.
+// If it's undefined, the feature will gracefully fail or return a mock.
+const genAI = process.env.API_KEY ? new GoogleGenAI({ apiKey: process.env.API_KEY }) : null;
+
+export const generateAiBio = async (role: string, skills: string[], tone: string = "professional"): Promise<string> => {
+  if (!genAI) {
+      console.warn("Gemini API Key not found.");
+      return "I create visual stories that leave an impact. (AI Key missing)";
+  }
+
+  try {
+      const prompt = `Write a short, engaging, 2-sentence bio for a ${role} who specializes in ${skills.join(', ')}. The tone should be ${tone}. Do not include hashtags.`;
+      const response = await genAI.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+      });
+      return response.text.trim();
+  } catch (error) {
+      console.error("AI Bio Generation failed:", error);
+      return "Passionate creator dedicated to crafting exceptional visual experiences.";
+  }
+};
 
 
 // --- Brand Helpers ---
-
-// Generate a consistent HSL color from a string
 const stringToColor = (str: string, saturation = 60, lightness = 60) => {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
@@ -24,11 +47,8 @@ const stringToColor = (str: string, saturation = 60, lightness = 60) => {
   return `hsl(${h}, ${saturation}%, ${lightness}%)`;
 };
 
-// Heuristic to map common software names to simpleicon slugs
 export const getIconSlug = (name: string): string => {
     const n = name.toLowerCase().replace(/[^a-z0-9]/g, '');
-    
-    // Manual mapping for complex names
     if (n.includes('davinci')) return 'davinciresolve';
     if (n.includes('premiere')) return 'adobepremierepro';
     if (n.includes('aftereffect')) return 'adobeaftereffects';
@@ -41,14 +61,11 @@ export const getIconSlug = (name: string): string => {
     if (n.includes('unreal')) return 'unrealengine';
     if (n.includes('c4d') || n.includes('cinema4d')) return 'cinema4d';
     if (n.includes('substance')) return 'adobe-substance-3d-painter';
-    
     return n;
 };
 
 export const getBrandColor = (name: string): string => {
     const n = name.toLowerCase();
-    
-    // Specific Brand Colors
     if (n.includes('davinci') || n.includes('resolve')) return '#ff4747';
     if (n.includes('premiere')) return '#9999FF';
     if (n.includes('after')) return '#9999FF';
@@ -65,47 +82,29 @@ export const getBrandColor = (name: string): string => {
     if (n.includes('veo')) return '#4285F4';
     if (n.includes('final')) return '#F6ADF6'; 
     if (n.includes('avid')) return '#6600cc';
-
     return stringToColor(name);
 };
 
 // --- State Encoding/Decoding ---
-
 export const encodeState = (data: PortfolioData): string => {
   try {
     const cleanProjects = data.projects.map(p => {
-        // PRESERVE CLOUD LINKS: Only strip if it's a blob OR extremely large non-http string (base64)
         const isBlob = p.link.startsWith('blob:');
         const isTooLarge = p.link.length > 50000 && !p.link.startsWith('http');
-        const isLinkLocal = isBlob || isTooLarge;
-
-        const isThumbBlob = p.thumbnail.startsWith('blob:');
-        const isThumbTooLarge = p.thumbnail.length > 50000 && !p.thumbnail.startsWith('http');
-        const isThumbLocal = isThumbBlob || isThumbTooLarge;
-
         return {
             ...p,
-            link: isLinkLocal ? '' : p.link, 
-            thumbnail: isThumbLocal ? '' : p.thumbnail,
+            link: (isBlob || isTooLarge) ? '' : p.link, 
+            thumbnail: (p.thumbnail.startsWith('blob:') || p.thumbnail.length > 50000) ? '' : p.thumbnail,
             thumbnailBlob: undefined,
             customVideoBlob: undefined
         };
     });
     
-    const isShowreelBlob = data.showreelLink.startsWith('blob:');
-    const isShowreelTooLarge = data.showreelLink.length > 50000 && !data.showreelLink.startsWith('http');
-    const isShowreelLocal = isShowreelBlob || isShowreelTooLarge;
-
-    const isProfileBlob = data.profileImage.startsWith('blob:');
-    const isProfileTooLarge = data.profileImage.length > 50000 && !data.profileImage.startsWith('http');
-    const isProfileLocal = isProfileBlob || isProfileTooLarge;
-
     const cleanData = {
         ...data,
-        profileImage: isProfileLocal ? '' : data.profileImage,
-        showreelLink: isShowreelLocal ? '' : data.showreelLink,
-        // Thumbnails are often small enough base64, but if huge, strip them.
-        showreelThumbnail: (data.showreelThumbnail.length > 50000 && !data.showreelThumbnail.startsWith('http')) ? '' : data.showreelThumbnail,
+        profileImage: (data.profileImage.startsWith('blob:') || data.profileImage.length > 50000) ? '' : data.profileImage,
+        showreelLink: (data.showreelLink.startsWith('blob:') || data.showreelLink.length > 50000) ? '' : data.showreelLink,
+        showreelThumbnail: (data.showreelThumbnail.startsWith('blob:') || data.showreelThumbnail.length > 50000) ? '' : data.showreelThumbnail,
         projects: cleanProjects,
         profileImageBlob: undefined,
         showreelThumbnailBlob: undefined,
@@ -124,7 +123,6 @@ export const decodeState = (encoded: string): PortfolioData | null => {
   try {
     const json = decodeURIComponent(atob(encoded));
     const parsed = JSON.parse(json);
-    
     return {
         ...INITIAL_DATA,
         ...parsed,
@@ -143,26 +141,18 @@ export const getCroppedImg = (imageSrc: string, pixelCrop: { x: number; y: numbe
     const image = new Image();
     image.src = imageSrc;
     image.crossOrigin = 'anonymous'; 
-    
     image.onload = () => {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        return reject(new Error('No 2d context'));
-      }
+      if (!ctx) return reject(new Error('No 2d context'));
       canvas.width = pixelCrop.width;
       canvas.height = pixelCrop.height;
       ctx.drawImage(image, pixelCrop.x, pixelCrop.y, pixelCrop.width, pixelCrop.height, 0, 0, pixelCrop.width, pixelCrop.height);
-
       canvas.toBlob((blob) => {
-        if (!blob) {
-          reject(new Error('Canvas is empty'));
-          return;
-        }
+        if (!blob) return reject(new Error('Canvas is empty'));
         resolve(blob);
       }, 'image/jpeg', 0.95);
     };
-
     image.onerror = (error) => reject(error);
   });
 };
@@ -175,45 +165,27 @@ export const generateThumbnailFromVideo = (file: File): Promise<{ url: string; b
     video.muted = true;
     video.playsInline = true;
     video.currentTime = 1;
-
     const onSeeked = () => {
       try {
         const canvas = document.createElement("canvas");
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         const ctx = canvas.getContext("2d");
-        
-        if (!ctx) {
-            reject(new Error("Canvas context failed"));
-            return;
-        }
-        
+        if (!ctx) { reject(new Error("Canvas context failed")); return; }
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        
         canvas.toBlob((blob) => {
-            if (blob) {
-                resolve({ url: URL.createObjectURL(blob), blob });
-            } else {
-                reject(new Error("Thumbnail generation failed"));
-            }
+            if (blob) { resolve({ url: URL.createObjectURL(blob), blob }); } 
+            else { reject(new Error("Thumbnail generation failed")); }
             video.removeEventListener('seeked', onSeeked);
             URL.revokeObjectURL(video.src);
         }, 'image/jpeg', 0.85);
-      } catch (e) {
-        reject(e);
-      }
+      } catch (e) { reject(e); }
     };
-
     video.addEventListener('seeked', onSeeked);
-    video.onerror = () => {
-        reject(new Error("Video load error"));
-    };
+    video.onerror = () => { reject(new Error("Video load error")); };
   });
 };
 
-// --- Storage Operations ---
-
-// Helper: Convert Blob to Base64 String
 const blobToBase64 = (blob: Blob): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -223,44 +195,41 @@ const blobToBase64 = (blob: Blob): Promise<string> => {
   });
 };
 
-// Upload Helper for Firebase Storage
 export const uploadFileToStorage = (file: File, path: string, onProgress?: (progress: number) => void): Promise<string> => {
     return new Promise((resolve, reject) => {
         if (!storage) {
             reject(new Error("Storage not configured or unavailable"));
             return;
         }
-        
         try {
             const storageRef = ref(storage, path);
             const uploadTask = uploadBytesResumable(storageRef, file);
-
             uploadTask.on('state_changed', 
                 (snapshot) => {
                     const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
                     if (onProgress) onProgress(progress);
                 }, 
-                (error) => {
-                    console.error("Upload failed", error);
-                    reject(error);
-                }, 
-                () => {
-                    getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
-                        resolve(downloadURL);
-                    });
-                }
+                (error) => { reject(error); }, 
+                () => { getDownloadURL(uploadTask.snapshot.ref).then(resolve); }
             );
-        } catch (e) {
-            reject(e);
-        }
+        } catch (e) { reject(e); }
     });
 };
 
+// --- AUTH & DATABASE ---
+
+// Check if username is taken
+export const checkUsernameAvailable = async (username: string): Promise<boolean> => {
+    if (!db || !username) return true; // Assume available if offline
+    const q = query(collection(db, COLLECTION_NAME), where("username", "==", username));
+    const docs = await getDocs(q);
+    return docs.empty;
+};
+
 export const saveToDB = async (data: PortfolioData): Promise<void> => {
-  // Deep clone to prepare for serialization
   const dataToSave: any = { ...data };
 
-  // --- 1. IMAGE CONVERSION (Blob -> Base64) ---
+  // Convert blobs
   if (dataToSave.profileImageBlob) {
     dataToSave.profileImage = await blobToBase64(dataToSave.profileImageBlob);
   }
@@ -270,95 +239,81 @@ export const saveToDB = async (data: PortfolioData): Promise<void> => {
     dataToSave.showreelThumbnail = await blobToBase64(dataToSave.showreelThumbnailBlob);
   }
   delete dataToSave.showreelThumbnailBlob;
-
-  // --- 2. VIDEO HANDLING ---
-  if (dataToSave.showreelBlob) {
-      if (dataToSave.showreelLink && dataToSave.showreelLink.startsWith('blob:')) {
-           console.warn("Unsaved blob detected for showreel. Clearing to prevent DB crash.");
-           dataToSave.showreelLink = ""; 
-      }
-  }
   delete dataToSave.showreelBlob;
 
-  // Projects Processing
   if (dataToSave.projects) {
       dataToSave.projects = await Promise.all(dataToSave.projects.map(async (p: any) => {
           const newP = { ...p };
-          
-          if (newP.thumbnailBlob) {
-              newP.thumbnail = await blobToBase64(newP.thumbnailBlob);
-          }
+          if (newP.thumbnailBlob) newP.thumbnail = await blobToBase64(newP.thumbnailBlob);
           delete newP.thumbnailBlob;
-
-          if (newP.customVideoBlob) {
-              if (newP.link && newP.link.startsWith('blob:')) {
-                   console.warn(`Unsaved blob detected for project ${newP.id}. Clearing.`);
-                   newP.link = "";
-              }
-          }
           delete newP.customVideoBlob;
-          
           return newP;
       }));
   }
 
-  // --- 3. SAVE ---
-  
-  // Try Firestore if configured
+  // Save to Firestore using UID or Username as key
   if (isConfigured && db) {
       try {
-          // Race against a timeout to prevent hanging on "Connection failed"
-          const savePromise = setDoc(doc(db, COLLECTION_NAME, MAIN_DOC_ID), dataToSave);
-          const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Firestore timeout")), DB_TIMEOUT_MS));
-          
-          await Promise.race([savePromise, timeoutPromise]);
+          const docId = data.uid || 'guest_user';
+          await setDoc(doc(db, COLLECTION_NAME, docId), dataToSave);
       } catch (e) {
-          console.warn("Firestore save failed (offline or db not created), falling back to Local Storage.", e);
+          console.warn("Firestore save failed", e);
       }
   }
 
-  // Local Storage Fallback (Always save to local as backup)
+  // Local Storage Backup
   try {
      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(dataToSave));
-  } catch (e: any) {
-     console.error("Local Storage save failed", e);
-     if (e.name === 'QuotaExceededError') {
-         alert("Storage Limit Reached: Please use external links for images/videos or compress them.");
-     }
-  }
+  } catch (e) {}
 };
 
-export const loadFromDB = async (): Promise<PortfolioData | null> => {
-  // Try Firestore if configured
+export const loadFromDB = async (identifier?: string): Promise<PortfolioData | null> => {
   if (isConfigured && db) {
       try {
-        const docRef = doc(db, COLLECTION_NAME, MAIN_DOC_ID);
+        let docSnap;
         
-        // Race against a timeout to prevent hanging on initial load if DB is missing/offline
-        const loadPromise = getDoc(docRef);
-        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Firestore timeout")), DB_TIMEOUT_MS));
-
-        const docSnap = await Promise.race([loadPromise, timeoutPromise]) as any;
+        // If identifier is provided, check if it's a UID (by checking direct doc) or a username (query)
+        if (identifier) {
+            // 1. Try direct ID (UID)
+            const docRef = doc(db, COLLECTION_NAME, identifier);
+            docSnap = await getDoc(docRef);
+            
+            // 2. If not found, try searching by username
+            if (!docSnap.exists()) {
+                const q = query(collection(db, COLLECTION_NAME), where("username", "==", identifier));
+                const querySnap = await getDocs(q);
+                if (!querySnap.empty) {
+                    docSnap = querySnap.docs[0];
+                }
+            }
+        } else {
+             // Default load (legacy main_portfolio or local)
+             // For now return null to force re-auth in new system
+             return null;
+        }
 
         if (docSnap && docSnap.exists()) {
-          console.log("✅ Successfully connected to Firebase.");
           return docSnap.data() as PortfolioData;
         }
       } catch (e) {
-        console.warn("Firestore load failed, checking Local Storage.", e);
+        console.warn("Firestore load failed", e);
       }
   }
-
-  // Local Storage Fallback
-  const local = localStorage.getItem(LOCAL_STORAGE_KEY);
-  if (local) {
-      try {
-          return JSON.parse(local) as PortfolioData;
-      } catch (e) {
-          console.error("Error parsing local data", e);
-      }
-  }
-
-  console.log("No data found in DB or Local Storage.");
   return null;
+};
+
+// --- AUTH ACTIONS ---
+export const loginWithEmail = async (email: string, pass: string) => {
+    if (!auth) throw new Error("Auth not configured");
+    return signInWithEmailAndPassword(auth, email, pass);
+};
+
+export const signupWithEmail = async (email: string, pass: string) => {
+    if (!auth) throw new Error("Auth not configured");
+    return createUserWithEmailAndPassword(auth, email, pass);
+};
+
+export const loginWithGoogle = async () => {
+    if (!auth || !googleProvider) throw new Error("Auth not configured");
+    return signInWithPopup(auth, googleProvider);
 };
