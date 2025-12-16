@@ -1,4 +1,4 @@
-import { PortfolioData, INITIAL_DATA } from './types';
+import { PortfolioData, INITIAL_DATA, Project } from './types';
 import { db, storage, auth, googleProvider, isConfigured } from './firebase';
 import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
@@ -6,15 +6,12 @@ import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPass
 import { GoogleGenAI } from "@google/genai";
 
 const COLLECTION_NAME = 'portfolios';
-// Removed MAIN_DOC_ID const as we now use dynamic IDs
 const LOCAL_STORAGE_KEY = 'frames_portfolio_data';
 
 export { isConfigured, auth };
 export const hasCloudStorage = !!storage;
 
 // --- AI Integration ---
-// Assuming API_KEY is available in process.env.API_KEY as per instructions.
-// If it's undefined, the feature will gracefully fail or return a mock.
 const genAI = process.env.API_KEY ? new GoogleGenAI({ apiKey: process.env.API_KEY }) : null;
 
 export const generateAiBio = async (role: string, skills: string[], tone: string = "professional"): Promise<string> => {
@@ -35,6 +32,25 @@ export const generateAiBio = async (role: string, skills: string[], tone: string
       return "Passionate creator dedicated to crafting exceptional visual experiences.";
   }
 };
+
+export const generateAiDescription = async (title: string, currentDesc: string): Promise<string> => {
+    if (!genAI) return currentDesc;
+    try {
+        const prompt = `Rewrite this video project description to be more professional and engaging for a portfolio. 
+        Project Title: "${title}". 
+        Draft Description: "${currentDesc}".
+        Keep it under 30 words.`;
+        
+        const response = await genAI.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+        });
+        return response.text.trim();
+    } catch (e) {
+        console.error("AI Desc failed", e);
+        return currentDesc;
+    }
+}
 
 
 // --- Brand Helpers ---
@@ -294,7 +310,6 @@ export const loadFromDB = async (identifier?: string): Promise<PortfolioData | n
             }
         } else {
              // Default load (legacy main_portfolio or local)
-             // For now return null to force re-auth in new system
              return null;
         }
 

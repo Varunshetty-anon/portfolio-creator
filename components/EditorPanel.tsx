@@ -2,9 +2,9 @@ import React, { useState, useCallback } from 'react';
 import { PortfolioData, Project, Testimonial } from '../types';
 import { Input, TextArea } from './ui/Input';
 import { Button } from './ui/Button';
-import { Plus, Trash2, Video, Wand2, Image, ChevronDown, ChevronUp, Upload, X, LayoutDashboard, Copy, ExternalLink, FileVideo, User, MessageSquare, Loader2, CheckCircle2, Globe, Crop, Smartphone, Monitor, AlertCircle, Settings, LogOut, Shield, Share2, Eye, EyeOff, Cloud, Link, Sparkles, Wrench } from 'lucide-react';
+import { Plus, Trash2, Video, Wand2, Image, ChevronDown, ChevronUp, Upload, X, LayoutDashboard, Copy, ExternalLink, FileVideo, User, MessageSquare, Loader2, CheckCircle2, Globe, Crop, Settings, LogOut, AlertCircle, Share2, Eye, EyeOff, Cloud, Link, Sparkles, Wrench } from 'lucide-react';
 import Cropper from 'react-easy-crop';
-import { getCroppedImg, generateThumbnailFromVideo, encodeState, uploadFileToStorage, isConfigured, hasCloudStorage, generateAiBio } from '../utils';
+import { getCroppedImg, generateThumbnailFromVideo, encodeState, uploadFileToStorage, isConfigured, hasCloudStorage, generateAiBio, generateAiDescription } from '../utils';
 
 interface EditorPanelProps {
   data: PortfolioData;
@@ -70,9 +70,9 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
   const [copySuccess, setCopySuccess] = useState(false);
   const [uploadingState, setUploadingState] = useState<{id: string, progress: number} | null>(null);
   const [showreelUploading, setShowreelUploading] = useState<{progress: number} | null>(null);
-  const [activeInputMethod, setActiveInputMethod] = useState<Record<string, 'upload' | 'link'>>({});
   const [showreelInputMethod, setShowreelInputMethod] = useState<'upload' | 'link'>(data.showreelLink.startsWith('blob:') ? 'upload' : 'link');
   const [isGeneratingBio, setIsGeneratingBio] = useState(false);
+  const [generatingDescId, setGeneratingDescId] = useState<string | null>(null);
   const [profileImageUploading, setProfileImageUploading] = useState(false);
   
   // Crop State
@@ -106,12 +106,16 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
       setIsGeneratingBio(false);
   };
 
+  const handleAiDescription = async (projectId: string, title: string, currentDesc: string) => {
+      setGeneratingDescId(projectId);
+      const newDesc = await generateAiDescription(title, currentDesc);
+      updateProject(projectId, { description: newDesc });
+      setGeneratingDescId(null);
+  };
+
   // --- Link Generator ---
   const getShareLink = () => {
      const origin = window.location.origin === 'null' || !window.location.origin ? 'https://cinefolio.app' : window.location.origin;
-     if (isConfigured) {
-         return `${origin}${window.location.pathname}#${data.username}`;
-     }
      return `${origin}${window.location.pathname}#${data.username}`;
   };
 
@@ -132,7 +136,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
     const newProject: Project = {
       id: Date.now().toString(),
       title: "New Project",
-      description: "Brief description...",
+      description: "Short description about the work...",
       thumbnail: `https://picsum.photos/600/800?random=${Date.now()}`,
       link: "",
       category: "Work",
@@ -141,7 +145,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
     };
     updateField('projects', [...data.projects, newProject]);
     setExpandedProject(newProject.id);
-    setActiveInputMethod(prev => ({ ...prev, [newProject.id]: 'upload' }));
   };
 
   const removeProject = (id: string, e: React.MouseEvent) => {
@@ -303,7 +306,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
   };
 
   return (
-    <div className="h-full flex flex-col bg-zinc-950 border-r border-zinc-800 relative">
+    <div className="h-full flex flex-col bg-zinc-950 border-r border-zinc-900 relative">
       
       {/* Crop Modal */}
       {cropModalOpen && tempImgSrc && (
@@ -331,15 +334,18 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
       )}
 
       {/* Header */}
-      <div className="p-6 border-b border-zinc-800 bg-zinc-950 flex justify-between items-center">
+      <div className="p-6 border-b border-zinc-900 bg-zinc-950 flex justify-between items-center">
         <div>
-          <h2 className="text-xl font-display font-bold text-white mb-1">Editor</h2>
-          <p className="text-xs text-zinc-500">Logged in as {data.username}</p>
+          <h2 className="text-lg font-display font-bold text-white mb-1">Editor</h2>
+          <p className="text-xs text-zinc-500">/{data.username}</p>
+        </div>
+        <div className="flex items-center gap-2">
+            <span className={`w-2 h-2 rounded-full ${hasUnsavedChanges ? 'bg-orange-500 animate-pulse' : 'bg-green-500'}`}></span>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-zinc-800 overflow-x-auto no-scrollbar bg-zinc-900/50">
+      <div className="flex border-b border-zinc-900 overflow-x-auto no-scrollbar bg-zinc-950">
         {[
            { id: 'dashboard', icon: LayoutDashboard },
            { id: 'profile', icon: User },
@@ -351,70 +357,67 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
            <button 
            key={tab.id}
            onClick={() => setActiveTab(tab.id as any)}
-           className={`flex-1 py-4 px-3 text-xs font-medium transition-all flex flex-col items-center gap-1 min-w-[70px] ${activeTab === tab.id ? 'bg-zinc-800 text-white border-b-2 border-indigo-500' : 'text-zinc-500 hover:text-zinc-300'}`}
+           className={`flex-1 py-4 px-3 text-xs font-medium transition-all flex flex-col items-center gap-1 min-w-[65px] relative ${activeTab === tab.id ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
          >
-           <tab.icon size={16} />
-           <span className="capitalize hidden md:block">{tab.id === 'settings' ? 'Account' : tab.id}</span>
-           <span className="capitalize md:hidden">{tab.id === 'testimonials' ? 'Endorse' : (tab.id === 'settings' ? 'Acct' : tab.id)}</span>
+           <tab.icon size={18} className={activeTab === tab.id ? 'text-indigo-500' : ''}/>
+           <span className="capitalize text-[10px]">{tab.id === 'settings' ? 'Account' : tab.id}</span>
+           {activeTab === tab.id && <span className="absolute bottom-0 left-0 w-full h-[2px] bg-indigo-500"></span>}
          </button>
         ))}
       </div>
 
       {/* Content Area */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar bg-zinc-950">
+      <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar bg-zinc-950 pb-24">
         
         {/* === DASHBOARD TAB === */}
         {activeTab === 'dashboard' && (
           <div className="space-y-6 animate-fadeIn">
-             <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
-                <div className="flex items-center justify-between mb-4">
+             
+             <div className="bg-gradient-to-br from-indigo-500/10 to-purple-500/5 border border-indigo-500/20 rounded-2xl p-6">
+                <div className="flex justify-between items-start mb-6">
                     <div>
-                        <h3 className="text-white font-bold text-sm">Work Availability</h3>
-                        <p className="text-xs text-zinc-500">Show on profile</p>
+                         <h3 className="text-white font-bold text-lg">Portfolio Status</h3>
+                         <p className="text-xs text-zinc-400 mt-1">{hasUnsavedChanges ? 'You have unsaved changes.' : 'All changes are live.'}</p>
                     </div>
-                    <button 
-                       onClick={() => updateAvailability(!data.availability.status)}
-                       className={`relative w-12 h-6 rounded-full transition-colors ${data.availability.status ? 'bg-green-500' : 'bg-zinc-700'}`}
-                    >
-                        <span className={`absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full transition-transform ${data.availability.status ? 'translate-x-6' : 'translate-x-0'}`} />
-                    </button>
-                </div>
-             </div>
-
-             <div className="bg-gradient-to-br from-indigo-900/30 to-purple-900/10 border border-indigo-500/30 rounded-2xl p-6">
-                <h3 className="text-white font-bold text-lg mb-2">Portfolio Status</h3>
-                <div className="flex items-center gap-2 mb-6">
-                   <span className={`w-2 h-2 rounded-full ${hasUnsavedChanges ? 'bg-yellow-500' : 'bg-green-500'}`}></span>
-                   <span className="text-sm text-zinc-300">
-                      {hasUnsavedChanges ? 'Unsaved Draft' : 'Published & Live'}
-                   </span>
                 </div>
 
-                <Button onClick={onPublish} className="w-full mb-2" variant={hasUnsavedChanges ? 'primary' : 'secondary'}>
+                <Button onClick={onPublish} className="w-full mb-3" variant={hasUnsavedChanges ? 'primary' : 'secondary'}>
                    {isSaving ? 'Publishing...' : 'Save & Publish'}
                 </Button>
              </div>
-             
-             <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-4">
-                <div className="flex items-center gap-2">
-                   <Share2 size={16} className="text-indigo-500"/>
-                   <h3 className="text-white font-bold text-sm uppercase tracking-wider">Share Portfolio</h3>
-                </div>
-                
-                <div className="flex flex-col gap-2 bg-black rounded-lg p-3 border border-zinc-800">
-                   <div className="flex items-center gap-2 text-zinc-500 mb-1">
-                      <Link size={12} />
-                      <span className="text-[10px] font-mono truncate text-white">.../#{data.username}</span>
-                   </div>
 
-                   <div className="flex items-center gap-2">
-                      <Button size="sm" className="w-full text-xs" onClick={copyLink} icon={copySuccess ? <CheckCircle2 size={14}/> : <Copy size={14}/>}>
-                         {copySuccess ? 'Copied' : 'Copy Link'}
-                      </Button>
-                      <Button size="sm" variant="secondary" className="px-3" onClick={openLink}>
-                         <ExternalLink size={14} />
-                      </Button>
+             <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-5">
+                <div className="flex items-center justify-between mb-4">
+                    <div>
+                        <h3 className="text-white font-bold text-sm">Work Availability</h3>
+                        <p className="text-xs text-zinc-500">Show visible badge on profile</p>
+                    </div>
+                    <button 
+                       onClick={() => updateAvailability(!data.availability.status)}
+                       className={`relative w-11 h-6 rounded-full transition-colors ${data.availability.status ? 'bg-green-500' : 'bg-zinc-800'}`}
+                    >
+                        <span className={`absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full transition-transform ${data.availability.status ? 'translate-x-5' : 'translate-x-0'}`} />
+                    </button>
+                </div>
+             </div>
+             
+             <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-5 space-y-4">
+                <h3 className="text-white font-bold text-sm uppercase tracking-wider flex items-center gap-2"><Share2 size={14}/> Share</h3>
+                
+                <div className="bg-black rounded-lg p-3 border border-zinc-800 flex items-center justify-between">
+                   <div className="flex items-center gap-2 text-zinc-500 overflow-hidden">
+                      <Link size={12} className="flex-shrink-0"/>
+                      <span className="text-xs font-mono truncate text-zinc-300">{getShareLink()}</span>
                    </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                    <Button size="sm" className="w-full" onClick={copyLink} icon={copySuccess ? <CheckCircle2 size={14}/> : <Copy size={14}/>}>
+                        {copySuccess ? 'Copied' : 'Copy'}
+                    </Button>
+                    <Button size="sm" variant="secondary" className="w-full" onClick={openLink} icon={<ExternalLink size={14}/>}>
+                        Visit
+                    </Button>
                 </div>
              </div>
           </div>
@@ -422,110 +425,135 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
 
         {/* ... PROFILE TAB ... */}
         {activeTab === 'profile' && (
-          <div className="space-y-5 animate-fadeIn">
-            <div className="space-y-4">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2"><Image size={14}/> Avatar</h3>
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-full bg-zinc-800 overflow-hidden border border-zinc-700 relative group">
+          <div className="space-y-6 animate-fadeIn">
+            <div className="flex items-center gap-6 p-4 bg-zinc-900/30 rounded-xl border border-zinc-800">
+                <div className="w-20 h-20 rounded-full bg-zinc-800 overflow-hidden border border-zinc-700 relative group flex-shrink-0">
                   <img src={data.profileImage} alt="Profile" className="w-full h-full object-cover" />
                   {profileImageUploading && <div className="absolute inset-0 bg-black/50 flex items-center justify-center"><Loader2 className="animate-spin text-white"/></div>}
                 </div>
-                <Button size="sm" variant="secondary" onClick={() => handleFileUpload('image/*', handleProfileImageUpload)} icon={<Upload size={14}/>}>
-                    Upload
-                </Button>
-              </div>
+                <div className="flex-1">
+                    <h3 className="text-sm font-bold text-white mb-2">Avatar</h3>
+                    <Button size="sm" variant="secondary" onClick={() => handleFileUpload('image/*', handleProfileImageUpload)} icon={<Upload size={14}/>}>
+                        Change Image
+                    </Button>
+                </div>
             </div>
             
-            <div className="space-y-4 pt-4 border-t border-zinc-800">
-              <h3 className="text-sm font-bold text-white">Identity</h3>
+            <div className="space-y-4">
+              <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Identity</h3>
               <Input label="Full Name" value={data.name} onChange={(e) => updateField('name', e.target.value)} />
-              <Input label="Job Title" value={data.role} onChange={(e) => updateField('role', e.target.value)} />
+              <Input label="Job Title" value={data.role} onChange={(e) => updateField('role', e.target.value)} placeholder="e.g. Video Editor"/>
+              
               <div className="relative">
-                 <TextArea label="Bio / Intro" value={data.bio} onChange={(e) => updateField('bio', e.target.value)} rows={4} />
-                 <button onClick={handleAiBio} className="absolute bottom-3 right-3 text-indigo-400 hover:text-white transition-colors" title="Generate with AI">
-                     {isGeneratingBio ? <Loader2 size={16} className="animate-spin"/> : <Sparkles size={16} />}
+                 <TextArea label="Bio / Intro" value={data.bio} onChange={(e) => updateField('bio', e.target.value)} rows={4} placeholder="Tell your story..."/>
+                 <button onClick={handleAiBio} className="absolute bottom-3 right-3 text-indigo-400 hover:text-indigo-300 transition-colors bg-zinc-900 p-1.5 rounded-lg border border-indigo-500/30" title="Generate Bio with Gemini">
+                     {isGeneratingBio ? <Loader2 size={14} className="animate-spin"/> : <div className="flex items-center gap-1 text-[10px] font-bold uppercase"><Sparkles size={12} /> AI Generate</div>}
                  </button>
               </div>
+              
               <div className="grid grid-cols-2 gap-3">
-                <Input label="Location" value={data.location} onChange={(e) => updateField('location', e.target.value)} />
+                <Input label="Location" value={data.location} onChange={(e) => updateField('location', e.target.value)} placeholder="City, Country"/>
                 <Input label="Languages" value={data.languages} onChange={(e) => updateField('languages', e.target.value)} />
               </div>
             </div>
 
-            <div className="space-y-4 pt-4 border-t border-zinc-800">
-              <h3 className="text-sm font-bold text-white">Socials</h3>
+            <div className="space-y-4 pt-4 border-t border-zinc-900">
+              <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Social Links</h3>
               <SocialInput label="Email" value={data.socials.email} onChange={(e) => updateSocials('email', e.target.value)} placeholder="you@example.com"/>
-              <SocialInput label="Instagram" value={data.socials.instagram || ''} onChange={(e) => updateSocials('instagram', e.target.value)} placeholder="https://instagram.com/username"/>
-              <SocialInput label="LinkedIn" value={data.socials.linkedin || ''} onChange={(e) => updateSocials('linkedin', e.target.value)} placeholder="https://linkedin.com/in/username"/>
-              <SocialInput label="Twitter / X" value={data.socials.twitter || ''} onChange={(e) => updateSocials('twitter', e.target.value)} placeholder="https://x.com/username"/>
-              <SocialInput label="YouTube" value={data.socials.youtube || ''} onChange={(e) => updateSocials('youtube', e.target.value)} placeholder="https://youtube.com/@channel"/>
+              <SocialInput label="Instagram" value={data.socials.instagram || ''} onChange={(e) => updateSocials('instagram', e.target.value)} placeholder="instagram.com/username"/>
+              <SocialInput label="LinkedIn" value={data.socials.linkedin || ''} onChange={(e) => updateSocials('linkedin', e.target.value)} placeholder="linkedin.com/in/username"/>
+              <SocialInput label="Twitter / X" value={data.socials.twitter || ''} onChange={(e) => updateSocials('twitter', e.target.value)} placeholder="x.com/username"/>
+              <SocialInput label="YouTube" value={data.socials.youtube || ''} onChange={(e) => updateSocials('youtube', e.target.value)} placeholder="youtube.com/@channel"/>
             </div>
           </div>
         )}
 
         {/* ... CONTENT TAB ... */}
         {activeTab === 'content' && (
-          <div className="space-y-6 animate-fadeIn">
+          <div className="space-y-8 animate-fadeIn">
             {/* Showreel */}
-            <div className="bg-zinc-900/50 p-4 rounded-xl border border-zinc-800 space-y-3">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2"><Video size={14} className="text-purple-400"/> Showreel</h3>
-              
-              <div className="flex p-1 bg-zinc-900 rounded-lg mb-2">
-                 <button onClick={() => setShowreelInputMethod('upload')} className={`flex-1 text-xs py-1.5 rounded-md transition-colors ${showreelInputMethod === 'upload' ? 'bg-zinc-800 text-white' : 'text-zinc-500'}`}>Upload</button>
-                 <button onClick={() => setShowreelInputMethod('link')} className={`flex-1 text-xs py-1.5 rounded-md transition-colors ${showreelInputMethod === 'link' ? 'bg-zinc-800 text-white' : 'text-zinc-500'}`}>Link</button>
+            <div className="bg-zinc-900/30 p-5 rounded-xl border border-zinc-800 space-y-4">
+              <div className="flex justify-between items-center">
+                   <h3 className="text-sm font-bold text-white flex items-center gap-2"><Video size={16} className="text-indigo-400"/> Showreel</h3>
+                   <div className="flex bg-black rounded-lg p-1 border border-zinc-800">
+                        <button onClick={() => setShowreelInputMethod('upload')} className={`px-3 py-1 text-[10px] font-bold uppercase rounded-md transition-colors ${showreelInputMethod === 'upload' ? 'bg-zinc-800 text-white' : 'text-zinc-500'}`}>Upload</button>
+                        <button onClick={() => setShowreelInputMethod('link')} className={`px-3 py-1 text-[10px] font-bold uppercase rounded-md transition-colors ${showreelInputMethod === 'link' ? 'bg-zinc-800 text-white' : 'text-zinc-500'}`}>Link</button>
+                   </div>
               </div>
 
               {showreelInputMethod === 'upload' ? (
                   showreelUploading ? (
-                     <div className="h-24 bg-zinc-900 border border-zinc-800 rounded-lg flex flex-col items-center justify-center p-4">
-                        <Loader2 className="animate-spin mb-2" />
-                        <span className="text-xs">Uploading...</span>
+                     <div className="h-32 bg-black/50 border border-zinc-800 rounded-lg flex flex-col items-center justify-center p-4">
+                        <Loader2 className="animate-spin mb-2 text-indigo-500" />
+                        <span className="text-xs text-zinc-400">Uploading Video... {Math.round(showreelUploading.progress)}%</span>
                      </div>
                   ) : (
-                     <Button size="sm" className="w-full h-24 border-2 border-dashed border-zinc-700 bg-zinc-900/50 hover:bg-zinc-900" variant="ghost" onClick={() => handleFileUpload('video/*', handleShowreelVideoUpload)}>
-                        <Upload size={24} className="text-zinc-400 mb-2"/>
-                        <span className="text-xs">Select Video</span>
-                     </Button>
+                     <div className="relative">
+                         {data.showreelLink && !data.showreelLink.startsWith('http') && <div className="text-xs text-green-500 mb-2 flex items-center gap-1"><CheckCircle2 size={12}/> Video Uploaded</div>}
+                         <Button size="sm" className="w-full h-32 border border-dashed border-zinc-700 bg-black/20 hover:bg-black/40 hover:border-zinc-500 transition-all group" variant="ghost" onClick={() => handleFileUpload('video/*', handleShowreelVideoUpload)}>
+                            <div className="flex flex-col items-center">
+                                <Upload size={24} className="text-zinc-500 group-hover:text-white mb-2 transition-colors"/>
+                                <span className="text-xs text-zinc-400 group-hover:text-white">Click to upload video</span>
+                            </div>
+                         </Button>
+                     </div>
                   )
               ) : (
-                  <Input label="Link" value={data.showreelLink} onChange={(e) => updateField('showreelLink', e.target.value)} />
+                  <Input label="Video URL" value={data.showreelLink} onChange={(e) => updateField('showreelLink', e.target.value)} placeholder="https://..." />
               )}
             </div>
 
             {/* Projects */}
-            <div className="space-y-3">
-               <div className="flex justify-between items-center">
-                 <h3 className="text-sm font-bold text-white">Works</h3>
-                 <Button size="sm" variant="secondary" onClick={addProject} icon={<Plus size={14}/>}>Add</Button>
+            <div className="space-y-4">
+               <div className="flex justify-between items-center border-b border-zinc-900 pb-2">
+                 <h3 className="text-sm font-bold text-white">Project Gallery</h3>
+                 <Button size="sm" variant="secondary" onClick={addProject} icon={<Plus size={14}/>}>Add Project</Button>
                </div>
                
-               <div className="space-y-3">
+               <div className="space-y-4">
                  {data.projects.map((project) => {
                    const isUploading = uploadingState?.id === project.id;
+                   const isExpanded = expandedProject === project.id;
+                   
                    return (
-                   <div key={project.id} className="bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden">
-                     <div className="flex items-center justify-between p-3 hover:bg-zinc-800 cursor-pointer" onClick={() => setExpandedProject(expandedProject === project.id ? null : project.id)}>
-                       <div className="flex items-center gap-3">
-                         <div className="w-10 h-10 rounded bg-zinc-800 bg-cover bg-center" style={{backgroundImage: `url(${project.thumbnail})`}}></div>
-                         <span className="text-sm font-medium text-white">{project.title}</span>
+                   <div key={project.id} className={`bg-zinc-900/40 border rounded-xl overflow-hidden transition-all ${isExpanded ? 'border-zinc-700 bg-zinc-900' : 'border-zinc-800 hover:border-zinc-700'}`}>
+                     <div className="flex items-center justify-between p-4 cursor-pointer" onClick={() => setExpandedProject(isExpanded ? null : project.id)}>
+                       <div className="flex items-center gap-4">
+                         <div className="w-12 h-12 rounded-lg bg-black bg-cover bg-center border border-zinc-800" style={{backgroundImage: `url(${project.thumbnail})`}}></div>
+                         <div>
+                             <span className="text-sm font-bold text-white block">{project.title}</span>
+                             <span className="text-xs text-zinc-500">{project.category}</span>
+                         </div>
                        </div>
                        <div className="flex gap-2">
-                           <button onClick={(e) => removeProject(project.id, e)} className="p-1 hover:text-red-500"><Trash2 size={16}/></button>
-                           {expandedProject === project.id ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
+                           <button onClick={(e) => removeProject(project.id, e)} className="p-2 text-zinc-600 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"><Trash2 size={16}/></button>
+                           <div className={`p-2 text-zinc-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}><ChevronDown size={16}/></div>
                        </div>
                      </div>
                      
-                     {expandedProject === project.id && (
-                       <div className="p-4 border-t border-zinc-800 space-y-4 bg-zinc-950">
-                         <Input label="Title" value={project.title} onChange={(e) => updateProject(project.id, { title: e.target.value })} />
+                     {isExpanded && (
+                       <div className="p-5 border-t border-zinc-800 space-y-5 bg-black/20">
+                         <Input label="Project Title" value={project.title} onChange={(e) => updateProject(project.id, { title: e.target.value })} />
                          
-                         <div className="grid grid-cols-2 gap-3">
+                         <div className="relative">
+                            <TextArea label="Description" value={project.description} onChange={(e) => updateProject(project.id, { description: e.target.value })} rows={3} />
+                            <button 
+                                onClick={() => handleAiDescription(project.id, project.title, project.description)} 
+                                className="absolute top-0 right-0 text-indigo-400 hover:text-white text-[10px] uppercase font-bold flex items-center gap-1 bg-indigo-500/10 px-2 py-1 rounded"
+                                disabled={generatingDescId === project.id}
+                            >
+                                {generatingDescId === project.id ? <Loader2 size={10} className="animate-spin"/> : <Wand2 size={10} />}
+                                Magic Fix
+                            </button>
+                         </div>
+
+                         <div className="grid grid-cols-2 gap-4">
                             <Input label="Category" value={project.category} onChange={(e) => updateProject(project.id, { category: e.target.value })} />
                             <div className="space-y-1">
-                                <label className="text-xs font-medium text-zinc-500 uppercase">Type</label>
-                                <div className="flex bg-zinc-900 rounded border border-zinc-800 p-1">
-                                    <button onClick={() => updateProject(project.id, { type: 'video' })} className={`flex-1 text-xs py-1 rounded ${project.type !== 'image' ? 'bg-zinc-800 text-white' : 'text-zinc-500'}`}>Video</button>
-                                    <button onClick={() => updateProject(project.id, { type: 'image' })} className={`flex-1 text-xs py-1 rounded ${project.type === 'image' ? 'bg-zinc-800 text-white' : 'text-zinc-500'}`}>Image</button>
+                                <label className="text-xs font-medium text-zinc-500 uppercase">Media Type</label>
+                                <div className="flex bg-black rounded-lg border border-zinc-800 p-1">
+                                    <button onClick={() => updateProject(project.id, { type: 'video' })} className={`flex-1 text-xs py-1.5 rounded ${project.type !== 'image' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500'}`}>Video</button>
+                                    <button onClick={() => updateProject(project.id, { type: 'image' })} className={`flex-1 text-xs py-1.5 rounded ${project.type === 'image' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500'}`}>Image</button>
                                 </div>
                             </div>
                          </div>
@@ -534,22 +562,31 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
                              <div className="space-y-2">
                                 <label className="text-xs font-medium text-zinc-500 uppercase">Video Source</label>
                                 {isUploading ? (
-                                    <div className="text-xs text-center py-4">Uploading...</div>
+                                    <div className="h-10 bg-zinc-800/50 rounded flex items-center justify-center text-xs text-indigo-400">
+                                        <Loader2 className="animate-spin mr-2" size={14}/> Uploading...
+                                    </div>
                                 ) : (
                                     <div className="flex gap-2">
-                                        <Button size="sm" variant="secondary" onClick={() => handleFileUpload('video/*', (f) => handleProjectVideoUpload(project.id, f))} className="flex-1">Upload File</Button>
-                                        <Input placeholder="Or paste URL" value={project.link} onChange={(e) => updateProject(project.id, { link: e.target.value })} className="flex-[2]"/>
+                                        <Button size="sm" variant="secondary" onClick={() => handleFileUpload('video/*', (f) => handleProjectVideoUpload(project.id, f))} className="whitespace-nowrap">Upload File</Button>
+                                        <Input placeholder="Or paste YouTube/Vimeo URL" value={project.link} onChange={(e) => updateProject(project.id, { link: e.target.value })} className="flex-1"/>
                                     </div>
                                 )}
                              </div>
                          )}
 
                          <div className="space-y-2">
-                            <label className="text-xs font-medium text-zinc-500 uppercase">{project.type === 'image' ? 'Image Upload' : 'Thumbnail'}</label>
-                            {project.thumbnail && <img src={project.thumbnail} className="w-full aspect-video object-cover rounded mb-2" />}
-                            <Button size="sm" variant="secondary" onClick={() => handleFileUpload('image/*', (f) => handleThumbnailUpload(project.id, f))} className="w-full">
-                                {project.type === 'image' ? 'Upload Image' : 'Change Thumbnail'}
-                            </Button>
+                            <label className="text-xs font-medium text-zinc-500 uppercase">{project.type === 'image' ? 'Image File' : 'Custom Thumbnail'}</label>
+                            {project.thumbnail && <div className="relative group w-full aspect-video rounded-lg overflow-hidden border border-zinc-800 mb-2">
+                                <img src={project.thumbnail} className="w-full h-full object-cover" />
+                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                    <Button size="sm" onClick={() => handleFileUpload('image/*', (f) => handleThumbnailUpload(project.id, f))}>Change</Button>
+                                </div>
+                            </div>}
+                            {!project.thumbnail && (
+                                <Button size="sm" variant="secondary" onClick={() => handleFileUpload('image/*', (f) => handleThumbnailUpload(project.id, f))} className="w-full h-20 border-dashed">
+                                    Upload Image
+                                </Button>
+                            )}
                          </div>
                        </div>
                      )}
@@ -566,20 +603,19 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
             <div className="space-y-6 animate-fadeIn">
                 <div className="space-y-4">
                     <Input label="Primary Workflow Tool" value={data.primaryTool} onChange={e => updateField('primaryTool', e.target.value)} placeholder="e.g. DaVinci Resolve"/>
-                    <p className="text-xs text-zinc-500">This will be highlighted in your portfolio header.</p>
                 </div>
                 
-                <div className="space-y-2 pt-4 border-t border-zinc-800">
+                <div className="space-y-2 pt-4 border-t border-zinc-900">
                     <label className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Other Tools (Comma separated)</label>
                     <TextArea 
-                        rows={3}
+                        rows={4}
                         value={data.tools.join(', ')} 
                         onChange={e => updateField('tools', e.target.value.split(',').map(s => s.trim()).filter(Boolean))} 
                         placeholder="Premiere Pro, After Effects, Photoshop..."
                     />
                 </div>
 
-                <div className="space-y-2 pt-4 border-t border-zinc-800">
+                <div className="space-y-2 pt-4 border-t border-zinc-900">
                     <label className="text-xs font-medium text-zinc-500 uppercase tracking-wider">AI Tools (Comma separated)</label>
                     <TextArea 
                         rows={2}
@@ -601,15 +637,15 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
 
                 <div className="space-y-4">
                     {data.testimonials.map((t) => (
-                        <div key={t.id} className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 space-y-3 relative group">
-                            <button onClick={() => removeTestimonial(t.id)} className="absolute top-2 right-2 text-zinc-600 hover:text-red-500 p-1"><Trash2 size={14}/></button>
+                        <div key={t.id} className="bg-zinc-900 border border-zinc-800 rounded-lg p-5 space-y-4 relative group">
+                            <button onClick={() => removeTestimonial(t.id)} className="absolute top-3 right-3 text-zinc-600 hover:text-red-500 p-1"><Trash2 size={14}/></button>
                             <Input label="Client Name" value={t.name} onChange={e => updateTestimonial(t.id, 'name', e.target.value)} />
                             <Input label="Role" value={t.role} onChange={e => updateTestimonial(t.id, 'role', e.target.value)} />
                             <TextArea label="Quote" value={t.quote} onChange={e => updateTestimonial(t.id, 'quote', e.target.value)} rows={3}/>
                         </div>
                     ))}
                     {data.testimonials.length === 0 && (
-                        <div className="text-center py-8 border border-dashed border-zinc-800 rounded-xl">
+                        <div className="text-center py-12 border border-dashed border-zinc-800 rounded-xl bg-zinc-900/20">
                             <p className="text-zinc-500 text-xs">No endorsements yet.</p>
                         </div>
                     )}
@@ -621,8 +657,8 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
         {activeTab === 'settings' && (
            <div className="space-y-8 animate-fadeIn">
               <div className="bg-red-500/5 border border-red-500/20 rounded-2xl p-6">
-                 <h3 className="text-red-500 font-bold text-sm mb-2">Session</h3>
-                 <Button variant="outline" className="w-full border-red-500/30 text-red-500" onClick={onLogout} icon={<LogOut size={16}/>}>
+                 <h3 className="text-red-500 font-bold text-sm mb-2">Account Session</h3>
+                 <Button variant="outline" className="w-full border-red-500/30 text-red-500 hover:bg-red-500 hover:text-white" onClick={onLogout} icon={<LogOut size={16}/>}>
                     Log Out
                  </Button>
               </div>
