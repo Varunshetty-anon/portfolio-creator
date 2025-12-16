@@ -221,9 +221,15 @@ export const uploadFileToStorage = (file: File, path: string, onProgress?: (prog
 // Check if username is taken
 export const checkUsernameAvailable = async (username: string): Promise<boolean> => {
     if (!db || !username) return true; // Assume available if offline
-    const q = query(collection(db, COLLECTION_NAME), where("username", "==", username));
-    const docs = await getDocs(q);
-    return docs.empty;
+    try {
+        const q = query(collection(db, COLLECTION_NAME), where("username", "==", username));
+        const docs = await getDocs(q);
+        return docs.empty;
+    } catch (e: any) {
+        // If permission denied (e.g. strict rules on unauthenticated users), skip check
+        console.warn("Username availability check skipped:", e.message);
+        return true;
+    }
 };
 
 export const saveToDB = async (data: PortfolioData): Promise<void> => {
