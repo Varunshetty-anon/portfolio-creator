@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { PortfolioView } from './components/PortfolioView';
 import { EditorPanel } from './components/EditorPanel';
+import { OnboardingFlow } from './components/OnboardingFlow';
 import { PortfolioData, INITIAL_DATA } from './types';
 import { loadFromDB, saveToDB, isConfigured, auth, loginWithEmail, signupWithEmail, loginWithGoogle, checkUsernameAvailable } from './utils';
 import { Database, HardDrive, Loader2, Code, Eye, AlertCircle, X } from 'lucide-react';
@@ -19,6 +20,7 @@ const App: React.FC = () => {
   const [route, setRoute] = useState<'home' | 'editor' | 'public'>('home');
   const [data, setData] = useState<PortfolioData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   
   // Auth Form State
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
@@ -36,45 +38,49 @@ const App: React.FC = () => {
 
   // --- Initialization ---
   useEffect(() => {
-    // Listen for Firebase Auth State
+    // 1. Check for Public Hash URL FIRST (No Auth Required)
+    const hash = getHash();
+    if (hash && hash !== '#editor' && hash !== '#' && !hash.startsWith('#access_token')) {
+        const slug = hash.replace('#', '');
+        // Immediately try to load public data
+        const loadPublic = async () => {
+            const publicData = await loadFromDB(slug);
+            if (publicData) {
+                setData(publicData);
+                setRoute('public');
+                document.title = `${publicData.name} - Portfolio`;
+            } else {
+                // If not found, go home
+                setRoute('home');
+            }
+            setIsLoading(false);
+        };
+        loadPublic();
+        return; // Stop auth listener from interfering
+    }
+
+    // 2. Listen for Firebase Auth State (Only for Editor/Home)
     const unsubscribe = isConfigured && auth ? onAuthStateChanged(auth, async (user) => {
         if (user) {
-             // If logged in, load THEIR data
              const userPortfolio = await loadFromDB(user.uid);
              if (userPortfolio) {
                  setData(userPortfolio);
+                 // Check if onboarding is needed (empty name)
+                 if (!userPortfolio.name) {
+                     setShowOnboarding(true);
+                 }
                  setRoute('editor');
              } else {
-                 // New user via Google Auth potentially, or data missing
+                 // New user - Initialize empty profile for onboarding
                  const newProfile = { ...INITIAL_DATA, uid: user.uid, contactEmail: user.email || '' };
                  setData(newProfile);
+                 setShowOnboarding(true); // Trigger onboarding
                  setRoute('editor');
              }
         }
-    }) : () => {};
+        setIsLoading(false);
+    }) : () => setIsLoading(false);
 
-    const initApp = async () => {
-      setIsLoading(true);
-      const hash = getHash();
-      
-      // Public Route Check (#username)
-      if (hash && hash !== '#editor' && hash !== '#' && !hash.startsWith('#access_token')) {
-          const slug = hash.replace('#', '');
-          const publicData = await loadFromDB(slug);
-          if (publicData) {
-              setData(publicData);
-              setRoute('public');
-              document.title = `${publicData.name} - Portfolio`;
-              setIsLoading(false);
-              return;
-          }
-      }
-
-      // If no public route, and not logged in via Firebase listener above
-      setIsLoading(false);
-    };
-
-    initApp();
     return () => unsubscribe();
   }, []);
 
@@ -96,10 +102,11 @@ const App: React.FC = () => {
                 uid: cred.user.uid,
                 username: username.toLowerCase().replace(/\s/g, ''),
                 contactEmail: email,
-                name: "VARUN"
+                name: "" // Explicitly empty to trigger onboarding
             };
-            await saveToDB(newProfile);
+            // Do not save yet, wait for onboarding
             setData(newProfile);
+            setShowOnboarding(true);
             setRoute('editor');
         } else {
             await loginWithEmail(email, password);
@@ -132,6 +139,7 @@ const App: React.FC = () => {
       if (auth) await auth.signOut();
       setRoute('home');
       setData(null);
+      setShowOnboarding(false);
       safeSetHash('');
   };
 
@@ -148,8 +156,14 @@ const App: React.FC = () => {
     } catch (e) {
       console.error("Save failed", e);
       setIsSaving(false);
-      alert("Failed to save.");
+      alert("Failed to save. Check your connection.");
     }
+  };
+
+  const handleOnboardingComplete = async (completedData: PortfolioData) => {
+      setData(completedData);
+      setShowOnboarding(false);
+      await handleSaveAndPublish(completedData);
   };
 
   if (isLoading) {
@@ -161,22 +175,26 @@ const App: React.FC = () => {
       );
   }
 
-  // --- VIEW: PUBLIC ---
+  // --- VIEW: PUBLIC (Read-Only) ---
   if (route === 'public' && data) {
     return (
-        <>
+        <div className="relative">
             <PortfolioView data={data} />
             <div className="fixed bottom-6 right-6 z-50">
-               <Button variant="secondary" size="sm" onClick={() => { safeSetHash(''); window.location.reload(); }} className="shadow-2xl opacity-50 hover:opacity-100 backdrop-blur-md bg-black/50 border border-zinc-800">
-                 Create Your Portfolio
+               <Button variant="secondary" size="sm" onClick={() => { safeSetHash(''); window.location.reload(); }} className="shadow-2xl opacity-50 hover:opacity-100 backdrop-blur-md bg-black/50 border border-zinc-800 text-xs font-bold uppercase tracking-wider">
+                 Create with Frames
                </Button>
             </div>
-        </>
+        </div>
     );
   }
 
   // --- VIEW: EDITOR ---
   if (route === 'editor' && data) {
+    if (showOnboarding) {
+        return <OnboardingFlow data={data} onComplete={handleOnboardingComplete} />;
+    }
+
     return (
       <div className="h-screen w-screen bg-black overflow-hidden flex flex-col md:flex-row">
         

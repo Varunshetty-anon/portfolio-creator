@@ -11,6 +11,26 @@ const LOCAL_STORAGE_KEY = 'frames_portfolio_data';
 export { isConfigured, auth };
 export const hasCloudStorage = !!storage;
 
+// --- Helpers ---
+export const getDriveEmbedUrl = (url: string): string | null => {
+    if (!url) return null;
+    // Extract ID from common Drive URL patterns
+    const patterns = [
+        /\/file\/d\/([a-zA-Z0-9_-]+)/,
+        /id=([a-zA-Z0-9_-]+)/,
+        /\/open\?id=([a-zA-Z0-9_-]+)/
+    ];
+
+    for (const pattern of patterns) {
+        const match = url.match(pattern);
+        if (match && match[1]) {
+            return `https://drive.google.com/file/d/${match[1]}/preview`;
+        }
+    }
+    return null; // Return null if not a valid Drive link
+};
+
+
 // --- AI Integration ---
 // API Key is strictly from process.env.API_KEY
 const genAI = process.env.API_KEY ? new GoogleGenAI({ apiKey: process.env.API_KEY }) : null;
@@ -235,7 +255,6 @@ export const uploadFileToStorage = (file: File, path: string, onProgress?: (prog
 
 // --- AUTH & DATABASE ---
 
-// Check if username is taken
 export const checkUsernameAvailable = async (username: string): Promise<boolean> => {
     if (!db || !username) return true; // Assume available if offline
     try {
@@ -243,7 +262,6 @@ export const checkUsernameAvailable = async (username: string): Promise<boolean>
         const docs = await getDocs(q);
         return docs.empty;
     } catch (e: any) {
-        // If permission denied (e.g. strict rules on unauthenticated users), skip check
         console.warn("Username availability check skipped:", e.message);
         return true;
     }
@@ -252,35 +270,35 @@ export const checkUsernameAvailable = async (username: string): Promise<boolean>
 export const saveToDB = async (data: PortfolioData): Promise<void> => {
   const dataToSave: any = { ...data };
 
-  // Convert blobs
-  if (dataToSave.profileImageBlob) {
-    dataToSave.profileImage = await blobToBase64(dataToSave.profileImageBlob);
+  // CRITICAL: Filter out any Blob URLs that might have been set locally to prevent Firestore bloat/errors
+  // Use a placeholder or ensure they are uploaded before calling saveToDB in components
+  // Here we just ensure we don't crash firestore with data:urls if they slipped through
+  
+  if (dataToSave.projects) {
+      dataToSave.projects = dataToSave.projects.map((p: any) => {
+          const cleanP = { ...p };
+          delete cleanP.thumbnailBlob;
+          delete cleanP.customVideoBlob;
+          return cleanP;
+      });
   }
+  
+  // Remove blobs
   delete dataToSave.profileImageBlob;
-
-  if (dataToSave.showreelThumbnailBlob) {
-    dataToSave.showreelThumbnail = await blobToBase64(dataToSave.showreelThumbnailBlob);
-  }
   delete dataToSave.showreelThumbnailBlob;
   delete dataToSave.showreelBlob;
 
-  if (dataToSave.projects) {
-      dataToSave.projects = await Promise.all(dataToSave.projects.map(async (p: any) => {
-          const newP = { ...p };
-          if (newP.thumbnailBlob) newP.thumbnail = await blobToBase64(newP.thumbnailBlob);
-          delete newP.thumbnailBlob;
-          delete newP.customVideoBlob;
-          return newP;
-      }));
-  }
-
-  // Save to Firestore using UID or Username as key
-  if (isConfigured && db) {
+  // Save to Firestore using UID
+  if (isConfigured && db && data.uid) {
       try {
-          const docId = data.uid || 'guest_user';
-          await setDoc(doc(db, COLLECTION_NAME, docId), dataToSave);
+          // Save under UID for user retrieval
+          await setDoc(doc(db, COLLECTION_NAME, data.uid), dataToSave);
+          
+          // Also allow lookup by username (store a simplified mapping or rely on query)
+          // For this app's simplicity, we are querying by username field for public view
       } catch (e) {
           console.warn("Firestore save failed", e);
+          throw e;
       }
   }
 
@@ -295,23 +313,20 @@ export const loadFromDB = async (identifier?: string): Promise<PortfolioData | n
       try {
         let docSnap;
         
-        // If identifier is provided, check if it's a UID (by checking direct doc) or a username (query)
+        // 1. Try Direct UID match (Editor Mode)
         if (identifier) {
-            // 1. Try direct ID (UID)
             const docRef = doc(db, COLLECTION_NAME, identifier);
             docSnap = await getDoc(docRef);
-            
-            // 2. If not found, try searching by username
-            if (!docSnap.exists()) {
-                const q = query(collection(db, COLLECTION_NAME), where("username", "==", identifier));
-                const querySnap = await getDocs(q);
-                if (!querySnap.empty) {
-                    docSnap = querySnap.docs[0];
-                }
-            }
-        } else {
-             // Default load (legacy main_portfolio or local)
-             return null;
+        }
+
+        // 2. If not found or if identifier looks like a username (Public Mode)
+        if (!docSnap || !docSnap.exists()) {
+             // Query by username
+             const q = query(collection(db, COLLECTION_NAME), where("username", "==", identifier));
+             const querySnap = await getDocs(q);
+             if (!querySnap.empty) {
+                 docSnap = querySnap.docs[0];
+             }
         }
 
         if (docSnap && docSnap.exists()) {

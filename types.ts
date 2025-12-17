@@ -4,11 +4,12 @@ export interface Project {
   description: string;
   thumbnail: string;
   thumbnailBlob?: Blob;
-  link: string;
+  link: string; // Can be direct URL or Google Drive link
+  driveLink?: string; // Explicit field for drive link if needed, or re-use link
   customVideoBlob?: Blob;
   category: string;
   aspectRatio?: '16:9' | '9:16';
-  type: 'video' | 'image'; // New field to distinguish media type
+  type: 'video' | 'image'; 
 }
 
 export interface Testimonial {
@@ -28,8 +29,8 @@ export interface Socials {
 }
 
 export interface PortfolioData {
-  uid?: string; // Firebase Auth UID
-  username: string; // Unique handle for public URL
+  uid?: string; 
+  username: string; 
   name: string;
   role: string;
   location: string;
@@ -54,18 +55,18 @@ export interface PortfolioData {
     link?: string;
   };
   settings: {
-    username: string; // Legacy/Fallback
-    password: string; // Legacy/Fallback
+    username: string; 
+    password: string; 
   };
 }
 
 export const INITIAL_DATA: PortfolioData = {
   username: "guest",
-  name: "VARUN",
-  role: "Creative Director",
+  name: "", // Empty to trigger onboarding
+  role: "",
   location: "Earth",
   languages: "English",
-  bio: "I create visual stories that matter. Welcome to my portfolio.",
+  bio: "I create visual stories that matter.",
   contactEmail: "",
   profileImage: "https://picsum.photos/id/64/400/400",
   showreelThumbnail: "https://picsum.photos/id/190/800/450",

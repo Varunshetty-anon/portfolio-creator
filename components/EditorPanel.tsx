@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { PortfolioData, Project, Testimonial } from '../types';
 import { Input, TextArea } from './ui/Input';
 import { Button } from './ui/Button';
-import { Plus, Trash2, Video, Wand2, Image, ChevronDown, ChevronUp, Upload, X, LayoutDashboard, Copy, ExternalLink, FileVideo, User, MessageSquare, Loader2, CheckCircle2, Globe, Crop, Settings, LogOut, AlertCircle, Share2, Eye, EyeOff, Cloud, Link, Sparkles, Wrench, ZoomIn, ZoomOut } from 'lucide-react';
+import { Plus, Trash2, Video, Wand2, Image as ImageIcon, ChevronDown, ChevronUp, Upload, X, LayoutDashboard, Copy, ExternalLink, FileVideo, User, MessageSquare, Loader2, CheckCircle2, Globe, Crop, Settings, LogOut, AlertCircle, Share2, Eye, EyeOff, Cloud, Link, Sparkles, Wrench, ZoomIn, ZoomOut, QrCode } from 'lucide-react';
 import Cropper from 'react-easy-crop';
 import { getCroppedImg, generateThumbnailFromVideo, encodeState, uploadFileToStorage, isConfigured, hasCloudStorage, generateAiBio, generateAiDescription } from '../utils';
 
@@ -75,6 +75,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
   const [isGeneratingBio, setIsGeneratingBio] = useState(false);
   const [generatingDescId, setGeneratingDescId] = useState<string | null>(null);
   const [profileImageUploading, setProfileImageUploading] = useState(false);
+  const [showQr, setShowQr] = useState(false);
   
   // Crop State
   const [cropModalOpen, setCropModalOpen] = useState(false);
@@ -117,7 +118,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
   // --- Link Generator ---
   const getShareLink = () => {
      const origin = window.location.origin === 'null' || !window.location.origin ? 'https://cinefolio.app' : window.location.origin;
-     return `${origin}${window.location.pathname}#${data.username}`;
+     return `${origin}/#${data.username}`;
   };
 
   const copyLink = () => {
@@ -161,6 +162,27 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
     updateField('projects', data.projects.map(p => p.id === id ? { ...p, ...updates } : p));
   };
 
+  // --- Testimonial Helpers ---
+  const addTestimonial = () => {
+      const newTestimonial: Testimonial = {
+          id: Date.now().toString(),
+          name: "Client Name",
+          role: "Role / Company",
+          quote: "Describe the experience working with you..."
+      };
+      updateField('testimonials', [...data.testimonials, newTestimonial]);
+  };
+
+  const removeTestimonial = (id: string) => {
+      if(window.confirm("Delete this endorsement?")) {
+          updateField('testimonials', data.testimonials.filter(t => t.id !== id));
+      }
+  };
+
+  const updateTestimonial = (id: string, field: keyof Testimonial, value: string) => {
+      updateField('testimonials', data.testimonials.map(t => t.id === id ? { ...t, [field]: value } : t));
+  };
+
   // --- File Upload ---
   const handleFileUpload = (accept: string, callback: (file: File) => void) => {
     const input = document.createElement('input');
@@ -193,7 +215,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
              const url = await uploadFileToStorage(file, `users/${data.uid || 'guest'}/profile/${Date.now()}.jpg`);
              onChange({ ...data, profileImage: url, profileImageBlob: undefined });
           } else {
-             // Fallback for offline/demo
              const url = URL.createObjectURL(croppedBlob);
              onChange({ ...data, profileImage: url, profileImageBlob: file });
           }
@@ -255,7 +276,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
             };
             
             if (generatedThumb) {
-                // Upload thumbnail too
                 const thumbUrl = await uploadFileToStorage(
                     new File([generatedThumb.blob], "thumb.jpg", { type: "image/jpeg" }), 
                     `users/${data.uid || 'guest'}/projects/${id}/thumb_${Date.now()}.jpg`
@@ -287,29 +307,10 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
       }
   }
 
-  // --- Testimonials ---
-  const addTestimonial = () => {
-      const newT: Testimonial = {
-          id: Date.now().toString(),
-          name: "Client Name",
-          role: "Director",
-          quote: "Working with them was an absolute game changer."
-      };
-      updateField('testimonials', [...data.testimonials, newT]);
-  };
-
-  const removeTestimonial = (id: string) => {
-      updateField('testimonials', data.testimonials.filter(t => t.id !== id));
-  };
-
-  const updateTestimonial = (id: string, field: keyof Testimonial, val: string) => {
-      updateField('testimonials', data.testimonials.map(t => t.id === id ? { ...t, [field]: val } : t));
-  };
-
   return (
     <div className="h-full flex flex-col bg-zinc-950 border-r border-zinc-900 relative">
       
-      {/* Crop Modal - Moved to Portal */}
+      {/* Crop Modal - Portal */}
       {cropModalOpen && tempImgSrc && createPortal(
           <div className="fixed inset-0 z-[100] bg-black flex flex-col animate-in fade-in duration-200">
               <div className="relative flex-1 bg-zinc-900 w-full h-full overflow-hidden">
@@ -349,10 +350,31 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
           document.body
       )}
 
+      {/* QR Code Modal */}
+      {showQr && createPortal(
+          <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in" onClick={() => setShowQr(false)}>
+              <div className="bg-white rounded-2xl p-8 flex flex-col items-center gap-4 max-w-sm w-full" onClick={e => e.stopPropagation()}>
+                  <div className="bg-black p-4 rounded-xl">
+                    <img 
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(getShareLink())}`} 
+                        alt="Portfolio QR" 
+                        className="w-48 h-48"
+                    />
+                  </div>
+                  <div className="text-center">
+                      <h3 className="text-black font-bold text-lg mb-1">Scan to View</h3>
+                      <p className="text-zinc-500 text-xs break-all">{getShareLink()}</p>
+                  </div>
+                  <Button variant="secondary" onClick={() => setShowQr(false)} className="w-full">Close</Button>
+              </div>
+          </div>,
+          document.body
+      )}
+
       {/* Header */}
       <div className="p-6 border-b border-zinc-900 bg-zinc-950 flex justify-between items-center">
         <div>
-          <h2 className="text-lg font-display font-bold text-white mb-1">Editor</h2>
+          <h2 className="text-lg font-display font-bold text-white mb-1">Frames Studio</h2>
           <p className="text-xs text-zinc-500">/{data.username}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -402,21 +424,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
                 </Button>
              </div>
 
-             <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-5">
-                <div className="flex items-center justify-between mb-4">
-                    <div>
-                        <h3 className="text-white font-bold text-sm">Work Availability</h3>
-                        <p className="text-xs text-zinc-500">Show visible badge on profile</p>
-                    </div>
-                    <button 
-                       onClick={() => updateAvailability(!data.availability.status)}
-                       className={`relative w-11 h-6 rounded-full transition-colors ${data.availability.status ? 'bg-green-500' : 'bg-zinc-800'}`}
-                    >
-                        <span className={`absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full transition-transform ${data.availability.status ? 'translate-x-5' : 'translate-x-0'}`} />
-                    </button>
-                </div>
-             </div>
-             
              <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-5 space-y-4">
                 <h3 className="text-white font-bold text-sm uppercase tracking-wider flex items-center gap-2"><Share2 size={14}/> Share</h3>
                 
@@ -435,11 +442,14 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
                         Visit
                     </Button>
                 </div>
+                <Button size="sm" variant="ghost" className="w-full" onClick={() => setShowQr(true)} icon={<QrCode size={14}/>}>
+                    Show QR Code
+                </Button>
              </div>
           </div>
         )}
 
-        {/* ... PROFILE TAB ... */}
+        {/* ... PROFILE TAB (Standard inputs) ... */}
         {activeTab === 'profile' && (
           <div className="space-y-6 animate-fadeIn">
             <div className="flex items-center gap-6 p-4 bg-zinc-900/30 rounded-xl border border-zinc-800">
@@ -568,8 +578,8 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
                             <div className="space-y-1">
                                 <label className="text-xs font-medium text-zinc-500 uppercase">Media Type</label>
                                 <div className="flex bg-black rounded-lg border border-zinc-800 p-1">
-                                    <button onClick={() => updateProject(project.id, { type: 'video' })} className={`flex-1 text-xs py-1.5 rounded ${project.type !== 'image' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500'}`}>Video</button>
-                                    <button onClick={() => updateProject(project.id, { type: 'image' })} className={`flex-1 text-xs py-1.5 rounded ${project.type === 'image' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500'}`}>Image</button>
+                                    <button onClick={() => updateProject(project.id, { type: 'video' })} className={`flex-1 text-xs py-1.5 rounded ${project.type !== 'image' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500'}`}><Video size={10} className="inline mr-1"/>Video</button>
+                                    <button onClick={() => updateProject(project.id, { type: 'image' })} className={`flex-1 text-xs py-1.5 rounded ${project.type === 'image' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500'}`}><ImageIcon size={10} className="inline mr-1"/>Image</button>
                                 </div>
                             </div>
                          </div>
@@ -582,9 +592,12 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
                                         <Loader2 className="animate-spin mr-2" size={14}/> Uploading...
                                     </div>
                                 ) : (
-                                    <div className="flex gap-2">
-                                        <Button size="sm" variant="secondary" onClick={() => handleFileUpload('video/*', (f) => handleProjectVideoUpload(project.id, f))} className="whitespace-nowrap">Upload File</Button>
-                                        <Input placeholder="Or paste YouTube/Vimeo URL" value={project.link} onChange={(e) => updateProject(project.id, { link: e.target.value })} className="flex-1"/>
+                                    <div className="flex flex-col gap-2">
+                                        <div className="flex gap-2">
+                                            <Button size="sm" variant="secondary" onClick={() => handleFileUpload('video/*', (f) => handleProjectVideoUpload(project.id, f))} className="whitespace-nowrap">Upload File</Button>
+                                            <Input placeholder="Or paste Google Drive / YouTube URL" value={project.link} onChange={(e) => updateProject(project.id, { link: e.target.value })} className="flex-1"/>
+                                        </div>
+                                        <p className="text-[10px] text-zinc-600">Supports YouTube, Vimeo, and Google Drive (Public View Link)</p>
                                     </div>
                                 )}
                              </div>
@@ -600,7 +613,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
                             </div>}
                             {!project.thumbnail && (
                                 <Button size="sm" variant="secondary" onClick={() => handleFileUpload('image/*', (f) => handleThumbnailUpload(project.id, f))} className="w-full h-20 border-dashed">
-                                    Upload Image
+                                    Upload {project.type === 'image' ? 'Image' : 'Thumbnail'}
                                 </Button>
                             )}
                          </div>
