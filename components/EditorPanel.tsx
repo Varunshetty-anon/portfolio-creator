@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -6,7 +5,7 @@ import { PortfolioData, Project, Testimonial } from '../types';
 import { Input, TextArea } from './ui/Input';
 import { Button } from './ui/Button';
 import { ToolSelector } from './ToolSelector';
-import { Plus, Trash2, Video, Wand2, Image as ImageIcon, ChevronDown, Upload, X, LayoutDashboard, Copy, ExternalLink, User, MessageSquare, Loader2, CheckCircle2, Globe, Crop, Settings, LogOut, AlertCircle, Sparkles, Wrench, ZoomIn, ZoomOut, QrCode, Download, AlertTriangle, Eye, Monitor, Smartphone, Info, HelpCircle } from 'lucide-react';
+import { Plus, Trash2, Video, Wand2, Image as ImageIcon, ChevronDown, Upload, X, LayoutDashboard, Copy, ExternalLink, User, MessageSquare, Loader2, CheckCircle2, Globe, Crop, Settings, LogOut, AlertCircle, Sparkles, Wrench, ZoomIn, ZoomOut, QrCode, Download, AlertTriangle, Eye, Monitor, Smartphone, HelpCircle, Info } from 'lucide-react';
 import Cropper from 'react-easy-crop';
 import { getCroppedImg, generateThumbnailFromVideo, uploadFileToStorage, hasCloudStorage, generateAiBio, generateAiDescription, checkPortfolioReadiness, downloadQrCode, getYouTubeThumbnail, getDriveThumbnail, generateAiThumbnail } from '../utils';
 
@@ -21,7 +20,6 @@ interface EditorPanelProps {
   onPreview?: () => void;
 }
 
-// Fixed Tooltip component: making children optional resolves the TypeScript "property missing" errors in JSX
 const Tooltip = ({ text, children }: { text: string; children?: React.ReactNode }) => {
     const [isVisible, setIsVisible] = useState(false);
     return (
@@ -346,7 +344,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
           setGeneratingThumbId(projectId);
           
           if (isDrive && !thumb) {
-             // Generate AI Thumbnail for Drive Links
              thumb = await generateAiThumbnail(project.title, project.category);
           }
 
@@ -726,7 +723,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
                         <div className="flex items-center gap-2 group">
                             <Input label="Username" value={data.username} disabled className="opacity-50 cursor-not-allowed text-zinc-400" />
                             <div className="pt-5">
-                                <Tooltip text="Your unique profile identifier.">
+                                <Tooltip text="Your unique profile identifier used in your custom URL.">
                                     <Info size={16} className="text-zinc-600 hover:text-indigo-400 cursor-help transition-colors"/>
                                 </Tooltip>
                             </div>
@@ -734,7 +731,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
                         <div className="flex items-center gap-2 group">
                             <Input label="Email" value={data.contactEmail} disabled className="opacity-50 cursor-not-allowed text-zinc-400" />
                             <div className="pt-5">
-                                <Tooltip text="Login email associated with this account.">
+                                <Tooltip text="Login email associated with this account. Cannot be changed.">
                                     <Info size={16} className="text-zinc-600 hover:text-indigo-400 cursor-help transition-colors"/>
                                 </Tooltip>
                             </div>
@@ -746,17 +743,17 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
                         <h3 className="text-sm font-bold text-red-400 uppercase tracking-[0.2em] flex items-center gap-2">
                             <AlertTriangle size={16}/> Danger Zone
                         </h3>
-                        <Tooltip text="Irreversible account actions.">
+                        <Tooltip text="Sensitive actions that impact your account access.">
                             <HelpCircle size={14} className="text-zinc-600"/>
                         </Tooltip>
                      </div>
                      <div className="space-y-4">
-                        <Tooltip text="Securely exit your current studio session.">
+                        <Tooltip text="Exit the current session safely.">
                             <Button variant="secondary" onClick={onLogout} className="w-full py-4 bg-red-500/10 text-red-400 hover:text-white hover:bg-red-600 border border-red-500/10 hover:border-red-500 transition-all font-bold tracking-widest"><LogOut className="mr-2" size={18} /> SIGN OUT</Button>
                         </Tooltip>
 
                         {!confirmDelete ? (
-                            <Tooltip text="Permanently erase your entire digital footprint on Frames.">
+                            <Tooltip text="Permanently delete everything and wipe your account from our servers.">
                                 <Button 
                                     variant="ghost" 
                                     onClick={() => setConfirmDelete(true)} 
@@ -772,7 +769,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
                                 className="p-4 bg-red-500/10 border border-red-500 rounded-xl space-y-4"
                             >
                                 <p className="text-xs text-red-400 font-bold text-center leading-relaxed">
-                                    WARNING: This action is permanent. All your projects, portfolio data, and login access will be wiped forever.
+                                    WARNING: This is permanent. All projects, settings, and login credentials will be WIPED.
                                 </p>
                                 <div className="flex gap-3">
                                     <Button variant="secondary" className="flex-1 bg-zinc-800 text-white" onClick={() => setConfirmDelete(false)}>Cancel</Button>
@@ -782,7 +779,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
                                         onClick={onDeleteAccount}
                                         disabled={isDeleting}
                                     >
-                                        {isDeleting ? <Loader2 className="animate-spin" size={18}/> : 'YES, WIPE DATA'}
+                                        {isDeleting ? <Loader2 className="animate-spin" size={18}/> : 'WIPE EVERYTHING'}
                                     </Button>
                                 </div>
                             </motion.div>

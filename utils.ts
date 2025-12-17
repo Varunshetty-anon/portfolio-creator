@@ -1,4 +1,3 @@
-
 import { PortfolioData, INITIAL_DATA, Project } from './types';
 import { db, storage, auth, googleProvider, isConfigured } from './firebase';
 import { doc, getDoc, setDoc, collection, query, where, getDocs, deleteDoc } from 'firebase/firestore';
@@ -117,14 +116,12 @@ export const downloadQrCode = async (url: string, filename: string) => {
 
 export const generateAiBio = async (currentBio: string, role: string, skills: string[]): Promise<string> => {
   try {
-    // Initializing GoogleGenAI right before the API call to ensure the latest API key is used
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const prompt = `Rewrite this bio to be professional, human, and creative. Role: ${role}, Skills: ${skills.join(', ')}. Current Draft: "${currentBio}". Rules: 2-3 sentences max. No bullet points. No hashtags. Sound punchy and premium.`;
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: prompt,
     });
-    // response.text is a property, not a method
     return response.text?.trim() || currentBio;
   } catch (error) {
     console.error("AI Bio Generation failed:", error);
@@ -134,14 +131,12 @@ export const generateAiBio = async (currentBio: string, role: string, skills: st
 
 export const generateAiDescription = async (title: string, category: string, currentDesc: string): Promise<string> => {
   try {
-    // Initializing GoogleGenAI right before the API call to ensure the latest API key is used
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const prompt = `Rewrite this project description to be punchy and professional for a video editor portfolio. Project: "${title}" (${category}). Draft: "${currentDesc}". Rules: 2 sentences max. No bullet points.`;
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: prompt,
     });
-    // response.text is a property, not a method
     return response.text?.trim() || currentDesc;
   } catch (e) {
     console.error("AI Desc failed", e);
@@ -151,7 +146,6 @@ export const generateAiDescription = async (title: string, category: string, cur
 
 export const generateAiThumbnail = async (title: string, category: string): Promise<string> => {
   try {
-    // Initializing GoogleGenAI right before the API call to ensure the latest API key is used
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
@@ -160,10 +154,8 @@ export const generateAiThumbnail = async (title: string, category: string): Prom
       }
     });
 
-    // Iterating through all parts of the first candidate to find the image part
-    const candidates = response.candidates || [];
-    if (candidates.length > 0) {
-      for (const part of candidates[0].content.parts) {
+    for (const candidate of response.candidates || []) {
+      for (const part of candidate.content.parts) {
         if (part.inlineData) {
           return `data:image/png;base64,${part.inlineData.data}`;
         }
@@ -306,12 +298,22 @@ export const checkUsernameAvailable = async (username: string): Promise<boolean>
 
 export const saveToDB = async (data: PortfolioData): Promise<void> => {
   if (!data.uid || data.uid === 'guest') return;
-  const dataToSave = { ...data };
+  // Deep clone to avoid mutations
+  const dataToSave = JSON.parse(JSON.stringify(data));
+  // Remove binary blobs before saving to Firestore
   delete dataToSave.profileImageBlob;
   delete dataToSave.showreelThumbnailBlob;
   delete dataToSave.showreelBlob;
+  if (dataToSave.projects) {
+    dataToSave.projects.forEach((p: any) => {
+      delete p.thumbnailBlob;
+      delete p.customVideoBlob;
+    });
+  }
+
   if (isConfigured && db) {
-    await setDoc(doc(db, COLLECTION_NAME, data.uid), dataToSave);
+    const docRef = doc(db, COLLECTION_NAME, data.uid);
+    await setDoc(docRef, dataToSave, { merge: true });
   }
   localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(dataToSave));
 };
