@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, Instagram, MapPin, Globe, Play, Twitter, Linkedin, Youtube, X, Volume2, VolumeX, Maximize2, ExternalLink, ArrowRight } from 'lucide-react';
+import { Mail, Instagram, MapPin, Globe, Play, Twitter, Linkedin, Youtube, X, Volume2, VolumeX, Maximize2, ExternalLink, ArrowRight, Video } from 'lucide-react';
 import { PortfolioData, Project } from '../types';
 import { getBrandColor, getDriveEmbedUrl } from '../utils';
 
@@ -115,6 +115,10 @@ const ToolBadge: React.FC<{ name: string, isMain?: boolean }> = ({ name, isMain 
 
 export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview }) => {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+
+  const handleCreateOwn = () => {
+      window.location.href = window.location.origin;
+  };
 
   return (
     <div className="min-h-screen bg-[#030303] text-zinc-100 font-sans selection:bg-indigo-500/30 overflow-x-hidden">
@@ -330,7 +334,14 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview })
               {/* FOOTER */}
               <div className="pt-12 border-t border-zinc-900 flex justify-between items-center text-xs uppercase tracking-widest text-zinc-600">
                   <div>{data.name} © {new Date().getFullYear()}</div>
-                  <div>Powered by Frames</div>
+                  <div className="flex items-center gap-4">
+                      {!isPreview && (
+                          <button onClick={handleCreateOwn} className="hover:text-white transition-colors flex items-center gap-1 group">
+                             Create your own portfolio <ArrowRight size={10} className="group-hover:translate-x-1 transition-transform"/>
+                          </button>
+                      )}
+                      <span>Powered by Frames</span>
+                  </div>
               </div>
 
           </div>

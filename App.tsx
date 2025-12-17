@@ -4,7 +4,7 @@ import { EditorPanel } from './components/EditorPanel';
 import { OnboardingFlow } from './components/OnboardingFlow';
 import { PortfolioData, INITIAL_DATA } from './types';
 import { loadFromDB, saveToDB, isConfigured, auth, loginWithEmail, signupWithEmail, loginWithGoogle, checkUsernameAvailable } from './utils';
-import { Database, HardDrive, Loader2, Code, Eye, AlertCircle, X } from 'lucide-react';
+import { Database, HardDrive, Loader2, Code, Eye, AlertCircle, X, ShieldAlert } from 'lucide-react';
 import { Button } from './components/ui/Button';
 import { onAuthStateChanged } from 'firebase/auth';
 
@@ -21,6 +21,7 @@ const App: React.FC = () => {
   const [data, setData] = useState<PortfolioData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [permissionError, setPermissionError] = useState(false);
   
   // Auth Form State
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
@@ -36,52 +37,72 @@ const App: React.FC = () => {
   const [mobileViewMode, setMobileViewMode] = useState<'editor' | 'preview'>('editor');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
-  // --- Initialization ---
+  // --- Initialization Logic ---
   useEffect(() => {
-    // 1. Check for Public Hash URL FIRST (No Auth Required)
-    const hash = getHash();
-    if (hash && hash !== '#editor' && hash !== '#' && !hash.startsWith('#access_token')) {
-        const slug = hash.replace('#', '');
-        // Immediately try to load public data
-        const loadPublic = async () => {
-            const publicData = await loadFromDB(slug);
-            if (publicData) {
-                setData(publicData);
-                setRoute('public');
-                document.title = `${publicData.name} - Portfolio`;
-            } else {
-                // If not found, go home
+    const initApp = async () => {
+        setIsLoading(true);
+        const hash = getHash();
+        const isPublicRoute = hash && hash !== '#editor' && hash !== '#' && !hash.startsWith('#access_token');
+
+        // 1. PUBLIC ROUTE (Priority: High) - No Auth Required
+        if (isPublicRoute) {
+            const slug = hash.replace('#', '');
+            try {
+                const publicData = await loadFromDB(slug);
+                if (publicData) {
+                    setData(publicData);
+                    setRoute('public');
+                    document.title = `${publicData.name} - Portfolio`;
+                } else {
+                    // Portfolio not found
+                    setRoute('home'); 
+                    // Optional: You could show a 404 state here instead
+                }
+            } catch (error: any) {
+                console.error("Failed to load public portfolio:", error);
+                if (error.code === 'permission-denied' || error.message.includes('permission')) {
+                    setPermissionError(true);
+                }
                 setRoute('home');
             }
             setIsLoading(false);
-        };
-        loadPublic();
-        return; // Stop auth listener from interfering
-    }
-
-    // 2. Listen for Firebase Auth State (Only for Editor/Home)
-    const unsubscribe = isConfigured && auth ? onAuthStateChanged(auth, async (user) => {
-        if (user) {
-             const userPortfolio = await loadFromDB(user.uid);
-             if (userPortfolio) {
-                 setData(userPortfolio);
-                 // Check if onboarding is needed (empty name)
-                 if (!userPortfolio.name) {
-                     setShowOnboarding(true);
-                 }
-                 setRoute('editor');
-             } else {
-                 // New user - Initialize empty profile for onboarding
-                 const newProfile = { ...INITIAL_DATA, uid: user.uid, contactEmail: user.email || '' };
-                 setData(newProfile);
-                 setShowOnboarding(true); // Trigger onboarding
-                 setRoute('editor');
-             }
+            return; // STOP HERE. Do not check auth for public routes.
         }
-        setIsLoading(false);
-    }) : () => setIsLoading(false);
 
-    return () => unsubscribe();
+        // 2. EDITOR/HOME ROUTE - Auth Required
+        // Only run auth listener if we are NOT on a public route
+        if (isConfigured && auth) {
+            onAuthStateChanged(auth, async (user) => {
+                if (user) {
+                    try {
+                        const userPortfolio = await loadFromDB(user.uid);
+                        if (userPortfolio) {
+                            setData(userPortfolio);
+                            if (!userPortfolio.name) setShowOnboarding(true);
+                            setRoute('editor');
+                        } else {
+                            // New User Setup
+                            const newProfile = { ...INITIAL_DATA, uid: user.uid, contactEmail: user.email || '' };
+                            setData(newProfile);
+                            setShowOnboarding(true);
+                            setRoute('editor');
+                        }
+                    } catch (e: any) {
+                        console.error("Error loading user data:", e);
+                         if (e.code === 'permission-denied') setPermissionError(true);
+                    }
+                } else {
+                    // Not logged in, and not on public route -> Home
+                    setRoute('home');
+                }
+                setIsLoading(false);
+            });
+        } else {
+            setIsLoading(false);
+        }
+    };
+
+    initApp();
   }, []);
 
   // --- Auth Handlers ---
@@ -104,7 +125,6 @@ const App: React.FC = () => {
                 contactEmail: email,
                 name: "" // Explicitly empty to trigger onboarding
             };
-            // Do not save yet, wait for onboarding
             setData(newProfile);
             setShowOnboarding(true);
             setRoute('editor');
@@ -144,6 +164,9 @@ const App: React.FC = () => {
   };
 
   const handleSaveAndPublish = async (newData?: PortfolioData) => {
+    // Security check: Never save if we are in public view mode (unauthenticated likely)
+    if (route === 'public') return;
+
     const dataToSave = newData || data;
     if (!dataToSave) return;
     
@@ -153,10 +176,14 @@ const App: React.FC = () => {
       setHasUnsavedChanges(false);
       if (newData) setData(newData);
       setTimeout(() => setIsSaving(false), 800);
-    } catch (e) {
+    } catch (e: any) {
       console.error("Save failed", e);
       setIsSaving(false);
-      alert("Failed to save. Check your connection.");
+      if (e.code === 'permission-denied') {
+          alert("Permission Denied: Check your Firestore Security Rules. Owners must be able to write to their own document.");
+      } else {
+          alert("Failed to save. Check your connection.");
+      }
     }
   };
 
@@ -179,12 +206,8 @@ const App: React.FC = () => {
   if (route === 'public' && data) {
     return (
         <div className="relative">
-            <PortfolioView data={data} />
-            <div className="fixed bottom-6 right-6 z-50">
-               <Button variant="secondary" size="sm" onClick={() => { safeSetHash(''); window.location.reload(); }} className="shadow-2xl opacity-50 hover:opacity-100 backdrop-blur-md bg-black/50 border border-zinc-800 text-xs font-bold uppercase tracking-wider">
-                 Create with Frames
-               </Button>
-            </div>
+            <PortfolioView data={data} isPreview={false} />
+            {/* Note: The 'Create your own' CTA is now inside PortfolioView footer as requested */}
         </div>
     );
   }
@@ -263,6 +286,17 @@ const App: React.FC = () => {
        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-zinc-900 via-black to-black opacity-80"></div>
        <div className="absolute top-0 w-full h-px bg-gradient-to-r from-transparent via-indigo-500 to-transparent opacity-20"></div>
        <div className="absolute bottom-0 w-full h-px bg-gradient-to-r from-transparent via-purple-500 to-transparent opacity-20"></div>
+
+       {permissionError && (
+           <div className="absolute top-4 w-full max-w-md bg-red-900/20 border border-red-500 text-red-200 p-4 rounded-lg flex gap-3 z-50">
+               <ShieldAlert className="flex-shrink-0" />
+               <div className="text-xs">
+                   <strong>Database Permission Error</strong>
+                   <p className="mt-1">Public access is blocked. Go to Firebase Console &gt; Firestore &gt; Rules and set <code>allow read: if true;</code>.</p>
+               </div>
+               <button onClick={() => setPermissionError(false)}><X size={14}/></button>
+           </div>
+       )}
 
        <div className="relative z-10 w-full max-w-md flex flex-col items-center">
           <div className="mb-12 text-center">

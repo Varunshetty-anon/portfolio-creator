@@ -268,6 +268,12 @@ export const checkUsernameAvailable = async (username: string): Promise<boolean>
 };
 
 export const saveToDB = async (data: PortfolioData): Promise<void> => {
+  // Guard against missing UID
+  if (!data.uid || data.uid === 'guest') {
+     console.warn("Attempted to save data without a valid UID. Skipping.");
+     return;
+  }
+
   const dataToSave: any = { ...data };
 
   // CRITICAL: Filter out any Blob URLs that might have been set locally to prevent Firestore bloat/errors
@@ -289,16 +295,13 @@ export const saveToDB = async (data: PortfolioData): Promise<void> => {
   delete dataToSave.showreelBlob;
 
   // Save to Firestore using UID
-  if (isConfigured && db && data.uid) {
+  if (isConfigured && db) {
       try {
           // Save under UID for user retrieval
           await setDoc(doc(db, COLLECTION_NAME, data.uid), dataToSave);
-          
-          // Also allow lookup by username (store a simplified mapping or rely on query)
-          // For this app's simplicity, we are querying by username field for public view
       } catch (e) {
           console.warn("Firestore save failed", e);
-          throw e;
+          throw e; // Propagate error to App.tsx for handling
       }
   }
 
@@ -316,7 +319,11 @@ export const loadFromDB = async (identifier?: string): Promise<PortfolioData | n
         // 1. Try Direct UID match (Editor Mode)
         if (identifier) {
             const docRef = doc(db, COLLECTION_NAME, identifier);
-            docSnap = await getDoc(docRef);
+            try {
+                docSnap = await getDoc(docRef);
+            } catch (e) {
+                // Ignore specific errors if just checking
+            }
         }
 
         // 2. If not found or if identifier looks like a username (Public Mode)
@@ -334,6 +341,7 @@ export const loadFromDB = async (identifier?: string): Promise<PortfolioData | n
         }
       } catch (e) {
         console.warn("Firestore load failed", e);
+        throw e; // Re-throw to handle permissions in App.tsx
       }
   }
   return null;
