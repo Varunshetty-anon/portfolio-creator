@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
+// Added motion import
+import { motion } from 'framer-motion';
 import { PortfolioView } from './components/PortfolioView';
 import { EditorPanel } from './components/EditorPanel';
 import { OnboardingFlow } from './components/OnboardingFlow';
 import { PortfolioData, INITIAL_DATA, DEMO_DATA } from './types';
-import { loadFromDB, saveToDB, isConfigured, auth, loginWithEmail, signupWithEmail, loginWithGoogle, checkUsernameAvailable, checkPortfolioReadiness } from './utils';
+import { loadFromDB, saveToDB, isConfigured, auth, loginWithEmail, signupWithEmail, loginWithGoogle, checkUsernameAvailable, checkPortfolioReadiness, deletePortfolioFromDB, deleteUserAuth } from './utils';
 import { Loader2, ShieldAlert, X, PenTool, Eye, EyeOff } from 'lucide-react';
 import { Button } from './components/ui/Button';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -58,7 +60,7 @@ const App: React.FC = () => {
 
         if (slug && slug !== 'editor') {
             try {
-                // Ensure we query directly from Firestore to bypass any stale local caching
+                // Force a fresh load from the DB for public views
                 const publicData = await loadFromDB(slug);
                 if (publicData) {
                     setData(publicData);
@@ -168,6 +170,32 @@ const App: React.FC = () => {
       window.location.pathname = '/';
   };
 
+  const handleDeleteAccount = async () => {
+      if (!data?.uid || !auth?.currentUser) return;
+      try {
+          setIsLoading(true);
+          // Delete from Firestore
+          await deletePortfolioFromDB(data.uid);
+          // Delete from Auth
+          await deleteUserAuth();
+          
+          setRoute('home');
+          setData(null);
+          setIsLoading(false);
+          window.location.hash = '';
+          window.location.pathname = '/';
+          alert("Account and all data successfully erased.");
+      } catch (e: any) {
+          setIsLoading(false);
+          if (e.code === 'auth/requires-recent-login') {
+              alert("Please log out and log back in to verify identity before deleting account.");
+          } else {
+              console.error(e);
+              alert("Account deletion partially failed. Please contact support.");
+          }
+      }
+  };
+
   const handleSaveAndPublish = async (newData?: PortfolioData) => {
     if (route === 'public') return;
     const dataToSave = newData || dataRef.current;
@@ -175,22 +203,19 @@ const App: React.FC = () => {
     
     setIsSaving(true);
     try {
-      // Force immediate save to Firestore
+      // Direct call to Firestore ensures viewers get the update immediately
       await saveToDB(dataToSave);
       
-      // Update local states
       setHasUnsavedChanges(false);
       if (newData) setData(newData);
       
-      // Sync URL hash with username
+      // Keep URL hash in sync with username for direct sharing
       if (dataToSave.username && window.location.hash !== `#${dataToSave.username}`) {
          window.location.hash = dataToSave.username;
       }
       
-      // Artificial delay for feedback
-      setTimeout(() => {
-          setIsSaving(false);
-      }, 600);
+      // Delay for UX feedback
+      setTimeout(() => setIsSaving(false), 800);
     } catch (e: any) {
       setIsSaving(false);
       console.error("Save failed:", e);
@@ -216,9 +241,25 @@ const App: React.FC = () => {
 
   if (isLoading) {
       return (
-          <div className="h-screen bg-black text-white flex flex-col gap-4 items-center justify-center font-display">
-              <Loader2 size={40} className="text-indigo-500 animate-spin" />
-              <p className="text-zinc-500 animate-pulse">Loading Frames...</p>
+          <div className="h-screen bg-black text-white flex flex-col gap-8 items-center justify-center font-display">
+              <div className="relative w-24 h-24">
+                  <motion.div
+                    className="absolute inset-0 border-8 border-indigo-500/10 rounded-full"
+                  />
+                  <motion.div
+                    className="absolute inset-0 border-8 border-t-indigo-500 rounded-full"
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  />
+              </div>
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="flex flex-col items-center gap-2"
+              >
+                  <p className="text-xl font-black text-white tracking-widest uppercase">FRAMES</p>
+                  <p className="text-zinc-600 font-bold text-[10px] tracking-[0.4em] uppercase">Initializing Studio</p>
+              </motion.div>
           </div>
       );
   }
@@ -270,6 +311,7 @@ const App: React.FC = () => {
                 isSaving={isSaving}
                 hasUnsavedChanges={hasUnsavedChanges}
                 onLogout={handleLogout}
+                onDeleteAccount={handleDeleteAccount}
                 onPreview={handlePreviewToggle}
              />
         </div>

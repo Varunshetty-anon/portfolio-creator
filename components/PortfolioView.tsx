@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useScroll, useTransform, useInView } from 'framer-motion';
-import { Mail, Instagram, Play, Twitter, Linkedin, Youtube, X, Volume2, VolumeX, Globe, Maximize2, Star, Sparkles, MonitorPlay, MapPin } from 'lucide-react';
+import { Mail, Instagram, Play, Twitter, Linkedin, Youtube, X, Volume2, VolumeX, Globe, Maximize2, Star, Sparkles, MonitorPlay, MapPin, Loader2 } from 'lucide-react';
 import { PortfolioData, Project } from '../types';
 import { getBrandColor, getDriveEmbedUrl, EDITING_TOOLS_LIST, AI_TOOLS_LIST } from '../utils';
 
@@ -8,6 +8,33 @@ interface PortfolioViewProps {
   data: PortfolioData;
   isPreview?: boolean;
 }
+
+const LoadingSpinner = () => (
+  <div className="flex flex-col items-center justify-center gap-4">
+    <div className="relative w-16 h-16">
+      <motion.div
+        className="absolute inset-0 border-4 border-indigo-500/20 rounded-full"
+      />
+      <motion.div
+        className="absolute inset-0 border-4 border-t-indigo-500 rounded-full"
+        animate={{ rotate: 360 }}
+        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+      />
+      <motion.div
+        className="absolute inset-0 blur-lg border-4 border-t-indigo-500 rounded-full opacity-50"
+        animate={{ rotate: 360 }}
+        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+      />
+    </div>
+    <motion.span
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="text-indigo-500 font-display font-bold text-[10px] uppercase tracking-[0.3em] animate-pulse"
+    >
+      Rendering Frames
+    </motion.span>
+  </div>
+);
 
 const getSocialUrl = (platform: string, handle: string) => {
     if (!handle) return '#';
@@ -75,35 +102,45 @@ const IntroOverlay: React.FC<{ name: string; onComplete: () => void }> = ({ name
             className="fixed inset-0 z-[500] bg-black flex flex-col items-center justify-center overflow-hidden"
             initial={{ opacity: 1 }}
             animate={{ opacity: 0 }}
-            transition={{ duration: 1, delay: 2.8, ease: "easeInOut" }}
+            transition={{ duration: 1, delay: 3.2, ease: "easeInOut" }}
             onAnimationComplete={onComplete}
         >
-            <div className="relative flex flex-col items-center">
-                <motion.div 
-                    className="overflow-hidden"
-                    initial={{ width: 0 }}
-                    animate={{ width: "auto" }}
-                    transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
-                >
-                    <motion.h1 
-                        className="text-5xl md:text-8xl lg:text-9xl font-display font-black text-white tracking-tighter uppercase whitespace-nowrap px-8"
-                        initial={{ y: 200 }}
-                        animate={{ y: 0 }}
-                        transition={{ duration: 1.2, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            <div className="relative flex flex-col items-center gap-12">
+                <div className="relative flex flex-col items-center">
+                    <motion.div 
+                        className="overflow-hidden"
+                        initial={{ width: 0 }}
+                        animate={{ width: "auto" }}
+                        transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
                     >
-                        {name || "PORTFOLIO"}
-                    </motion.h1>
-                </motion.div>
-                
-                <motion.div 
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 1.2, duration: 0.8 }}
-                    className="mt-4 flex items-center gap-4"
+                        <motion.h1 
+                            className="text-5xl md:text-8xl lg:text-9xl font-display font-black text-white tracking-tighter uppercase whitespace-nowrap px-8"
+                            initial={{ y: 200 }}
+                            animate={{ y: 0 }}
+                            transition={{ duration: 1.2, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                        >
+                            {name || "PORTFOLIO"}
+                        </motion.h1>
+                    </motion.div>
+                    
+                    <motion.div 
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 1.2, duration: 0.8 }}
+                        className="mt-4 flex items-center gap-4"
+                    >
+                        <div className="h-px w-12 bg-zinc-800" />
+                        <span className="text-zinc-500 font-display font-bold text-xs md:text-sm tracking-[0.4em] uppercase">Visual Storyteller</span>
+                        <div className="h-px w-12 bg-zinc-800" />
+                    </motion.div>
+                </div>
+
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 1.5, duration: 0.8 }}
                 >
-                    <div className="h-px w-12 bg-zinc-800" />
-                    <span className="text-zinc-500 font-display font-bold text-xs md:text-sm tracking-[0.4em] uppercase">Visual Storyteller</span>
-                    <div className="h-px w-12 bg-zinc-800" />
+                    <LoadingSpinner />
                 </motion.div>
             </div>
 
@@ -112,13 +149,13 @@ const IntroOverlay: React.FC<{ name: string; onComplete: () => void }> = ({ name
                 className="absolute top-0 left-0 w-1/2 h-full bg-zinc-950 z-[-1]"
                 initial={{ x: 0 }}
                 animate={{ x: "-100%" }}
-                transition={{ duration: 1.2, delay: 2.4, ease: [0.76, 0, 0.24, 1] }}
+                transition={{ duration: 1.2, delay: 2.8, ease: [0.76, 0, 0.24, 1] }}
             />
             <motion.div 
                 className="absolute top-0 right-0 w-1/2 h-full bg-zinc-950 z-[-1]"
                 initial={{ x: 0 }}
                 animate={{ x: "100%" }}
-                transition={{ duration: 1.2, delay: 2.4, ease: [0.76, 0, 0.24, 1] }}
+                transition={{ duration: 1.2, delay: 2.8, ease: [0.76, 0, 0.24, 1] }}
             />
         </motion.div>
     )
@@ -133,8 +170,8 @@ const HeroContent: React.FC<{ data: PortfolioData; isMobile?: boolean }> = ({ da
             className={`flex flex-col relative ${isMobile ? 'items-center text-center px-4 py-16 overflow-hidden min-h-[60vh] justify-center' : 'items-start text-left'}`}
         >
             {isMobile && (
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0 opacity-10 select-none pointer-events-none w-full text-center">
-                    <h2 className="text-[20vw] font-display font-black text-white tracking-tighter uppercase leading-none whitespace-nowrap">
+                <div className="absolute top-[45%] left-1/2 -translate-x-1/2 -translate-y-1/2 z-0 opacity-10 select-none pointer-events-none w-full text-center">
+                    <h2 className="text-[30vw] font-display font-black text-white/40 tracking-tighter uppercase leading-none whitespace-nowrap">
                         PORTFOLIO
                     </h2>
                 </div>
@@ -147,7 +184,7 @@ const HeroContent: React.FC<{ data: PortfolioData; isMobile?: boolean }> = ({ da
                 <div className="absolute -inset-6 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full blur-3xl opacity-10 group-hover:opacity-30 transition-opacity duration-500" />
                 <div className={`${isMobile ? 'w-64 h-64 sm:w-80 sm:h-80' : 'w-48 h-48 lg:w-56 lg:h-56'} rounded-full overflow-hidden border-[8px] border-zinc-900 shadow-[0_0_80px_rgba(0,0,0,0.6)] relative z-10 transition-transform duration-500 hover:scale-[1.03]`}>
                     <img src={data.profileImage} className="w-full h-full object-cover" alt={data.name} loading="lazy" />
-                    <div className={`absolute bottom-8 right-8 ${isMobile ? 'w-10 h-10' : 'w-8 h-8'} rounded-full border-4 border-zinc-900 z-20 ${data.availability.status ? 'bg-green-500 shadow-[0_0_20px_#22c55e]' : 'bg-red-500 shadow-[0_0_20px_#ef4444]'}`}></div>
+                    <div className={`absolute bottom-[8%] right-[8%] ${isMobile ? 'w-5 h-5' : 'w-4 h-4'} rounded-full border-[3px] border-zinc-900 z-20 ${data.availability.status ? 'bg-green-500 shadow-[0_0_15px_#22c55e]' : 'bg-red-500 shadow-[0_0_15px_#ef4444]'}`}></div>
                 </div>
             </motion.div>
 

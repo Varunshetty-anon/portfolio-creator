@@ -1,11 +1,12 @@
+
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { PortfolioData, Project, Testimonial } from '../types';
 import { Input, TextArea } from './ui/Input';
 import { Button } from './ui/Button';
 import { ToolSelector } from './ToolSelector';
-import { Plus, Trash2, Video, Wand2, Image as ImageIcon, ChevronDown, Upload, X, LayoutDashboard, Copy, ExternalLink, User, MessageSquare, Loader2, CheckCircle2, Globe, Crop, Settings, LogOut, AlertCircle, Sparkles, Wrench, ZoomIn, ZoomOut, QrCode, Download, AlertTriangle, Eye, Monitor, Smartphone } from 'lucide-react';
+import { Plus, Trash2, Video, Wand2, Image as ImageIcon, ChevronDown, Upload, X, LayoutDashboard, Copy, ExternalLink, User, MessageSquare, Loader2, CheckCircle2, Globe, Crop, Settings, LogOut, AlertCircle, Sparkles, Wrench, ZoomIn, ZoomOut, QrCode, Download, AlertTriangle, Eye, Monitor, Smartphone, Info, HelpCircle } from 'lucide-react';
 import Cropper from 'react-easy-crop';
 import { getCroppedImg, generateThumbnailFromVideo, uploadFileToStorage, hasCloudStorage, generateAiBio, generateAiDescription, checkPortfolioReadiness, downloadQrCode, getYouTubeThumbnail, getDriveThumbnail, generateAiThumbnail } from '../utils';
 
@@ -16,8 +17,32 @@ interface EditorPanelProps {
   isSaving: boolean;
   hasUnsavedChanges: boolean;
   onLogout?: () => void;
+  onDeleteAccount?: () => void;
   onPreview?: () => void;
 }
+
+// Fixed Tooltip component: making children optional resolves the TypeScript "property missing" errors in JSX
+const Tooltip = ({ text, children }: { text: string; children?: React.ReactNode }) => {
+    const [isVisible, setIsVisible] = useState(false);
+    return (
+        <div className="relative inline-block" onMouseEnter={() => setIsVisible(true)} onMouseLeave={() => setIsVisible(false)}>
+            {children}
+            <AnimatePresence>
+                {isVisible && (
+                    <motion.div 
+                        initial={{ opacity: 0, y: 5, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 5, scale: 0.95 }}
+                        className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-zinc-800 text-zinc-100 text-[10px] font-bold uppercase tracking-wider rounded-lg shadow-2xl border border-zinc-700 whitespace-nowrap z-[1000] pointer-events-none"
+                    >
+                        {text}
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-8 border-transparent border-t-zinc-800"></div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
+    );
+};
 
 const isValidUrl = (string: string) => {
   if (!string) return false;
@@ -70,7 +95,7 @@ const ValidatedInput = ({
     );
 }
 
-export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPublish, isSaving, hasUnsavedChanges, onLogout, onPreview }) => {
+export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPublish, isSaving, hasUnsavedChanges, onLogout, onDeleteAccount, onPreview }) => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'profile' | 'content' | 'testimonials' | 'tools' | 'settings'>('dashboard');
   const [expandedProject, setExpandedProject] = useState<string | null>(null);
   const [copySuccess, setCopySuccess] = useState(false);
@@ -82,6 +107,8 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
   const [generatingThumbId, setGeneratingThumbId] = useState<string | null>(null);
   const [profileImageUploading, setProfileImageUploading] = useState(false);
   const [showQr, setShowQr] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   
   const dataRef = useRef(data);
   useEffect(() => {
@@ -693,16 +720,74 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
                 <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl p-6 space-y-6 backdrop-blur-sm">
                     <div className="flex items-center gap-4 border-b border-zinc-800 pb-4">
                         <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center"><User size={24} className="text-zinc-400"/></div>
-                        <div><h3 className="text-lg font-bold text-white">Account Details</h3><p className="text-xs text-zinc-500">Manage your login information.</p></div>
+                        <div><h3 className="text-lg font-bold text-white">Account Details</h3><p className="text-xs text-zinc-500">Manage your identity and login access.</p></div>
                     </div>
                     <div className="space-y-4">
-                        <Input label="Username" value={data.username} disabled className="opacity-50 cursor-not-allowed text-zinc-400" />
-                        <Input label="Email" value={data.contactEmail} disabled className="opacity-50 cursor-not-allowed text-zinc-400" />
+                        <div className="flex items-center gap-2 group">
+                            <Input label="Username" value={data.username} disabled className="opacity-50 cursor-not-allowed text-zinc-400" />
+                            <div className="pt-5">
+                                <Tooltip text="Your unique profile identifier.">
+                                    <Info size={16} className="text-zinc-600 hover:text-indigo-400 cursor-help transition-colors"/>
+                                </Tooltip>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2 group">
+                            <Input label="Email" value={data.contactEmail} disabled className="opacity-50 cursor-not-allowed text-zinc-400" />
+                            <div className="pt-5">
+                                <Tooltip text="Login email associated with this account.">
+                                    <Info size={16} className="text-zinc-600 hover:text-indigo-400 cursor-help transition-colors"/>
+                                </Tooltip>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div className="bg-red-500/5 border border-red-500/10 rounded-2xl p-6 space-y-4">
-                     <h3 className="text-sm font-bold text-red-400 uppercase tracking-widest">Danger Zone</h3>
-                     <Button variant="secondary" onClick={onLogout} className="w-full py-4 bg-red-500/10 text-red-400 hover:text-white hover:bg-red-600 border border-red-500/20 hover:border-red-500 transition-all"><LogOut className="mr-2" size={18} /> Sign Out</Button>
+                     <div className="flex items-center justify-between border-b border-red-500/10 pb-4">
+                        <h3 className="text-sm font-bold text-red-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                            <AlertTriangle size={16}/> Danger Zone
+                        </h3>
+                        <Tooltip text="Irreversible account actions.">
+                            <HelpCircle size={14} className="text-zinc-600"/>
+                        </Tooltip>
+                     </div>
+                     <div className="space-y-4">
+                        <Tooltip text="Securely exit your current studio session.">
+                            <Button variant="secondary" onClick={onLogout} className="w-full py-4 bg-red-500/10 text-red-400 hover:text-white hover:bg-red-600 border border-red-500/10 hover:border-red-500 transition-all font-bold tracking-widest"><LogOut className="mr-2" size={18} /> SIGN OUT</Button>
+                        </Tooltip>
+
+                        {!confirmDelete ? (
+                            <Tooltip text="Permanently erase your entire digital footprint on Frames.">
+                                <Button 
+                                    variant="ghost" 
+                                    onClick={() => setConfirmDelete(true)} 
+                                    className="w-full py-4 text-zinc-600 hover:text-red-500 hover:bg-red-500/5 transition-all text-xs font-bold tracking-widest uppercase"
+                                >
+                                    <Trash2 className="mr-2" size={16} /> Delete Account
+                                </Button>
+                            </Tooltip>
+                        ) : (
+                            <motion.div 
+                                initial={{ opacity: 0, scale: 0.98 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                className="p-4 bg-red-500/10 border border-red-500 rounded-xl space-y-4"
+                            >
+                                <p className="text-xs text-red-400 font-bold text-center leading-relaxed">
+                                    WARNING: This action is permanent. All your projects, portfolio data, and login access will be wiped forever.
+                                </p>
+                                <div className="flex gap-3">
+                                    <Button variant="secondary" className="flex-1 bg-zinc-800 text-white" onClick={() => setConfirmDelete(false)}>Cancel</Button>
+                                    <Button 
+                                        variant="primary" 
+                                        className="flex-1 bg-red-600 text-white hover:bg-red-700 border-none shadow-2xl" 
+                                        onClick={onDeleteAccount}
+                                        disabled={isDeleting}
+                                    >
+                                        {isDeleting ? <Loader2 className="animate-spin" size={18}/> : 'YES, WIPE DATA'}
+                                    </Button>
+                                </div>
+                            </motion.div>
+                        )}
+                     </div>
                 </div>
             </div>
         )}
