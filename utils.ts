@@ -297,10 +297,13 @@ export const checkUsernameAvailable = async (username: string): Promise<boolean>
 };
 
 export const saveToDB = async (data: PortfolioData): Promise<void> => {
-  if (!data.uid || data.uid === 'guest') return;
-  // Deep clone to avoid mutations
+  if (!data.uid || data.uid === 'guest') {
+      console.warn("Attempted to save without valid UID.");
+      return;
+  }
+  // Robust data cleanup to prevent Firestore errors with Blobs or circular refs
   const dataToSave = JSON.parse(JSON.stringify(data));
-  // Remove binary blobs before saving to Firestore
+  
   delete dataToSave.profileImageBlob;
   delete dataToSave.showreelThumbnailBlob;
   delete dataToSave.showreelBlob;
@@ -313,7 +316,9 @@ export const saveToDB = async (data: PortfolioData): Promise<void> => {
 
   if (isConfigured && db) {
     const docRef = doc(db, COLLECTION_NAME, data.uid);
+    // Use merge:true to ensure we don't accidentally wipe fields if they aren't in the object
     await setDoc(docRef, dataToSave, { merge: true });
+    console.log("Successfully saved to Firestore for UID:", data.uid);
   }
   localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(dataToSave));
 };

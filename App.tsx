@@ -91,7 +91,9 @@ const App: React.FC = () => {
                             setData(userPortfolio);
                             if (!userPortfolio.name) setShowOnboarding(true);
                         } else {
-                            const newProfile = { ...INITIAL_DATA, uid: user.uid, contactEmail: user.email || '' };
+                            // If user exists in Auth but not in DB yet (e.g., interrupted signup)
+                            const cleanUsername = (user.displayName || user.email?.split('@')[0] || 'user').toLowerCase().replace(/\s/g, '');
+                            const newProfile = { ...INITIAL_DATA, uid: user.uid, contactEmail: user.email || '', username: cleanUsername };
                             setData(newProfile);
                             setShowOnboarding(true);
                         }
@@ -136,7 +138,9 @@ const App: React.FC = () => {
                 contactEmail: email,
                 name: "" 
             };
+            // Important: Set data locally first, then let the observer handle state
             setData(newProfile);
+            await saveToDB(newProfile);
             setShowOnboarding(true);
             setRoute('editor');
         } else {
@@ -151,7 +155,16 @@ const App: React.FC = () => {
   const handleGoogleAuth = async () => {
       setAuthError('');
       try {
-          await loginWithGoogle();
+          const result = await loginWithGoogle();
+          // Initial save for Google users to set basic fields if they are new
+          const user = result.user;
+          const existing = await loadFromDB(user.uid);
+          if (!existing) {
+              const cleanUsername = (user.displayName || user.email?.split('@')[0] || 'user').toLowerCase().replace(/\s/g, '');
+              const newProfile = { ...INITIAL_DATA, uid: user.uid, contactEmail: user.email || '', username: cleanUsername, name: user.displayName || '' };
+              setData(newProfile);
+              await saveToDB(newProfile);
+          }
       } catch (e: any) {
           if (e.code === 'auth/unauthorized-domain') {
               setAuthError(`Domain not authorized. Check Firebase settings.`);
@@ -172,6 +185,8 @@ const App: React.FC = () => {
 
   const handleDeleteAccount = async () => {
       if (!data?.uid || !auth?.currentUser) return;
+      if (!window.confirm("ARE YOU ABSOLUTELY SURE? This will permanently delete your portfolio and all project links.")) return;
+      
       try {
           setIsLoading(true);
           // Delete from Firestore
@@ -188,10 +203,10 @@ const App: React.FC = () => {
       } catch (e: any) {
           setIsLoading(false);
           if (e.code === 'auth/requires-recent-login') {
-              alert("Please log out and log back in to verify identity before deleting account.");
+              alert("Security sensitive action: Please log out and log back in to verify identity before deleting account.");
           } else {
               console.error(e);
-              alert("Account deletion partially failed. Please contact support.");
+              alert("Account deletion failed. Error: " + e.message);
           }
       }
   };
@@ -203,7 +218,7 @@ const App: React.FC = () => {
     
     setIsSaving(true);
     try {
-      // Direct call to Firestore ensures viewers get the update immediately
+      // Use standard firestore call
       await saveToDB(dataToSave);
       
       setHasUnsavedChanges(false);
@@ -214,12 +229,13 @@ const App: React.FC = () => {
          window.location.hash = dataToSave.username;
       }
       
-      // Delay for UX feedback
+      // Artificial delay for UI polish
       setTimeout(() => setIsSaving(false), 800);
     } catch (e: any) {
       setIsSaving(false);
       console.error("Save failed:", e);
       if (e.code === 'permission-denied') setPermissionError(true);
+      alert("Error saving: " + e.message);
     }
   };
 
