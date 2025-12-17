@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { PortfolioData, Project, Testimonial } from '../types';
@@ -21,42 +22,48 @@ interface EditorPanelProps {
 const isValidUrl = (string: string) => {
   if (!string) return false;
   try {
-    new URL(string);
-    return true;
+    const url = new URL(string.startsWith('http') ? string : `https://${string}`);
+    return url.hostname.includes('.');
   } catch (_) {
     return false;
   }
 };
 
-const SocialInput = ({ 
+// Fixed ValidatedInput to correctly accept and handle the className prop
+const ValidatedInput = ({ 
     label, 
     value, 
     onChange, 
-    placeholder 
+    placeholder,
+    type = "text",
+    className = ""
 }: { 
     label: string, 
     value: string, 
     onChange: (e: React.ChangeEvent<HTMLInputElement>) => void, 
-    placeholder?: string
+    placeholder?: string,
+    type?: string,
+    className?: string
 }) => {
-    const isUrl = value.startsWith('http');
-    const isValid = value.length > 0 && (isUrl ? isValidUrl(value) : value.length > 2);
+    const isUrl = value.length > 0;
+    const isValid = value.length === 0 || isValidUrl(value);
     
     return (
-        <div className="relative group">
+        <div className={`relative group ${className}`}>
             <Input 
                 label={label} 
                 value={value} 
                 onChange={onChange} 
                 placeholder={placeholder}
-                className={`pr-10 transition-colors bg-black/40 ${value && isValid ? 'border-green-500/50 focus:border-green-500' : ''} ${value && !isValid ? 'border-red-500/50 focus:border-red-500' : ''}`}
+                type={type}
+                className={`pr-10 transition-all bg-black/40 ${value.length > 0 && !isValid ? 'border-red-500/50 focus:border-red-500' : value.length > 0 ? 'border-green-500/50 focus:border-green-500' : ''}`}
             />
-            {value && (
+            {value.length > 0 && (
                 <div className="absolute right-3 top-[2.1rem] transition-all duration-300">
                     {isValid ? (
-                        <CheckCircle2 size={18} className="text-green-500 animate-in fade-in zoom-in" />
+                        <CheckCircle2 size={16} className="text-green-500 animate-in fade-in zoom-in" />
                     ) : (
-                        <AlertCircle size={18} className="text-red-500 animate-in fade-in zoom-in" />
+                        <AlertCircle size={16} className="text-red-500 animate-in fade-in zoom-in" />
                     )}
                 </div>
             )}
@@ -324,7 +331,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
       </div>
 
       {cropModalOpen && tempImgSrc && createPortal(
-          <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="fixed inset-0 z-[1000] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
               <div className="bg-zinc-950 w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl border border-zinc-800 flex flex-col h-[500px]">
                   <div className="relative flex-1 bg-zinc-900 w-full overflow-hidden">
                      <Cropper image={tempImgSrc} crop={crop} zoom={zoom} aspect={1} onCropChange={setCrop} onCropComplete={(_, px) => setCroppedAreaPixels(px)} onZoomChange={setZoom} objectFit="contain" />
@@ -344,7 +351,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
       )}
 
       {showQr && createPortal(
-          <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in" onClick={() => setShowQr(false)}>
+          <div className="fixed inset-0 z-[1000] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in" onClick={() => setShowQr(false)}>
               <div className="bg-white rounded-2xl p-8 flex flex-col items-center gap-4 max-w-sm w-full" onClick={e => e.stopPropagation()}>
                   <div className="bg-black p-4 rounded-xl"><img src={getQrUrl()} alt="Portfolio QR" className="w-48 h-48" loading="lazy" /></div>
                   <div className="text-center">
@@ -472,11 +479,11 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
             <div className="space-y-6 pt-8 border-t border-zinc-900">
               <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-4">Social Presence</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <SocialInput label="Email" value={data.socials.email} onChange={(e) => updateSocials('email', e.target.value)} placeholder="you@example.com"/>
-                  <SocialInput label="Instagram" value={data.socials.instagram || ''} onChange={(e) => updateSocials('instagram', e.target.value)} placeholder="instagram.com/username"/>
-                  <SocialInput label="LinkedIn" value={data.socials.linkedin || ''} onChange={(e) => updateSocials('linkedin', e.target.value)} placeholder="linkedin.com/in/username"/>
-                  <SocialInput label="Twitter / X" value={data.socials.twitter || ''} onChange={(e) => updateSocials('twitter', e.target.value)} placeholder="x.com/username"/>
-                  <SocialInput label="YouTube" value={data.socials.youtube || ''} onChange={(e) => updateSocials('youtube', e.target.value)} placeholder="youtube.com/@channel"/>
+                  <ValidatedInput label="Email" value={data.socials.email} onChange={(e) => updateSocials('email', e.target.value)} placeholder="you@example.com"/>
+                  <ValidatedInput label="Instagram" value={data.socials.instagram || ''} onChange={(e) => updateSocials('instagram', e.target.value)} placeholder="instagram.com/username"/>
+                  <ValidatedInput label="LinkedIn" value={data.socials.linkedin || ''} onChange={(e) => updateSocials('linkedin', e.target.value)} placeholder="linkedin.com/in/username"/>
+                  <ValidatedInput label="Twitter / X" value={data.socials.twitter || ''} onChange={(e) => updateSocials('twitter', e.target.value)} placeholder="x.com/username"/>
+                  <ValidatedInput label="YouTube" value={data.socials.youtube || ''} onChange={(e) => updateSocials('youtube', e.target.value)} placeholder="youtube.com/@channel"/>
               </div>
             </div>
           </div>
@@ -520,7 +527,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
                             <div className="h-64 border-2 border-dashed border-zinc-800 bg-black/20 rounded-2xl flex flex-col justify-center p-8 space-y-4 relative">
                                 <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest">External URL</label>
                                 <div className="flex gap-2">
-                                    <Input value={data.showreelLink} onChange={(e) => updateField('showreelLink', e.target.value)} placeholder="YouTube or Google Drive link" className="py-4 text-lg bg-black border-zinc-700 focus:border-white transition-all" />
+                                    <ValidatedInput label="" value={data.showreelLink} onChange={(e) => updateField('showreelLink', e.target.value)} placeholder="YouTube or Google Drive link" className="py-4 text-lg bg-black border-zinc-700 focus:border-white transition-all" />
                                     <Button variant="secondary" onClick={() => handleLoadVideoLink('showreel', data.showreelLink)}>Load</Button>
                                 </div>
                                 <p className="text-xs text-zinc-600">Supports YouTube, Vimeo, or direct Google Drive links.</p>
@@ -580,7 +587,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
                                 ) : (
                                     <div className="flex flex-col gap-3"><div className="flex gap-3">
                                             <Button variant="secondary" onClick={() => handleFileUpload('video/*', (f) => handleProjectVideoUpload(project.id, f))} className="whitespace-nowrap">Upload File</Button>
-                                            <Input placeholder="Paste YouTube / Google Drive URL" value={project.link} onChange={(e) => updateProject(project.id, { link: e.target.value })} className="flex-1 transition-all"/>
+                                            <ValidatedInput label="" placeholder="Paste YouTube / Google Drive URL" value={project.link} onChange={(e) => updateProject(project.id, { link: e.target.value })} className="flex-1 transition-all"/>
                                             <Button variant="secondary" onClick={() => handleLoadVideoLink('project', project.link, project.id)}>Load</Button>
                                         </div></div>
                                 )}
