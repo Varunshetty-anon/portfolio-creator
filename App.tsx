@@ -3,8 +3,8 @@ import { PortfolioView } from './components/PortfolioView';
 import { EditorPanel } from './components/EditorPanel';
 import { OnboardingFlow } from './components/OnboardingFlow';
 import { PortfolioData, INITIAL_DATA, DEMO_DATA } from './types';
-import { loadFromDB, saveToDB, isConfigured, auth, loginWithEmail, signupWithEmail, loginWithGoogle, checkUsernameAvailable } from './utils';
-import { Database, HardDrive, Loader2, Code, Eye, AlertCircle, X, ShieldAlert } from 'lucide-react';
+import { loadFromDB, saveToDB, isConfigured, auth, loginWithEmail, signupWithEmail, loginWithGoogle, checkUsernameAvailable, checkPortfolioReadiness } from './utils';
+import { Database, HardDrive, Loader2, Code, Eye, AlertCircle, X, ShieldAlert, ArrowLeft } from 'lucide-react';
 import { Button } from './components/ui/Button';
 import { onAuthStateChanged } from 'firebase/auth';
 
@@ -18,6 +18,9 @@ const getHash = () => {
 
 const App: React.FC = () => {
   const [route, setRoute] = useState<'home' | 'editor' | 'public'>('home');
+  // New view mode for editor: 'edit' or 'preview' (full screen)
+  const [editorViewMode, setEditorViewMode] = useState<'edit' | 'preview'>('edit');
+  
   const [data, setData] = useState<PortfolioData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -35,7 +38,6 @@ const App: React.FC = () => {
   
   // Editor State
   const [isSaving, setIsSaving] = useState(false);
-  const [mobileViewMode, setMobileViewMode] = useState<'editor' | 'preview'>('editor');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   // --- Initialization Logic ---
@@ -60,7 +62,6 @@ const App: React.FC = () => {
             } catch (error: any) {
                 console.error("Failed to load public portfolio:", error);
                 if (error.code === 'permission-denied' || error.message.includes('permission')) {
-                    // Fallback to Demo Mode so the UI works even if backend is blocked
                     console.warn("Falling back to Demo Mode due to permission error");
                     setData(DEMO_DATA);
                     setRoute('public');
@@ -71,7 +72,7 @@ const App: React.FC = () => {
                 }
             }
             setIsLoading(false);
-            return; // STOP HERE. Do not check auth for public routes.
+            return;
         }
 
         // 2. EDITOR/HOME ROUTE - Auth Required
@@ -94,8 +95,6 @@ const App: React.FC = () => {
                          console.error("Error loading user data:", e);
                          if (e.code === 'permission-denied' || e.message.includes('permission')) {
                              setPermissionError(true);
-                             // Fallback to Local Editor Mode if permissions are broken
-                             // This allows the user to see the editor even if they can't save
                              const localProfile = { ...INITIAL_DATA, uid: user.uid, contactEmail: user.email || '' };
                              setData(localProfile);
                              setRoute('editor');
@@ -175,7 +174,6 @@ const App: React.FC = () => {
   };
 
   const handleSaveAndPublish = async (newData?: PortfolioData) => {
-    // Security check: Never save if we are in public view mode (unauthenticated likely)
     if (route === 'public') return;
 
     const dataToSave = newData || data;
@@ -191,8 +189,6 @@ const App: React.FC = () => {
       console.error("Save failed", e);
       setIsSaving(false);
       if (e.code === 'permission-denied') {
-          // Do not alert, just show warning in UI via state if needed, or simple toast
-          // We rely on the existing permissionError state to warn the user
           setPermissionError(true);
       } else {
           alert("Failed to save. Check your connection.");
@@ -205,6 +201,16 @@ const App: React.FC = () => {
       setShowOnboarding(false);
       await handleSaveAndPublish(completedData);
   };
+
+  const handlePreviewToggle = () => {
+      if (!data) return;
+      const { isReady } = checkPortfolioReadiness(data);
+      if (isReady) {
+          setEditorViewMode('preview');
+      } else {
+          alert("Please complete your portfolio first (Bio, Primary Tool, Socials, 1 Project)");
+      }
+  }
 
   if (isLoading) {
       return (
@@ -231,14 +237,31 @@ const App: React.FC = () => {
     );
   }
 
-  // --- VIEW: EDITOR ---
+  // --- VIEW: EDITOR (Full Screen or Preview Mode) ---
   if (route === 'editor' && data) {
     if (showOnboarding) {
         return <OnboardingFlow data={data} onComplete={handleOnboardingComplete} />;
     }
 
+    if (editorViewMode === 'preview') {
+        return (
+            <div className="relative h-screen w-screen overflow-hidden">
+                <div className="absolute top-6 left-6 z-[100]">
+                    <Button 
+                        onClick={() => setEditorViewMode('edit')} 
+                        className="shadow-2xl border border-zinc-800"
+                        icon={<ArrowLeft size={16}/>}
+                    >
+                        Back to Editor
+                    </Button>
+                </div>
+                <PortfolioView data={data} isPreview={true} />
+            </div>
+        )
+    }
+
     return (
-      <div className="h-screen w-screen bg-black overflow-hidden flex flex-col md:flex-row relative">
+      <div className="h-screen w-screen bg-black overflow-hidden flex flex-col relative">
          {permissionError && (
              <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[60] bg-red-900/90 border border-red-500 text-white px-4 py-2 rounded-full shadow-2xl flex items-center gap-2 text-xs backdrop-blur-md">
                  <ShieldAlert size={14}/>
@@ -247,11 +270,8 @@ const App: React.FC = () => {
              </div>
          )}
 
-        {/* Editor Side - Widened to 600px for "Full Screen" feel */}
-        <div className={`
-            flex-shrink-0 w-full md:w-[600px] bg-zinc-950 border-r border-zinc-800 flex flex-col h-full z-20 shadow-2xl
-            ${mobileViewMode === 'editor' ? 'block' : 'hidden md:block'}
-        `}>
+         {/* Full Screen Editor Panel */}
+         <div className="flex-1 w-full h-full">
              <EditorPanel 
                 data={data} 
                 onChange={(d) => { setData(d); setHasUnsavedChanges(true); }} 
@@ -259,46 +279,8 @@ const App: React.FC = () => {
                 isSaving={isSaving}
                 hasUnsavedChanges={hasUnsavedChanges}
                 onLogout={handleLogout}
+                onPreview={handlePreviewToggle}
              />
-        </div>
-
-        {/* Mobile Toggle Bar */}
-        <div className="md:hidden fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-zinc-800 p-2 flex z-50">
-            <button 
-                onClick={() => setMobileViewMode('editor')} 
-                className={`flex-1 py-3 rounded-lg text-sm font-bold ${mobileViewMode === 'editor' ? 'bg-zinc-800 text-white' : 'text-zinc-500'}`}
-            >
-                Editor
-            </button>
-            <button 
-                onClick={() => setMobileViewMode('preview')} 
-                className={`flex-1 py-3 rounded-lg text-sm font-bold ${mobileViewMode === 'preview' ? 'bg-zinc-800 text-white' : 'text-zinc-500'}`}
-            >
-                Preview
-            </button>
-        </div>
-
-        {/* Preview Side */}
-        <div className={`
-            flex-1 h-full bg-black relative flex flex-col
-            ${mobileViewMode === 'preview' ? 'block' : 'hidden md:block'}
-        `}>
-          <div className="h-12 border-b border-zinc-900 bg-zinc-950 flex items-center justify-between px-4 z-30 flex-shrink-0">
-             <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
-                {isConfigured ? <Database size={10} /> : <HardDrive size={10} />}
-                {isSaving ? 'Syncing...' : 'Live Preview'}
-            </div>
-            <div className="flex items-center gap-2">
-                <Button variant={hasUnsavedChanges ? "primary" : "secondary"} size="sm" onClick={() => handleSaveAndPublish()} className={`text-xs h-8 ${hasUnsavedChanges ? "animate-pulse" : ""}`}>
-                    {isSaving ? 'Publishing...' : 'Save Changes'}
-                </Button>
-            </div>
-          </div>
-          
-          {/* CRITICAL SCROLL FIX: Ensure container is flex-1 and scrollable, removed fixed heights */}
-          <div className="flex-1 w-full h-full overflow-y-auto overflow-x-hidden bg-black custom-scrollbar relative">
-               <PortfolioView data={data} isPreview={true} />
-          </div>
         </div>
       </div>
     );

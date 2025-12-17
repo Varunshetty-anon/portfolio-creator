@@ -65,6 +65,36 @@ export const getDriveEmbedUrl = (url: string): string | null => {
     return null;
 };
 
+export const checkPortfolioReadiness = (data: PortfolioData): { isReady: boolean; missing: string[] } => {
+    const missing: string[] = [];
+    if (!data.bio || data.bio.length < 10) missing.push("Bio");
+    if (!data.projects || data.projects.length === 0) missing.push("At least 1 Project");
+    if (!data.primaryTool) missing.push("Primary Workflow Tool");
+    
+    const hasSocials = Object.values(data.socials).some(val => val && val.length > 0);
+    if (!hasSocials) missing.push("At least 1 Social Link");
+
+    return { isReady: missing.length === 0, missing };
+};
+
+export const downloadQrCode = async (url: string, filename: string) => {
+    try {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(blobUrl);
+    } catch (e) {
+        console.error("QR Download failed", e);
+        window.open(url, '_blank');
+    }
+};
+
 
 // --- AI Integration ---
 // API Key is strictly from process.env.API_KEY
