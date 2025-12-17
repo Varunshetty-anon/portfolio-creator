@@ -133,8 +133,8 @@ const HeroContent: React.FC<{ data: PortfolioData; isMobile?: boolean }> = ({ da
             className={`flex flex-col relative ${isMobile ? 'items-center text-center px-4 py-16 overflow-hidden min-h-[60vh] justify-center' : 'items-start text-left'}`}
         >
             {isMobile && (
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0 opacity-5 select-none pointer-events-none w-full text-center">
-                    <h2 className="text-[28vw] font-display font-black text-white tracking-tighter uppercase leading-none whitespace-nowrap">
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0 opacity-10 select-none pointer-events-none w-full text-center">
+                    <h2 className="text-[20vw] font-display font-black text-white tracking-tighter uppercase leading-none whitespace-nowrap">
                         PORTFOLIO
                     </h2>
                 </div>

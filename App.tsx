@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { PortfolioView } from './components/PortfolioView';
 import { EditorPanel } from './components/EditorPanel';
 import { OnboardingFlow } from './components/OnboardingFlow';
@@ -17,6 +17,7 @@ const App: React.FC = () => {
   const [editorViewMode, setEditorViewMode] = useState<'edit' | 'preview'>('edit');
   
   const [data, setData] = useState<PortfolioData | null>(null);
+  const dataRef = useRef<PortfolioData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [permissionError, setPermissionError] = useState(false);
@@ -34,6 +35,10 @@ const App: React.FC = () => {
   // Editor State
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
 
   // --- Initialization Logic ---
   useEffect(() => {
@@ -53,6 +58,7 @@ const App: React.FC = () => {
 
         if (slug && slug !== 'editor') {
             try {
+                // Ensure we query directly from Firestore to bypass any stale local caching
                 const publicData = await loadFromDB(slug);
                 if (publicData) {
                     setData(publicData);
@@ -164,21 +170,27 @@ const App: React.FC = () => {
 
   const handleSaveAndPublish = async (newData?: PortfolioData) => {
     if (route === 'public') return;
-    const dataToSave = newData || data;
+    const dataToSave = newData || dataRef.current;
     if (!dataToSave) return;
+    
     setIsSaving(true);
     try {
-      // Ensure we have the latest UID or identifier for the update
+      // Force immediate save to Firestore
       await saveToDB(dataToSave);
+      
+      // Update local states
       setHasUnsavedChanges(false);
       if (newData) setData(newData);
       
-      // Update share link hash if username changed
+      // Sync URL hash with username
       if (dataToSave.username && window.location.hash !== `#${dataToSave.username}`) {
          window.location.hash = dataToSave.username;
       }
       
-      setTimeout(() => setIsSaving(false), 800);
+      // Artificial delay for feedback
+      setTimeout(() => {
+          setIsSaving(false);
+      }, 600);
     } catch (e: any) {
       setIsSaving(false);
       console.error("Save failed:", e);
