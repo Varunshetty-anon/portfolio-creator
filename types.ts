@@ -89,3 +89,55 @@ export const INITIAL_DATA: PortfolioData = {
     password: "password"
   }
 };
+
+export const DEMO_DATA: PortfolioData = {
+  ...INITIAL_DATA,
+  username: "demo",
+  name: "Alex Rivera",
+  role: "Senior Video Editor",
+  location: "Los Angeles, CA",
+  languages: "English, Spanish",
+  bio: "Specializing in high-energy commercial edits and documentary storytelling. I transform raw footage into compelling narratives.",
+  profileImage: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=1000&auto=format&fit=crop",
+  showreelThumbnail: "https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?q=80&w=1000&auto=format&fit=crop",
+  showreelLink: "https://www.youtube.com/watch?v=LXb3EKWsInQ", 
+  socials: {
+    email: "alex@example.com",
+    instagram: "https://instagram.com",
+    twitter: "https://twitter.com",
+  },
+  primaryTool: "DaVinci Resolve",
+  tools: ["Premiere Pro", "After Effects", "Cinema 4D"],
+  projects: [
+    {
+      id: "1",
+      title: "Nike - Run Future",
+      description: "A fast-paced commercial spot focusing on sound design and kinetic typography.",
+      thumbnail: "https://images.unsplash.com/photo-1556906781-9a412961d289?q=80&w=1000&auto=format&fit=crop",
+      link: "https://www.youtube.com/watch?v=LXb3EKWsInQ",
+      category: "Commercial",
+      type: "video",
+      aspectRatio: "16:9"
+    },
+    {
+      id: "2",
+      title: "Urban Echoes",
+      description: "Short documentary exploring the underground music scene in Berlin.",
+      thumbnail: "https://images.unsplash.com/photo-1516280440614-6697288d5d38?q=80&w=1000&auto=format&fit=crop",
+      link: "https://www.youtube.com/watch?v=LXb3EKWsInQ",
+      category: "Documentary",
+      type: "video",
+      aspectRatio: "16:9"
+    },
+    {
+      id: "3",
+      title: "Social Shorts Vol. 1",
+      description: "Collection of high-engagement vertical content for fashion brands.",
+      thumbnail: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=1000&auto=format&fit=crop",
+      link: "https://www.youtube.com/watch?v=LXb3EKWsInQ",
+      category: "Social Media",
+      type: "video",
+      aspectRatio: "9:16"
+    }
+  ]
+};

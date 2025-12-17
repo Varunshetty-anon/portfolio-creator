@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { PortfolioView } from './components/PortfolioView';
 import { EditorPanel } from './components/EditorPanel';
 import { OnboardingFlow } from './components/OnboardingFlow';
-import { PortfolioData, INITIAL_DATA } from './types';
+import { PortfolioData, INITIAL_DATA, DEMO_DATA } from './types';
 import { loadFromDB, saveToDB, isConfigured, auth, loginWithEmail, signupWithEmail, loginWithGoogle, checkUsernameAvailable } from './utils';
 import { Database, HardDrive, Loader2, Code, Eye, AlertCircle, X, ShieldAlert } from 'lucide-react';
 import { Button } from './components/ui/Button';
@@ -22,6 +22,7 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [permissionError, setPermissionError] = useState(false);
+  const [isDemoMode, setIsDemoMode] = useState(false);
   
   // Auth Form State
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
@@ -56,21 +57,25 @@ const App: React.FC = () => {
                 } else {
                     // Portfolio not found
                     setRoute('home'); 
-                    // Optional: You could show a 404 state here instead
                 }
             } catch (error: any) {
                 console.error("Failed to load public portfolio:", error);
                 if (error.code === 'permission-denied' || error.message.includes('permission')) {
+                    // Fallback to Demo Mode so the UI works even if backend is blocked
+                    console.warn("Falling back to Demo Mode due to permission error");
+                    setData(DEMO_DATA);
+                    setRoute('public');
                     setPermissionError(true);
+                    setIsDemoMode(true);
+                } else {
+                    setRoute('home');
                 }
-                setRoute('home');
             }
             setIsLoading(false);
             return; // STOP HERE. Do not check auth for public routes.
         }
 
         // 2. EDITOR/HOME ROUTE - Auth Required
-        // Only run auth listener if we are NOT on a public route
         if (isConfigured && auth) {
             onAuthStateChanged(auth, async (user) => {
                 if (user) {
@@ -79,17 +84,24 @@ const App: React.FC = () => {
                         if (userPortfolio) {
                             setData(userPortfolio);
                             if (!userPortfolio.name) setShowOnboarding(true);
-                            setRoute('editor');
                         } else {
                             // New User Setup
                             const newProfile = { ...INITIAL_DATA, uid: user.uid, contactEmail: user.email || '' };
                             setData(newProfile);
                             setShowOnboarding(true);
-                            setRoute('editor');
                         }
+                        setRoute('editor');
                     } catch (e: any) {
-                        console.error("Error loading user data:", e);
-                         if (e.code === 'permission-denied') setPermissionError(true);
+                         console.error("Error loading user data:", e);
+                         if (e.code === 'permission-denied' || e.message.includes('permission')) {
+                             setPermissionError(true);
+                             // Fallback to Local Editor Mode if permissions are broken
+                             // This allows the user to see the editor even if they can't save
+                             const localProfile = { ...INITIAL_DATA, uid: user.uid, contactEmail: user.email || '' };
+                             setData(localProfile);
+                             setRoute('editor');
+                             if (!localProfile.name) setShowOnboarding(true);
+                         }
                     }
                 } else {
                     // Not logged in, and not on public route -> Home
@@ -180,7 +192,9 @@ const App: React.FC = () => {
       console.error("Save failed", e);
       setIsSaving(false);
       if (e.code === 'permission-denied') {
-          alert("Permission Denied: Check your Firestore Security Rules. Owners must be able to write to their own document.");
+          // Do not alert, just show warning in UI via state if needed, or simple toast
+          // We rely on the existing permissionError state to warn the user
+          setPermissionError(true);
       } else {
           alert("Failed to save. Check your connection.");
       }
@@ -206,8 +220,14 @@ const App: React.FC = () => {
   if (route === 'public' && data) {
     return (
         <div className="relative">
-            <PortfolioView data={data} isPreview={false} />
-            {/* Note: The 'Create your own' CTA is now inside PortfolioView footer as requested */}
+             {permissionError && isDemoMode && (
+               <div className="fixed top-0 left-0 right-0 bg-indigo-600 text-white text-xs py-2 px-4 text-center z-[100] font-medium shadow-lg">
+                   Preview Mode: Database permissions are currently restricted. Showing demo portfolio.
+               </div>
+            )}
+            <div className={permissionError && isDemoMode ? "pt-8" : ""}>
+                <PortfolioView data={data} isPreview={false} />
+            </div>
         </div>
     );
   }
@@ -219,8 +239,15 @@ const App: React.FC = () => {
     }
 
     return (
-      <div className="h-screen w-screen bg-black overflow-hidden flex flex-col md:flex-row">
-        
+      <div className="h-screen w-screen bg-black overflow-hidden flex flex-col md:flex-row relative">
+         {permissionError && (
+             <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[60] bg-red-900/90 border border-red-500 text-white px-4 py-2 rounded-full shadow-2xl flex items-center gap-2 text-xs backdrop-blur-md">
+                 <ShieldAlert size={14}/>
+                 <span>Database Locked: Changes cannot be saved to cloud.</span>
+                 <button onClick={() => setPermissionError(false)} className="hover:text-red-200"><X size={14}/></button>
+             </div>
+         )}
+
         {/* Editor Side */}
         <div className={`
             flex-shrink-0 w-full md:w-[450px] bg-zinc-950 border-r border-zinc-800 flex flex-col h-full z-20
@@ -292,7 +319,7 @@ const App: React.FC = () => {
                <ShieldAlert className="flex-shrink-0" />
                <div className="text-xs">
                    <strong>Database Permission Error</strong>
-                   <p className="mt-1">Public access is blocked. Go to Firebase Console &gt; Firestore &gt; Rules and set <code>allow read: if true;</code>.</p>
+                   <p className="mt-1">Public access is restricted by your Firebase rules. Check console for details.</p>
                </div>
                <button onClick={() => setPermissionError(false)}><X size={14}/></button>
            </div>
