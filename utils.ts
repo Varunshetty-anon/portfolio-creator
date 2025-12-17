@@ -68,7 +68,6 @@ export const getDriveEmbedUrl = (url: string): string | null => {
 
 export const getDriveThumbnail = (url: string): string | null => {
   const id = getDriveId(url);
-  // High quality thumbnail export for publicly shared drive items
   return id ? `https://drive.google.com/thumbnail?id=${id}&sz=w1200` : null;
 };
 
@@ -144,6 +143,27 @@ export const generateAiDescription = async (title: string, category: string, cur
     return currentDesc;
   }
 };
+
+export const generateAiThumbnail = async (title: string, category: string): Promise<string> => {
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash-image',
+      contents: {
+        parts: [{ text: `A high-end, cinematic, professional video project thumbnail for a video titled "${title}" in the category "${category}". Style: Dramatic lighting, clean composition, professional color grading, video editor portfolio style, 4k, no text.` }]
+      }
+    });
+
+    for (const part of response.candidates[0].content.parts) {
+      if (part.inlineData) {
+        return `data:image/png;base64,${part.inlineData.data}`;
+      }
+    }
+    return '';
+  } catch (e) {
+    console.error("AI Thumbnail Generation failed:", e);
+    return '';
+  }
+}
 
 export const getBrandColor = (name: string): string => {
   const editTool = EDITING_TOOLS_LIST.find(t => t.name === name);

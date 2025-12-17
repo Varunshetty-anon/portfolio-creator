@@ -1,13 +1,14 @@
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { motion } from 'framer-motion'; // Added missing motion import
 import { PortfolioData, Project, Testimonial } from '../types';
 import { Input, TextArea } from './ui/Input';
 import { Button } from './ui/Button';
 import { ToolSelector } from './ToolSelector';
-import { Plus, Trash2, Video, Wand2, Image as ImageIcon, ChevronDown, Upload, X, LayoutDashboard, Copy, ExternalLink, User, MessageSquare, Loader2, CheckCircle2, Globe, Crop, Settings, LogOut, AlertCircle, Sparkles, Wrench, ZoomIn, ZoomOut, QrCode, Download, AlertTriangle, Eye } from 'lucide-react';
+import { Plus, Trash2, Video, Wand2, Image as ImageIcon, ChevronDown, Upload, X, LayoutDashboard, Copy, ExternalLink, User, MessageSquare, Loader2, CheckCircle2, Globe, Crop, Settings, LogOut, AlertCircle, Sparkles, Wrench, ZoomIn, ZoomOut, QrCode, Download, AlertTriangle, Eye, Monitor, Smartphone } from 'lucide-react';
 import Cropper from 'react-easy-crop';
-import { getCroppedImg, generateThumbnailFromVideo, uploadFileToStorage, hasCloudStorage, generateAiBio, generateAiDescription, checkPortfolioReadiness, downloadQrCode, getYouTubeThumbnail, getDriveThumbnail } from '../utils';
+import { getCroppedImg, generateThumbnailFromVideo, uploadFileToStorage, hasCloudStorage, generateAiBio, generateAiDescription, checkPortfolioReadiness, downloadQrCode, getYouTubeThumbnail, getDriveThumbnail, generateAiThumbnail } from '../utils';
 
 interface EditorPanelProps {
   data: PortfolioData;
@@ -29,7 +30,6 @@ const isValidUrl = (string: string) => {
   }
 };
 
-// Fixed ValidatedInput to correctly accept and handle the className prop
 const ValidatedInput = ({ 
     label, 
     value, 
@@ -80,6 +80,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
   const [showreelInputMethod, setShowreelInputMethod] = useState<'upload' | 'link'>(data.showreelLink.startsWith('blob:') || !data.showreelLink ? 'upload' : 'link');
   const [isGeneratingBio, setIsGeneratingBio] = useState(false);
   const [generatingDescId, setGeneratingDescId] = useState<string | null>(null);
+  const [generatingThumbId, setGeneratingThumbId] = useState<string | null>(null);
   const [profileImageUploading, setProfileImageUploading] = useState(false);
   const [showQr, setShowQr] = useState(false);
   
@@ -301,20 +302,32 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
     }
   };
 
-  const handleLoadVideoLink = (type: 'showreel' | 'project', link: string, projectId?: string) => {
+  const handleLoadVideoLink = async (type: 'showreel' | 'project', link: string, projectId?: string) => {
       if (!link) return;
       const youtubeThumb = getYouTubeThumbnail(link);
-      const driveThumb = getDriveThumbnail(link);
-      const thumb = youtubeThumb || driveThumb;
+      const isDrive = link.includes('drive.google.com');
+      
+      let thumb = youtubeThumb || '';
 
       if (type === 'showreel') {
           const updates: any = { showreelLink: link };
           if (thumb) updates.showreelThumbnail = thumb;
           onChange({ ...data, ...updates });
       } else if (projectId) {
+          const project = data.projects.find(p => p.id === projectId);
+          if (!project) return;
+
+          setGeneratingThumbId(projectId);
+          
+          if (isDrive && !thumb) {
+             // Generate AI Thumbnail for Drive Links
+             thumb = await generateAiThumbnail(project.title, project.category);
+          }
+
           const updates: any = { link: link };
           if (thumb) updates.thumbnail = thumb;
           updateProject(projectId, updates);
+          setGeneratingThumbId(null);
       }
       setTimeout(onPublish, 500);
   };
@@ -515,8 +528,16 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
                     <>
                         {showreelInputMethod === 'upload' ? (
                             showreelUploading ? (
-                                <div className="h-64 border-2 border-dashed border-zinc-700 bg-black/30 rounded-2xl flex flex-col items-center justify-center p-4">
-                                    <Loader2 className="animate-spin mb-4 text-indigo-500" size={32}/><span className="text-sm text-zinc-400">Uploading Video... {Math.round(showreelUploading.progress)}%</span>
+                                <div className="h-64 border-2 border-dashed border-zinc-700 bg-black/30 rounded-2xl flex flex-col items-center justify-center p-8">
+                                    <div className="w-full max-w-sm h-2 bg-zinc-800 rounded-full overflow-hidden mb-4">
+                                        {/* Added motion import to fix missing name error */}
+                                        <motion.div 
+                                            className="h-full bg-indigo-500" 
+                                            initial={{ width: 0 }} 
+                                            animate={{ width: `${showreelUploading.progress}%` }} 
+                                        />
+                                    </div>
+                                    <span className="text-sm text-zinc-400 font-mono tracking-widest">{Math.round(showreelUploading.progress)}% UPLOADED</span>
                                 </div>
                             ) : (
                                 <Button size="lg" className="w-full h-64 border-2 border-dashed border-zinc-800 bg-black/20 hover:bg-black/40 hover:border-zinc-600 transition-all group rounded-2xl relative" variant="ghost" onClick={() => handleFileUpload('video/*', handleShowreelVideoUpload)}>
@@ -527,7 +548,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
                             <div className="h-64 border-2 border-dashed border-zinc-800 bg-black/20 rounded-2xl flex flex-col justify-center p-8 space-y-4 relative">
                                 <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest">External URL</label>
                                 <div className="flex gap-2">
-                                    <ValidatedInput label="" value={data.showreelLink} onChange={(e) => updateField('showreelLink', e.target.value)} placeholder="YouTube or Google Drive link" className="py-4 text-lg bg-black border-zinc-700 focus:border-white transition-all" />
+                                    <ValidatedInput label="" value={data.showreelLink} onChange={(e) => updateField('showreelLink', e.target.value)} placeholder="YouTube or Google Drive link" className="py-4 text-lg bg-black border-zinc-700 focus:border-white transition-all flex-1" />
                                     <Button variant="secondary" onClick={() => handleLoadVideoLink('showreel', data.showreelLink)}>Load</Button>
                                 </div>
                                 <p className="text-xs text-zinc-600">Supports YouTube, Vimeo, or direct Google Drive links.</p>
@@ -546,11 +567,18 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
                  {data.projects.map((project) => {
                    const isUploading = uploadingState?.id === project.id;
                    const isExpanded = expandedProject === project.id;
+                   const isGeneratingThumb = generatingThumbId === project.id;
                    return (
                    <div key={project.id} className={`bg-zinc-900/30 border rounded-2xl overflow-hidden transition-all duration-300 ${isExpanded ? 'border-zinc-600 bg-zinc-900 shadow-2xl' : 'border-zinc-800 hover:border-zinc-700'}`}>
                      <div className="flex items-center justify-between p-4 cursor-pointer" onClick={() => setExpandedProject(isExpanded ? null : project.id)}>
                        <div className="flex items-center gap-4">
-                         <div className="w-20 h-16 rounded-lg bg-black bg-cover bg-center border border-zinc-800 flex-shrink-0" style={{backgroundImage: `url(${project.thumbnail})`}}></div>
+                         <div className="w-20 h-16 rounded-lg bg-black bg-cover bg-center border border-zinc-800 flex-shrink-0 relative overflow-hidden" style={{backgroundImage: `url(${project.thumbnail})`}}>
+                            {isGeneratingThumb && (
+                                <div className="absolute inset-0 bg-black/80 flex items-center justify-center">
+                                    <Loader2 className="animate-spin text-indigo-500" size={16}/>
+                                </div>
+                            )}
+                         </div>
                          <div><span className="text-base font-bold text-white block">{project.title}</span><div className="flex items-center gap-2 text-xs text-zinc-500 mt-1">
                                  <span className="uppercase tracking-wider">{project.category}</span><span>•</span><span className="bg-zinc-800 px-1.5 py-0.5 rounded text-zinc-400">{project.aspectRatio || '16:9'}</span>
                              </div></div>
@@ -572,24 +600,41 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
                                 {generatingDescId === project.id ? <Loader2 size={10} className="animate-spin"/> : <Wand2 size={10} />} Magic Fix
                             </button>
                          </div>
-                         <div className="space-y-3">
-                            <label className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Media Format</label>
-                            <div className="flex bg-black rounded-lg border border-zinc-800 p-1 w-full md:w-1/2">
-                                <button onClick={() => updateProject(project.id, { type: 'video' })} className={`flex-1 text-xs py-2 rounded transition-all ${project.type !== 'image' ? 'bg-zinc-800 text-white shadow-sm font-bold' : 'text-zinc-500 hover:text-zinc-300'}`}><Video size={14} className="inline mr-2"/>Video</button>
-                                <button onClick={() => updateProject(project.id, { type: 'image' })} className={`flex-1 text-xs py-2 rounded transition-all ${project.type === 'image' ? 'bg-zinc-800 text-white shadow-sm font-bold' : 'text-zinc-500 hover:text-zinc-300'}`}><ImageIcon size={14} className="inline mr-2"/>Image</button>
-                            </div>
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                             <div className="space-y-3">
+                                <label className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Media Format</label>
+                                <div className="flex bg-black rounded-lg border border-zinc-800 p-1">
+                                    <button onClick={() => updateProject(project.id, { type: 'video' })} className={`flex-1 text-xs py-2 rounded transition-all ${project.type !== 'image' ? 'bg-zinc-800 text-white shadow-sm font-bold' : 'text-zinc-500 hover:text-zinc-300'}`}><Video size={14} className="inline mr-2"/>Video</button>
+                                    <button onClick={() => updateProject(project.id, { type: 'image' })} className={`flex-1 text-xs py-2 rounded transition-all ${project.type === 'image' ? 'bg-zinc-800 text-white shadow-sm font-bold' : 'text-zinc-500 hover:text-zinc-300'}`}><ImageIcon size={14} className="inline mr-2"/>Image</button>
+                                </div>
+                             </div>
+                             <div className="space-y-3">
+                                <label className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Aspect Ratio</label>
+                                <div className="flex bg-black rounded-lg border border-zinc-800 p-1">
+                                    <button onClick={() => updateProject(project.id, { aspectRatio: '16:9' })} className={`flex-1 text-xs py-2 rounded transition-all ${project.aspectRatio === '16:9' ? 'bg-zinc-800 text-white shadow-sm font-bold' : 'text-zinc-500 hover:text-zinc-300'}`}><Monitor size={14} className="inline mr-2"/>16:9</button>
+                                    <button onClick={() => updateProject(project.id, { aspectRatio: '9:16' })} className={`flex-1 text-xs py-2 rounded transition-all ${project.aspectRatio === '9:16' ? 'bg-zinc-800 text-white shadow-sm font-bold' : 'text-zinc-500 hover:text-zinc-300'}`}><Smartphone size={14} className="inline mr-2"/>9:16</button>
+                                </div>
+                             </div>
                          </div>
                          {project.type !== 'image' && (
                              <div className="space-y-2">
                                 <label className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Video Source</label>
                                 {isUploading ? (
-                                    <div className="h-12 bg-zinc-800/50 rounded flex items-center justify-center text-sm text-indigo-400"><Loader2 className="animate-spin mr-2" size={16}/> Uploading...</div>
+                                    <div className="p-6 bg-zinc-800/20 border border-zinc-800/50 rounded-xl flex flex-col items-center gap-3">
+                                        <div className="w-full h-1.5 bg-zinc-900 rounded-full overflow-hidden">
+                                            {/* Added motion import to fix missing name error */}
+                                            <motion.div className="h-full bg-indigo-500" initial={{ width: 0 }} animate={{ width: `${uploadingState.progress}%` }} />
+                                        </div>
+                                        <span className="text-xs text-indigo-400 font-mono">UPLOADING... {Math.round(uploadingState.progress)}%</span>
+                                    </div>
                                 ) : (
-                                    <div className="flex flex-col gap-3"><div className="flex gap-3">
+                                    <div className="flex flex-col gap-3">
+                                        <div className="flex gap-3">
                                             <Button variant="secondary" onClick={() => handleFileUpload('video/*', (f) => handleProjectVideoUpload(project.id, f))} className="whitespace-nowrap">Upload File</Button>
                                             <ValidatedInput label="" placeholder="Paste YouTube / Google Drive URL" value={project.link} onChange={(e) => updateProject(project.id, { link: e.target.value })} className="flex-1 transition-all"/>
                                             <Button variant="secondary" onClick={() => handleLoadVideoLink('project', project.link, project.id)}>Load</Button>
-                                        </div></div>
+                                        </div>
+                                    </div>
                                 )}
                              </div>
                          )}

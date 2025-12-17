@@ -130,27 +130,35 @@ const HeroContent: React.FC<{ data: PortfolioData; isMobile?: boolean }> = ({ da
             variants={staggerContainer} 
             initial="initial" 
             animate="animate" 
-            className={`flex flex-col ${isMobile ? 'items-center text-center px-4' : 'items-start text-left'}`}
+            className={`flex flex-col relative ${isMobile ? 'items-center text-center px-4 py-12 overflow-hidden' : 'items-start text-left'}`}
         >
+            {isMobile && (
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0 opacity-5 select-none pointer-events-none">
+                    <h2 className="text-[25vw] font-display font-black text-white tracking-tighter uppercase whitespace-nowrap">
+                        PORTFOLIO
+                    </h2>
+                </div>
+            )}
+
             <motion.div 
                 variants={fadeInUp} 
-                className="relative mb-8 group"
+                className="relative mb-8 group z-10"
             >
-                <div className="absolute -inset-2 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full blur-xl opacity-20 group-hover:opacity-40 transition-opacity duration-500" />
-                <div className="w-32 h-32 md:w-48 md:h-48 lg:w-56 lg:h-56 rounded-full overflow-hidden border-[6px] border-zinc-900 shadow-2xl relative z-10 transition-transform duration-500 hover:scale-[1.02]">
+                <div className="absolute -inset-4 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full blur-2xl opacity-10 group-hover:opacity-30 transition-opacity duration-500" />
+                <div className={`${isMobile ? 'w-64 h-64' : 'w-48 h-48 lg:w-56 lg:h-56'} rounded-full overflow-hidden border-[8px] border-zinc-900 shadow-[0_0_50px_rgba(0,0,0,0.5)] relative z-10 transition-transform duration-500 hover:scale-[1.02]`}>
                     <img src={data.profileImage} className="w-full h-full object-cover" alt={data.name} loading="lazy" />
-                    <div className={`absolute bottom-6 right-6 w-6 h-6 rounded-full border-4 border-zinc-900 z-20 ${data.availability.status ? 'bg-green-500 shadow-[0_0_15px_#22c55e]' : 'bg-red-500'}`}></div>
+                    <div className={`absolute bottom-8 right-8 w-8 h-8 rounded-full border-4 border-zinc-900 z-20 ${data.availability.status ? 'bg-green-500 shadow-[0_0_15px_#22c55e]' : 'bg-red-500'}`}></div>
                 </div>
             </motion.div>
 
-            <div className="space-y-6 max-w-xl">
+            <div className="space-y-6 max-w-xl z-10">
                 <motion.div variants={fadeInUp} className="space-y-2">
                     <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border text-[10px] font-bold uppercase tracking-widest mb-4 backdrop-blur-md ${data.availability.status ? 'bg-green-500/10 border-green-500/20 text-green-500' : 'bg-red-500/10 border-red-500/20 text-red-500'}`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${data.availability.status ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></span>
                         {data.availability.status ? 'Available for Work' : 'Unavailable'}
                     </div>
                     
-                    <h1 className="text-5xl md:text-7xl lg:text-8xl font-display font-black text-white tracking-tighter leading-[0.85] uppercase">
+                    <h1 className={`${isMobile ? 'text-6xl' : 'text-5xl md:text-7xl lg:text-8xl'} font-display font-black text-white tracking-tighter leading-[0.85] uppercase`}>
                         {data.name || "YOUR NAME"}
                     </h1>
                     
@@ -172,7 +180,7 @@ const HeroContent: React.FC<{ data: PortfolioData; isMobile?: boolean }> = ({ da
                 </motion.p>
             </div>
 
-            <motion.div variants={fadeInUp} className="pt-8 flex flex-wrap gap-4 justify-center lg:justify-start">
+            <motion.div variants={fadeInUp} className="pt-8 flex flex-wrap gap-4 justify-center lg:justify-start z-10">
                 <a href={`mailto:${data.contactEmail}`} className="inline-flex items-center gap-2 bg-white text-black px-8 py-4 rounded-full font-bold text-xs tracking-widest uppercase hover:bg-zinc-200 transition-all hover:translate-y-[-2px] shadow-2xl">
                     <Mail size={16} /> Get In Touch
                 </a>
@@ -396,7 +404,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview })
           <main className="w-full lg:w-[55%] xl:w-[60%] lg:h-screen lg:overflow-y-auto custom-scrollbar relative" ref={containerRef}>
              <div className="p-6 md:p-12 lg:p-20 xl:p-24 space-y-24 pb-48 max-w-6xl mx-auto">
                  
-                 <div className="lg:hidden py-12">
+                 <div className="lg:hidden">
                     <HeroContent data={data} isMobile={true} />
                  </div>
 
