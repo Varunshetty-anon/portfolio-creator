@@ -4,19 +4,6 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Frames - Video Editor Portfolio</title>
-    <script>
-      // CRITICAL: Force unregister any existing Service Workers that might be intercepting requests
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', function() {
-          navigator.serviceWorker.getRegistrations().then(function(registrations) {
-            for(let registration of registrations) {
-              console.log('Unregistering Service Worker:', registration);
-              registration.unregister();
-            }
-          });
-        });
-      }
-    </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
     <script>
@@ -30,15 +17,15 @@
             colors: {
               zinc: {
                 850: '#1f1f22',
-                950: '#09090b', // Deep rich black
+                950: '#09090b', 
               }
             },
             animation: {
-              'wiggle': 'wiggle 0.5s ease-in-out', // Removed infinite, increased duration slightly for subtlety
+              'wiggle': 'wiggle 0.5s ease-in-out',
             },
             keyframes: {
               wiggle: {
-                '0%, 100%': { transform: 'rotate(-3deg)' }, // Reduced angle
+                '0%, 100%': { transform: 'rotate(-3deg)' },
                 '50%': { transform: 'rotate(3deg)' },
               }
             }
@@ -64,6 +51,8 @@
       body {
         background-color: #050505;
         color: #e4e4e7;
+        margin: 0;
+        padding: 0;
       }
     </style>
   <script type="importmap">

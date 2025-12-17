@@ -53,7 +53,6 @@ export const ToolSelector: React.FC<ToolSelectorProps> = ({
     if (selectedTools.includes(toolName)) {
       const newSelection = selectedTools.filter(t => t !== toolName);
       onSelect(newSelection);
-      // If we removed the primary tool, clear it
       if (primaryTool === toolName && onSetPrimary) {
         onSetPrimary('');
       }
@@ -70,7 +69,7 @@ export const ToolSelector: React.FC<ToolSelectorProps> = ({
   };
 
   return (
-    <div className={`grid grid-cols-2 sm:grid-cols-2 gap-3 ${className}`}>
+    <div className={`grid grid-cols-2 gap-3 ${className}`}>
       {options.map((tool) => {
         const isSelected = selectedTools.includes(tool.name);
         const isPrimary = primaryTool === tool.name;
@@ -80,38 +79,34 @@ export const ToolSelector: React.FC<ToolSelectorProps> = ({
             key={tool.name}
             onClick={() => toggleTool(tool.name)}
             className={`
-                group relative flex flex-col sm:flex-row items-start sm:items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all duration-200 select-none
+                group relative flex flex-col items-start gap-3 p-4 rounded-xl border cursor-pointer transition-all duration-200 select-none
                 ${isSelected 
-                    ? 'bg-zinc-800/80 border-indigo-500/50 shadow-[0_0_15px_-5px_rgba(99,102,241,0.2)]' 
-                    : 'bg-zinc-900/30 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900/60'
+                    ? 'bg-zinc-800 border-indigo-500/50 shadow-[0_0_15px_-5px_rgba(99,102,241,0.2)]' 
+                    : 'bg-zinc-900/40 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900/60'
                 }
             `}
           >
-            {/* Header: Logo and Checkbox (on Mobile) */}
-            <div className="flex items-center justify-between w-full sm:w-auto">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center bg-black border border-zinc-800 flex-shrink-0 ${isSelected ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'}`}>
+            {/* Header: Logo and Checkbox */}
+            <div className="flex items-center justify-between w-full">
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center bg-black border border-zinc-800 flex-shrink-0 ${isSelected ? 'opacity-100' : 'opacity-60 group-hover:opacity-100'}`}>
                    <ToolIcon tool={tool} />
                 </div>
-                <div className={`sm:hidden w-4 h-4 rounded border flex items-center justify-center transition-colors ${isSelected ? 'bg-indigo-500 border-indigo-500' : 'border-zinc-700 bg-zinc-950'}`}>
+                <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${isSelected ? 'bg-indigo-500 border-indigo-500' : 'border-zinc-700 bg-zinc-950'}`}>
                     {isSelected && <Check size={10} className="text-white" strokeWidth={3} />}
                 </div>
             </div>
 
             {/* Name & Primary Selection */}
-            <div className="flex-1 min-w-0 w-full">
-                <div className="flex items-center justify-between mb-1">
-                    <span className={`text-sm font-medium truncate ${isSelected ? 'text-white' : 'text-zinc-400 group-hover:text-zinc-300'}`}>
-                        {tool.name}
-                    </span>
-                    <div className={`hidden sm:flex w-4 h-4 rounded border items-center justify-center transition-colors ${isSelected ? 'bg-indigo-500 border-indigo-500' : 'border-zinc-700 bg-zinc-950'}`}>
-                        {isSelected && <Check size={10} className="text-white" strokeWidth={3} />}
-                    </div>
-                </div>
-                {/* Primary Tool Selection (Only for editing tools and if selected) */}
+            <div className="w-full space-y-2">
+                <span className={`text-[13px] font-semibold truncate block ${isSelected ? 'text-white' : 'text-zinc-500 group-hover:text-zinc-300'}`}>
+                    {tool.name}
+                </span>
+                
+                {/* Primary Tool Selection Tag - Clearly separated below logo/name */}
                 {type === 'editing' && onSetPrimary && isSelected && (
                     <button 
                         onClick={(e) => setPrimary(e, tool.name)}
-                        className={`text-[10px] w-full sm:w-auto justify-center sm:justify-start flex items-center gap-1.5 font-bold uppercase tracking-wider py-1 px-2 rounded-md transition-all ${isPrimary ? 'text-yellow-400 bg-yellow-400/10 border border-yellow-400/20' : 'text-zinc-500 hover:text-zinc-300 bg-zinc-900 border border-zinc-700'}`}
+                        className={`text-[9px] w-full flex items-center justify-center gap-1.5 font-bold uppercase tracking-wider py-1.5 px-2 rounded-md transition-all ${isPrimary ? 'text-yellow-400 bg-yellow-400/10 border border-yellow-400/20 shadow-[0_0_10px_rgba(250,204,21,0.1)]' : 'text-zinc-500 hover:text-zinc-300 bg-zinc-950 border border-zinc-800'}`}
                     >
                         <Star size={10} fill={isPrimary ? "currentColor" : "none"} />
                         {isPrimary ? 'Primary' : 'Set Primary'}
