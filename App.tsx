@@ -4,7 +4,7 @@ import { EditorPanel } from './components/EditorPanel';
 import { OnboardingFlow } from './components/OnboardingFlow';
 import { PortfolioData, INITIAL_DATA, DEMO_DATA } from './types';
 import { loadFromDB, saveToDB, isConfigured, auth, loginWithEmail, signupWithEmail, loginWithGoogle, checkUsernameAvailable, checkPortfolioReadiness } from './utils';
-import { Database, HardDrive, Loader2, Code, Eye, AlertCircle, X, ShieldAlert, ArrowLeft } from 'lucide-react';
+import { Database, HardDrive, Loader2, Code, Eye, AlertCircle, X, ShieldAlert, ArrowLeft, PenTool } from 'lucide-react';
 import { Button } from './components/ui/Button';
 import { onAuthStateChanged } from 'firebase/auth';
 
@@ -224,7 +224,7 @@ const App: React.FC = () => {
   // --- VIEW: PUBLIC (Read-Only) ---
   if (route === 'public' && data) {
     return (
-        <div className="relative">
+        <div className="relative min-h-screen bg-black">
              {permissionError && isDemoMode && (
                <div className="fixed top-0 left-0 right-0 bg-indigo-600 text-white text-xs py-2 px-4 text-center z-[100] font-medium shadow-lg">
                    Preview Mode: Database permissions are currently restricted. Showing demo portfolio.
@@ -245,14 +245,15 @@ const App: React.FC = () => {
 
     if (editorViewMode === 'preview') {
         return (
-            <div className="relative h-screen w-screen overflow-hidden">
-                <div className="absolute top-6 left-6 z-[100]">
+            <div className="relative min-h-screen w-full bg-black">
+                {/* Fixed: Moved button to Bottom-Right to avoid blocking profile info on Top-Left */}
+                <div className="fixed bottom-6 right-6 z-[200]">
                     <Button 
                         onClick={() => setEditorViewMode('edit')} 
-                        className="shadow-2xl border border-zinc-800"
-                        icon={<ArrowLeft size={16}/>}
+                        className="shadow-[0_0_30px_rgba(0,0,0,0.5)] border border-zinc-700 bg-zinc-900/90 backdrop-blur-md text-white hover:bg-white hover:text-black transition-all rounded-full px-6 py-4 flex items-center gap-2 group"
                     >
-                        Back to Editor
+                        <PenTool size={18} className="group-hover:rotate-12 transition-transform"/> 
+                        <span className="font-bold tracking-wide">Back to Editor</span>
                     </Button>
                 </div>
                 <PortfolioView data={data} isPreview={true} />
@@ -261,7 +262,7 @@ const App: React.FC = () => {
     }
 
     return (
-      <div className="h-screen w-screen bg-black overflow-hidden flex flex-col relative">
+      <div className="h-[100dvh] w-screen bg-black overflow-hidden flex flex-col relative">
          {permissionError && (
              <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[60] bg-red-900/90 border border-red-500 text-white px-4 py-2 rounded-full shadow-2xl flex items-center gap-2 text-xs backdrop-blur-md">
                  <ShieldAlert size={14}/>
@@ -271,7 +272,7 @@ const App: React.FC = () => {
          )}
 
          {/* Full Screen Editor Panel */}
-         <div className="flex-1 w-full h-full">
+         <div className="flex-1 w-full h-full overflow-hidden">
              <EditorPanel 
                 data={data} 
                 onChange={(d) => { setData(d); setHasUnsavedChanges(true); }} 
@@ -289,8 +290,13 @@ const App: React.FC = () => {
   // --- VIEW: LOGIN / HOME ---
   return (
     <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4 relative overflow-hidden">
-       {/* Ambient BG */}
-       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-zinc-900 via-black to-black opacity-80"></div>
+       {/* Animated Ambient BG */}
+       <div className="absolute inset-0 bg-black">
+          <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-indigo-500/20 rounded-full blur-[120px] animate-pulse"></div>
+          <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-purple-500/20 rounded-full blur-[120px] animate-pulse delay-700"></div>
+          <div className="absolute top-[40%] left-[40%] w-[30%] h-[30%] bg-blue-500/10 rounded-full blur-[100px] animate-pulse delay-1000"></div>
+       </div>
+       
        <div className="absolute top-0 w-full h-px bg-gradient-to-r from-transparent via-indigo-500 to-transparent opacity-20"></div>
        <div className="absolute bottom-0 w-full h-px bg-gradient-to-r from-transparent via-purple-500 to-transparent opacity-20"></div>
 
@@ -306,10 +312,14 @@ const App: React.FC = () => {
        )}
 
        <div className="relative z-10 w-full max-w-md flex flex-col items-center">
-          <div className="mb-12 text-center">
-             <h1 className="text-7xl md:text-8xl font-display font-black text-white tracking-tighter mb-2 leading-none">FRAMES</h1>
-             <p className="text-zinc-500 font-mono text-sm tracking-[0.3em] uppercase">Portfolio Creator</p>
-          </div>
+          <div className="mb-12 flex flex-col items-center select-none">
+              <h1 className="text-7xl md:text-9xl font-display font-black text-white tracking-tighter leading-[0.8]">FRAMES</h1>
+              <div className="relative">
+                 <div className="transform -rotate-3 bg-white text-black px-4 py-1 font-display font-bold text-sm tracking-[0.2em] uppercase shadow-[0_0_30px_rgba(255,255,255,0.2)]">
+                     by VARUN
+                 </div>
+              </div>
+           </div>
 
           <div className="bg-zinc-900/40 backdrop-blur-xl border border-zinc-800 p-8 rounded-2xl shadow-2xl w-full">
              <div className="flex gap-4 mb-8 bg-black/40 p-1 rounded-lg">
