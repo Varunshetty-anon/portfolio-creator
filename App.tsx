@@ -55,7 +55,6 @@ const App: React.FC = () => {
                     setRoute('public');
                     document.title = `${publicData.name} - Portfolio`;
                 } else {
-                    // Portfolio not found
                     setRoute('home'); 
                 }
             } catch (error: any) {
@@ -248,9 +247,9 @@ const App: React.FC = () => {
              </div>
          )}
 
-        {/* Editor Side */}
+        {/* Editor Side - Widened to 600px for "Full Screen" feel */}
         <div className={`
-            flex-shrink-0 w-full md:w-[450px] bg-zinc-950 border-r border-zinc-800 flex flex-col h-full z-20
+            flex-shrink-0 w-full md:w-[600px] bg-zinc-950 border-r border-zinc-800 flex flex-col h-full z-20 shadow-2xl
             ${mobileViewMode === 'editor' ? 'block' : 'hidden md:block'}
         `}>
              <EditorPanel 
@@ -281,10 +280,10 @@ const App: React.FC = () => {
 
         {/* Preview Side */}
         <div className={`
-            flex-1 h-full bg-zinc-950 relative flex flex-col
+            flex-1 h-full bg-black relative flex flex-col
             ${mobileViewMode === 'preview' ? 'block' : 'hidden md:block'}
         `}>
-          <div className="h-12 border-b border-zinc-800 bg-zinc-950 flex items-center justify-between px-4 z-30 flex-shrink-0">
+          <div className="h-12 border-b border-zinc-900 bg-zinc-950 flex items-center justify-between px-4 z-30 flex-shrink-0">
              <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
                 {isConfigured ? <Database size={10} /> : <HardDrive size={10} />}
                 {isSaving ? 'Syncing...' : 'Live Preview'}
@@ -296,10 +295,9 @@ const App: React.FC = () => {
             </div>
           </div>
           
-          <div className="flex-1 overflow-y-auto overflow-x-hidden bg-black custom-scrollbar relative">
-             <div className="min-h-full w-full bg-black">
+          {/* CRITICAL SCROLL FIX: Ensure container is flex-1 and scrollable, removed fixed heights */}
+          <div className="flex-1 w-full h-full overflow-y-auto overflow-x-hidden bg-black custom-scrollbar relative">
                <PortfolioView data={data} isPreview={true} />
-             </div>
           </div>
         </div>
       </div>

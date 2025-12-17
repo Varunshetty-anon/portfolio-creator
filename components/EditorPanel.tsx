@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { PortfolioData, Project, Testimonial } from '../types';
 import { Input, TextArea } from './ui/Input';
 import { Button } from './ui/Button';
+import { ToolSelector } from './ToolSelector';
 import { Plus, Trash2, Video, Wand2, Image as ImageIcon, ChevronDown, ChevronUp, Upload, X, LayoutDashboard, Copy, ExternalLink, FileVideo, User, MessageSquare, Loader2, CheckCircle2, Globe, Crop, Settings, LogOut, AlertCircle, Share2, Eye, EyeOff, Cloud, Link, Sparkles, Wrench, ZoomIn, ZoomOut, QrCode } from 'lucide-react';
 import Cropper from 'react-easy-crop';
 import { getCroppedImg, generateThumbnailFromVideo, encodeState, uploadFileToStorage, isConfigured, hasCloudStorage, generateAiBio, generateAiDescription } from '../utils';
@@ -16,7 +17,6 @@ interface EditorPanelProps {
   onLogout?: () => void;
 }
 
-// Helper to validate URL
 const isValidUrl = (string: string) => {
   if (!string) return false;
   try {
@@ -115,7 +115,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
       setGeneratingDescId(null);
   };
 
-  // --- Link Generator ---
   const getShareLink = () => {
      const origin = window.location.origin === 'null' || !window.location.origin ? 'https://cinefolio.app' : window.location.origin;
      return `${origin}/#${data.username}`;
@@ -133,7 +132,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
 
   const openLink = () => window.open(getShareLink(), '_blank');
 
-  // --- Project Helpers ---
   const addProject = () => {
     const newProject: Project = {
       id: Date.now().toString(),
@@ -162,7 +160,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
     updateField('projects', data.projects.map(p => p.id === id ? { ...p, ...updates } : p));
   };
 
-  // --- Testimonial Helpers ---
   const addTestimonial = () => {
       const newTestimonial: Testimonial = {
           id: Date.now().toString(),
@@ -183,7 +180,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
       updateField('testimonials', data.testimonials.map(t => t.id === id ? { ...t, [field]: value } : t));
   };
 
-  // --- File Upload ---
   const handleFileUpload = (accept: string, callback: (file: File) => void) => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -310,7 +306,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
   return (
     <div className="h-full flex flex-col bg-zinc-950 border-r border-zinc-900 relative">
       
-      {/* Crop Modal - Portal */}
       {cropModalOpen && tempImgSrc && createPortal(
           <div className="fixed inset-0 z-[100] bg-black flex flex-col animate-in fade-in duration-200">
               <div className="relative flex-1 bg-zinc-900 w-full h-full overflow-hidden">
@@ -350,7 +345,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
           document.body
       )}
 
-      {/* QR Code Modal */}
       {showQr && createPortal(
           <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in" onClick={() => setShowQr(false)}>
               <div className="bg-white rounded-2xl p-8 flex flex-col items-center gap-4 max-w-sm w-full" onClick={e => e.stopPropagation()}>
@@ -404,10 +398,8 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
         ))}
       </div>
 
-      {/* Content Area */}
       <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar bg-zinc-950 pb-24">
         
-        {/* === DASHBOARD TAB === */}
         {activeTab === 'dashboard' && (
           <div className="space-y-6 animate-fadeIn">
              
@@ -449,7 +441,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
           </div>
         )}
 
-        {/* ... PROFILE TAB (Standard inputs) ... */}
         {activeTab === 'profile' && (
           <div className="space-y-6 animate-fadeIn">
             <div className="flex items-center gap-6 p-4 bg-zinc-900/30 rounded-xl border border-zinc-800">
@@ -494,7 +485,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
           </div>
         )}
 
-        {/* ... CONTENT TAB ... */}
         {activeTab === 'content' && (
           <div className="space-y-8 animate-fadeIn">
             {/* Showreel */}
@@ -529,7 +519,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
               )}
             </div>
 
-            {/* Projects */}
             <div className="space-y-4">
                <div className="flex justify-between items-center border-b border-zinc-900 pb-2">
                  <h3 className="text-sm font-bold text-white">Project Gallery</h3>
@@ -627,36 +616,39 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
           </div>
         )}
 
-        {/* ... TOOLS TAB ... */}
+        {/* --- TOOLS TAB (VISUAL SELECTOR) --- */}
         {activeTab === 'tools' && (
-            <div className="space-y-6 animate-fadeIn">
-                <div className="space-y-4">
-                    <Input label="Primary Workflow Tool" value={data.primaryTool} onChange={e => updateField('primaryTool', e.target.value)} placeholder="e.g. DaVinci Resolve"/>
-                </div>
-                
-                <div className="space-y-2 pt-4 border-t border-zinc-900">
-                    <label className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Other Tools (Comma separated)</label>
-                    <TextArea 
-                        rows={4}
-                        value={data.tools.join(', ')} 
-                        onChange={e => updateField('tools', e.target.value.split(',').map(s => s.trim()).filter(Boolean))} 
-                        placeholder="Premiere Pro, After Effects, Photoshop..."
+            <div className="space-y-8 animate-fadeIn">
+                <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                         <h3 className="text-sm font-bold text-white uppercase tracking-wider">Editing Software</h3>
+                         <span className="text-xs text-zinc-500">{data.tools.length} Selected</span>
+                    </div>
+                    <ToolSelector 
+                        type="editing" 
+                        selectedTools={data.tools} 
+                        primaryTool={data.primaryTool} 
+                        onSelect={(tools) => updateField('tools', tools)}
+                        onSetPrimary={(tool) => updateField('primaryTool', tool)}
                     />
                 </div>
+                
+                <div className="w-full h-px bg-zinc-900"></div>
 
-                <div className="space-y-2 pt-4 border-t border-zinc-900">
-                    <label className="text-xs font-medium text-zinc-500 uppercase tracking-wider">AI Tools (Comma separated)</label>
-                    <TextArea 
-                        rows={2}
-                        value={data.aiTools.join(', ')} 
-                        onChange={e => updateField('aiTools', e.target.value.split(',').map(s => s.trim()).filter(Boolean))} 
-                        placeholder="Midjourney, RunwayML..."
+                <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                         <h3 className="text-sm font-bold text-white uppercase tracking-wider">AI Tools</h3>
+                         <span className="text-xs text-zinc-500">{data.aiTools.length} Selected</span>
+                    </div>
+                    <ToolSelector 
+                        type="ai" 
+                        selectedTools={data.aiTools} 
+                        onSelect={(tools) => updateField('aiTools', tools)}
                     />
                 </div>
             </div>
         )}
 
-        {/* ... TESTIMONIALS TAB ... */}
         {activeTab === 'testimonials' && (
             <div className="space-y-6 animate-fadeIn">
                  <div className="flex justify-between items-center mb-4">
@@ -682,7 +674,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
             </div>
         )}
 
-        {/* === SETTINGS TAB === */}
         {activeTab === 'settings' && (
            <div className="space-y-8 animate-fadeIn">
               <div className="bg-red-500/5 border border-red-500/20 rounded-2xl p-6">

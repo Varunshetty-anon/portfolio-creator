@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, Instagram, MapPin, Globe, Play, Twitter, Linkedin, Youtube, X, Volume2, VolumeX, Maximize2, ExternalLink, ArrowRight, Video } from 'lucide-react';
+import { Mail, Instagram, MapPin, Globe, Play, Twitter, Linkedin, Youtube, X, Volume2, VolumeX, Maximize2, ExternalLink, ArrowRight, Video, ArrowUpRight } from 'lucide-react';
 import { PortfolioData, Project } from '../types';
 import { getBrandColor, getDriveEmbedUrl } from '../utils';
 
@@ -44,7 +44,6 @@ const AutoPlayVideo = ({ src, thumbnail }: { src: string, thumbnail?: string }) 
                 className="w-full h-full object-cover border-0" 
                 allow="autoplay"
               />
-              {/* Overlay to catch clicks for parent lightbox trigger */}
               <div className="absolute inset-0 z-10"></div>
           </div>
       )
@@ -63,7 +62,7 @@ const AutoPlayVideo = ({ src, thumbnail }: { src: string, thumbnail?: string }) 
         playsInline
         preload="metadata"
       />
-      <div className="absolute top-4 right-4 z-30 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+      <div className="absolute bottom-4 right-4 z-30 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
           <button onClick={toggleMute} className="bg-black/60 backdrop-blur-md p-2 rounded-full text-white hover:bg-black transition-colors border border-white/10">
             {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
           </button>
@@ -94,7 +93,7 @@ const Lightbox = ({ src, type, title, onClose }: { src: string, type: 'video' | 
                         <img src={src} className="w-full max-h-[85vh] object-contain" />
                     )}
                 </div>
-                <h2 className="mt-4 text-xl font-display font-bold text-white tracking-tight">{title}</h2>
+                <h2 className="mt-6 text-2xl font-display font-bold text-white tracking-tight">{title}</h2>
             </div>
         </div>
     )
@@ -104,11 +103,10 @@ const ToolBadge: React.FC<{ name: string, isMain?: boolean }> = ({ name, isMain 
     const color = getBrandColor(name);
     return (
         <div 
-            className={`px-4 py-2 rounded-lg border flex items-center gap-3 transition-transform hover:scale-105 select-none ${isMain ? 'bg-zinc-900 border-zinc-700' : 'bg-black border-zinc-800'}`}
+            className={`px-3 py-1.5 rounded-full border flex items-center gap-2 transition-transform hover:scale-105 select-none ${isMain ? 'bg-zinc-900 border-zinc-700' : 'bg-transparent border-zinc-800'}`}
         >
-            <div className="w-2 h-2 rounded-full shadow-[0_0_8px_currentColor]" style={{ backgroundColor: color, color: color }}></div>
-            <span className="text-sm font-medium text-zinc-300 tracking-wide">{name}</span>
-            {isMain && <span className="text-[10px] uppercase text-zinc-500 font-bold tracking-wider ml-auto">Primary</span>}
+            <div className="w-1.5 h-1.5 rounded-full shadow-[0_0_8px_currentColor]" style={{ backgroundColor: color, color: color }}></div>
+            <span className="text-xs font-medium text-zinc-300 tracking-wide">{name}</span>
         </div>
     )
 }
@@ -121,230 +119,183 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview })
   };
 
   return (
-    <div className="min-h-screen bg-[#030303] text-zinc-100 font-sans selection:bg-indigo-500/30 overflow-x-hidden">
+    <div className="min-h-screen bg-[#050505] text-zinc-100 font-sans selection:bg-white/20 overflow-x-hidden">
       
       {/* Dynamic Background */}
       <div className="fixed inset-0 pointer-events-none z-0">
-          <div className="absolute top-[-20%] left-[-10%] w-[50vw] h-[50vh] bg-indigo-900/5 blur-[150px] rounded-full" />
-          <div className="absolute bottom-[-20%] right-[-10%] w-[50vw] h-[50vh] bg-blue-900/5 blur-[150px] rounded-full" />
+          <div className="absolute top-[-10%] left-[-10%] w-[40vw] h-[40vh] bg-indigo-900/5 blur-[120px] rounded-full opacity-50" />
+          <div className="absolute bottom-[-10%] right-[-10%] w-[40vw] h-[40vh] bg-purple-900/5 blur-[120px] rounded-full opacity-50" />
       </div>
 
-      <div className="max-w-[1600px] mx-auto lg:grid lg:grid-cols-12 lg:gap-20 px-6 md:px-12 py-16 relative z-10">
+      <div className="max-w-5xl mx-auto px-6 py-12 md:py-24 relative z-10 space-y-24">
           
-          {/* === LEFT SIDEBAR (IDENTITY) === */}
-          <div className="lg:col-span-5 xl:col-span-4 flex flex-col lg:sticky lg:top-16 lg:h-[calc(100vh-8rem)] mb-20 lg:mb-0">
-              
-              <div className="flex-1 flex flex-col justify-between">
-                <div>
-                    {/* Avatar */}
-                    <motion.div 
-                        initial={{ opacity: 0, scale: 0.9, filter: 'blur(10px)' }} 
-                        animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
-                        transition={{ duration: 0.8, ease: "easeOut" }}
-                        className="relative w-40 h-40 md:w-56 md:h-56 mb-12 rounded-full overflow-hidden grayscale hover:grayscale-0 transition-all duration-700 ease-out"
-                    >
-                        <img src={data.profileImage} className="w-full h-full object-cover" alt={data.name} />
-                    </motion.div>
+          {/* === HERO SECTION === */}
+          <header className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
+              <div className="flex flex-col md:flex-row gap-8 justify-between items-start md:items-end">
+                  <div className="space-y-6 max-w-2xl">
+                      {/* Avatar & Availability */}
+                      <div className="flex items-center gap-4">
+                          <div className="w-16 h-16 rounded-full overflow-hidden border border-zinc-800 bg-zinc-900">
+                             <img src={data.profileImage} className="w-full h-full object-cover" alt={data.name} />
+                          </div>
+                          <div className={`px-3 py-1 rounded-full border text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 ${data.availability.status ? 'bg-green-500/10 border-green-500/20 text-green-500' : 'bg-zinc-800 border-zinc-700 text-zinc-500'}`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${data.availability.status ? 'bg-green-500 animate-pulse' : 'bg-zinc-500'}`}></span>
+                              {data.availability.status ? 'Available for Work' : 'Currently Busy'}
+                          </div>
+                      </div>
 
-                    {/* Name & Role */}
-                    <motion.div 
-                        initial={{ opacity: 0, y: 30 }} 
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.2, duration: 0.6 }}
-                        className="mb-12"
-                    >
-                        <h1 className="text-6xl md:text-8xl font-display font-bold tracking-tighter leading-[0.85] text-white uppercase mb-6">
-                            {data.name}
+                      <div className="space-y-2">
+                        <h1 className="text-5xl md:text-8xl font-display font-bold tracking-tighter text-white leading-[0.9]">
+                            {data.name || "YOUR NAME"}
                         </h1>
-                        <p className="text-xl md:text-2xl text-indigo-400 font-medium tracking-tight">
-                            {data.role}
+                        <p className="text-xl md:text-3xl text-zinc-400 font-medium tracking-tight">
+                            {data.role || "Creative Director"}
                         </p>
-                    </motion.div>
+                      </div>
+                      
+                      <p className="text-lg text-zinc-500 leading-relaxed max-w-lg">
+                          {data.bio}
+                      </p>
+                  </div>
 
-                    {/* Bio */}
-                    <motion.div 
-                        initial={{ opacity: 0 }} 
-                        animate={{ opacity: 1 }}
-                        transition={{ delay: 0.4 }}
-                        className="mb-12"
-                    >
-                        <p className="text-zinc-400 leading-relaxed text-lg max-w-md font-light border-l-2 border-zinc-800 pl-6">
-                            {data.bio}
-                        </p>
-                    </motion.div>
-
-                    {/* Status & Location */}
-                    <motion.div 
-                         initial={{ opacity: 0 }} 
-                         animate={{ opacity: 1 }}
-                         transition={{ delay: 0.5 }}
-                         className="flex gap-4 mb-12"
-                    >
-                         <div className={`px-4 py-2 rounded-full border ${data.availability.status ? 'bg-green-900/10 border-green-500/20 text-green-400' : 'bg-red-900/10 border-red-500/20 text-red-400'} flex items-center gap-2 text-xs font-bold uppercase tracking-widest`}>
-                             <span className={`w-2 h-2 rounded-full ${data.availability.status ? 'bg-green-500' : 'bg-red-500'} animate-pulse`}></span>
-                             {data.availability.status ? 'Available for Work' : 'Busy'}
-                         </div>
-                    </motion.div>
-
-                    {/* Socials */}
-                    <motion.div 
-                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}
-                        className="flex flex-wrap gap-4"
-                    >
-                        {Object.entries(data.socials).map(([key, val]) => {
+                  {/* Socials */}
+                  <div className="flex gap-2 flex-wrap justify-end">
+                      {Object.entries(data.socials).map(([key, val]) => {
                            if (!val) return null;
                            const Icon = { instagram: Instagram, twitter: Twitter, youtube: Youtube, linkedin: Linkedin, email: Mail }[key] || Globe;
                            return (
                                <a key={key} href={key === 'email' ? `mailto:${val}` : getSocialUrl(key, val as string)} target="_blank" rel="noopener noreferrer" 
-                                  className="w-12 h-12 flex items-center justify-center rounded-full bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 hover:scale-110 transition-all duration-300">
-                                   <Icon size={20} />
+                                  className="w-10 h-10 flex items-center justify-center rounded-full bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 hover:border-zinc-700 transition-all duration-200">
+                                   <Icon size={18} />
                                </a>
                            )
                         })}
-                    </motion.div>
-                </div>
+                  </div>
               </div>
-          </div>
 
-          {/* === RIGHT CONTENT (SCROLLABLE) === */}
-          <div className="lg:col-span-7 xl:col-span-8 flex flex-col gap-32 pb-32">
-              
-              {/* SKILLS */}
-              {data.tools.length > 0 && (
-                 <motion.div 
-                    initial={{ opacity: 0, y: 20 }} 
-                    animate={{ opacity: 1, y: 0 }} 
-                    transition={{ delay: 0.3 }}
-                 >
-                    <h2 className="text-sm font-bold text-zinc-500 uppercase tracking-widest mb-8">Skills & Stack</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {data.primaryTool && (
-                            <div className="col-span-1 md:col-span-2">
-                                <ToolBadge name={data.primaryTool} isMain />
-                            </div>
-                        )}
-                        {data.tools.map(t => <ToolBadge key={t} name={t} />)}
-                    </div>
-                 </motion.div>
+              {/* Skills Ticker */}
+              {(data.primaryTool || data.tools.length > 0) && (
+                  <div className="flex flex-wrap gap-2 pt-4 border-t border-zinc-900/50">
+                      {data.primaryTool && <ToolBadge name={data.primaryTool} isMain />}
+                      {data.tools.map(t => <ToolBadge key={t} name={t} />)}
+                  </div>
               )}
+          </header>
 
-              {/* SHOWREEL SECTION */}
-              {data.showreelLink && (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 40 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    className="relative w-full group cursor-pointer"
+          {/* === SHOWREEL SECTION === */}
+          {data.showreelLink && (
+              <section className="space-y-6 animate-in fade-in slide-in-from-bottom-8 duration-1000 delay-100">
+                  <div className="flex items-center gap-4">
+                      <h2 className="text-xs font-bold text-zinc-600 uppercase tracking-widest">Showreel</h2>
+                      <div className="h-px bg-zinc-900 flex-1"></div>
+                  </div>
+                  
+                  <div 
+                    className="aspect-video w-full bg-zinc-900 rounded-xl overflow-hidden shadow-2xl border border-zinc-800 relative group cursor-pointer"
                     onClick={() => setSelectedProject({ id: 'reel', title: 'Showreel', link: data.showreelLink, type: 'video' } as any)}
                   >
-                      <h2 className="text-4xl font-display font-bold text-white mb-8">Showreel</h2>
+                      <AutoPlayVideo src={data.showreelLink} thumbnail={data.showreelThumbnail} />
                       
-                      <div className="relative aspect-video rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-800 shadow-2xl">
-                          <AutoPlayVideo src={data.showreelLink} thumbnail={data.showreelThumbnail} />
-                          
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/10 group-hover:bg-black/30 transition-colors duration-300">
-                                <div className="flex items-center gap-2 px-6 py-3 bg-black/80 backdrop-blur rounded-full border border-white/10 text-white opacity-0 group-hover:opacity-100 transform translate-y-4 group-hover:translate-y-0 transition-all duration-300">
-                                    <Maximize2 size={16} />
-                                    <span className="text-xs font-bold uppercase tracking-widest">Fullscreen</span>
-                                </div>
-                          </div>
-                      </div>
-                  </motion.div>
-              )}
-
-              {/* WORKS */}
-              {data.projects.length > 0 && (
-                  <div className="space-y-16">
-                      <div className="flex items-end gap-4 border-b border-zinc-900 pb-8">
-                          <h2 className="text-4xl font-display font-bold text-white">Selected Works</h2>
-                          <span className="text-zinc-600 font-mono text-sm pb-2">({data.projects.length})</span>
-                      </div>
-                      
-                      <div className="flex flex-col gap-24">
-                          {data.projects.map((p, index) => (
-                              <motion.div 
-                                key={p.id}
-                                initial={{ opacity: 0, y: 50 }}
-                                whileInView={{ opacity: 1, y: 0 }}
-                                viewport={{ once: true, margin: "-50px" }}
-                                transition={{ delay: index * 0.1 }}
-                                className="group cursor-pointer grid grid-cols-1 md:grid-cols-2 gap-8 items-center"
-                                onClick={() => setSelectedProject(p)}
-                              >
-                                 <div className={`relative w-full bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800 transition-all duration-500 group-hover:border-zinc-600 group-hover:shadow-2xl ${p.aspectRatio === '9:16' ? 'aspect-[9/16] max-w-[300px]' : 'aspect-video'}`}>
-                                     <img src={p.thumbnail} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 opacity-80 group-hover:opacity-100" />
-                                     
-                                     {/* Hover Overlay */}
-                                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                                         <div className="w-16 h-16 rounded-full bg-white text-black flex items-center justify-center transform scale-50 group-hover:scale-100 transition-transform duration-300 shadow-xl">
-                                             {p.type === 'image' ? <Maximize2 size={24}/> : <Play size={24} fill="currentColor" className="ml-1"/>}
-                                         </div>
-                                     </div>
-                                 </div>
-
-                                 <div className="flex flex-col gap-4">
-                                     <h3 className="text-3xl font-bold font-display text-white group-hover:text-indigo-400 transition-colors">{p.title}</h3>
-                                     <span className="text-xs font-bold px-2 py-1 bg-zinc-900 w-fit rounded text-zinc-400 uppercase tracking-wider">{p.category}</span>
-                                     <p className="text-zinc-400 text-base leading-relaxed border-l border-zinc-800 pl-4">{p.description}</p>
-                                     <div className="pt-4 flex items-center gap-2 text-sm font-bold text-white group-hover:translate-x-2 transition-transform">
-                                         View Project <ArrowRight size={16} />
-                                     </div>
-                                 </div>
-                              </motion.div>
-                          ))}
+                      {/* Play Overlay */}
+                      <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center backdrop-blur-[2px]">
+                           <div className="flex items-center gap-3 px-6 py-3 bg-white text-black rounded-full font-bold transform scale-90 group-hover:scale-100 transition-transform">
+                               <Play size={18} fill="currentColor"/>
+                               <span>Watch Full Reel</span>
+                           </div>
                       </div>
                   </div>
-              )}
+              </section>
+          )}
 
-              {/* TESTIMONIALS */}
-              {data.testimonials.length > 0 && (
-                  <div className="space-y-12">
-                       <h2 className="text-sm font-bold text-zinc-500 uppercase tracking-widest">Endorsements</h2>
-                       <div className="grid grid-cols-1 gap-8">
-                           {data.testimonials.map(t => (
-                               <div key={t.id} className="p-10 bg-zinc-900/30 border border-zinc-800 rounded-2xl hover:bg-zinc-900/50 transition-colors">
-                                   <div className="mb-6 text-indigo-500"><span className="text-6xl font-serif opacity-30">"</span></div>
-                                   <p className="text-xl text-zinc-200 mb-8 font-light leading-relaxed -mt-8">{t.quote}</p>
-                                   <div className="flex items-center gap-4">
-                                       <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-sm font-bold text-white">
-                                           {t.name.charAt(0)}
-                                       </div>
-                                       <div>
-                                           <p className="font-bold text-white text-base">{t.name}</p>
-                                           <p className="text-xs text-zinc-500 uppercase tracking-wider">{t.role}</p>
-                                       </div>
+          {/* === PROJECTS SECTION === */}
+          {data.projects.length > 0 && (
+             <section className="space-y-12">
+                 <div className="flex items-end justify-between border-b border-zinc-900 pb-6">
+                     <h2 className="text-3xl md:text-5xl font-display font-bold text-white tracking-tight">Selected Works</h2>
+                     <span className="text-zinc-600 font-mono text-sm pb-1">({data.projects.length})</span>
+                 </div>
+
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-16">
+                    {data.projects.map((p, index) => (
+                        <motion.div 
+                            key={p.id}
+                            initial={{ opacity: 0, y: 30 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true, margin: "-50px" }}
+                            transition={{ delay: index * 0.1 }}
+                            className="group cursor-pointer space-y-4"
+                            onClick={() => setSelectedProject(p)}
+                        >
+                            {/* Thumbnail */}
+                            <div className={`relative w-full bg-zinc-900 rounded-lg overflow-hidden border border-zinc-800 transition-all duration-500 group-hover:border-zinc-600 group-hover:shadow-2xl ${p.aspectRatio === '9:16' ? 'aspect-[9/16] max-w-[280px]' : 'aspect-video'}`}>
+                                <img src={p.thumbnail} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 opacity-90 group-hover:opacity-100" />
+                                <div className="absolute top-3 right-3 bg-black/60 backdrop-blur px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider text-white border border-white/10">
+                                    {p.category}
+                                </div>
+                            </div>
+
+                            {/* Info */}
+                            <div className="space-y-2">
+                                <div className="flex justify-between items-start">
+                                    <h3 className="text-2xl font-display font-bold text-white group-hover:text-indigo-400 transition-colors">{p.title}</h3>
+                                    <ArrowUpRight size={20} className="text-zinc-600 group-hover:text-white transition-colors opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 transition-all"/>
+                                </div>
+                                <p className="text-sm text-zinc-500 line-clamp-2 leading-relaxed">{p.description}</p>
+                            </div>
+                        </motion.div>
+                    ))}
+                 </div>
+             </section>
+          )}
+
+          {/* === TESTIMONIALS === */}
+          {data.testimonials.length > 0 && (
+              <section className="space-y-8">
+                  <h2 className="text-xs font-bold text-zinc-600 uppercase tracking-widest">Endorsements</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                       {data.testimonials.map(t => (
+                           <div key={t.id} className="p-8 bg-zinc-900/20 border border-zinc-800 rounded-xl hover:border-zinc-700 transition-colors">
+                               <p className="text-lg text-zinc-300 font-light italic mb-6">"{t.quote}"</p>
+                               <div className="flex items-center gap-3">
+                                   <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-xs font-bold text-zinc-400">
+                                       {t.name.charAt(0)}
+                                   </div>
+                                   <div>
+                                       <div className="text-sm font-bold text-white">{t.name}</div>
+                                       <div className="text-xs text-zinc-600 uppercase tracking-wider">{t.role}</div>
                                    </div>
                                </div>
-                           ))}
-                       </div>
+                           </div>
+                       ))}
                   </div>
+              </section>
+          )}
+          
+          {/* === FOOTER CTA === */}
+           <section className="py-24 border-t border-zinc-900 text-center space-y-8">
+              <h2 className="text-4xl md:text-7xl font-display font-bold text-white tracking-tighter">Let's create together.</h2>
+              <p className="text-zinc-500 max-w-lg mx-auto text-lg">
+                  I'm currently accepting new projects. Reach out if you want to build something distinctive.
+              </p>
+              <div className="pt-4">
+                  <a href={`mailto:${data.contactEmail}`} className="inline-flex items-center gap-2 bg-white text-black px-8 py-4 rounded-full font-bold text-lg hover:bg-zinc-200 transition-colors group">
+                      <Mail size={20} />
+                      <span>Get in Touch</span>
+                      <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform"/>
+                  </a>
+              </div>
+           </section>
+
+           {/* Branding Footer */}
+           <div className="flex justify-between items-center text-[10px] uppercase tracking-widest text-zinc-700 pb-8">
+              <span>{data.name} © {new Date().getFullYear()}</span>
+              {!isPreview && (
+                  <button onClick={handleCreateOwn} className="hover:text-zinc-400 transition-colors">
+                      Built with Frames
+                  </button>
               )}
-              
-              {/* CTA */}
-              <div className="p-12 bg-zinc-900/50 border border-zinc-800 rounded-3xl text-center space-y-8">
-                   <h2 className="text-4xl font-display font-bold text-white">Ready to collaborate?</h2>
-                   <p className="text-zinc-400 max-w-lg mx-auto">I'm currently available for freelance projects and long-term partnerships. Let's make something loud.</p>
-                   <div className="flex flex-col md:flex-row gap-4 justify-center">
-                       <a href={`mailto:${data.contactEmail}`} className="px-8 py-4 bg-white text-black font-bold rounded-xl hover:bg-zinc-200 transition-colors">
-                           Start a Project
-                       </a>
-                   </div>
-              </div>
+           </div>
 
-              {/* FOOTER */}
-              <div className="pt-12 border-t border-zinc-900 flex justify-between items-center text-xs uppercase tracking-widest text-zinc-600">
-                  <div>{data.name} © {new Date().getFullYear()}</div>
-                  <div className="flex items-center gap-4">
-                      {!isPreview && (
-                          <button onClick={handleCreateOwn} className="hover:text-white transition-colors flex items-center gap-1 group">
-                             Create your own portfolio <ArrowRight size={10} className="group-hover:translate-x-1 transition-transform"/>
-                          </button>
-                      )}
-                      <span>Powered by Frames</span>
-                  </div>
-              </div>
-
-          </div>
       </div>
 
       {/* Lightbox Portal */}

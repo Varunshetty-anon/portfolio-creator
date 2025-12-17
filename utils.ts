@@ -11,10 +11,45 @@ const LOCAL_STORAGE_KEY = 'frames_portfolio_data';
 export { isConfigured, auth };
 export const hasCloudStorage = !!storage;
 
+// --- CONSTANTS ---
+export const EDITING_TOOLS_LIST = [
+  { name: 'Premiere Pro', slug: 'adobepremierepro', color: '#9999FF' },
+  { name: 'After Effects', slug: 'adobeaftereffects', color: '#9999FF' },
+  { name: 'DaVinci Resolve', slug: 'davinciresolve', color: '#ff4747' },
+  { name: 'Final Cut Pro', slug: 'apple', color: '#ffffff' },
+  { name: 'CapCut', slug: 'tiktok', color: '#000000' },
+  { name: 'Avid Media Composer', slug: 'avid', color: '#6600cc' },
+  { name: 'Blender', slug: 'blender', color: '#EA7600' },
+  { name: 'Cinema 4D', slug: 'cinema4d', color: '#002E70' },
+  { name: 'Unreal Engine', slug: 'unrealengine', color: '#0E1128' },
+  { name: 'Photoshop', slug: 'adobephotoshop', color: '#31A8FF' },
+  { name: 'Illustrator', slug: 'adobeillustrator', color: '#FF9A00' },
+  { name: 'Sony Vegas', slug: 'sony', color: '#ffffff' },
+  { name: 'Nuke', slug: 'thefoundry', color: '#F7C429' },
+  { name: 'Maya', slug: 'autodesk', color: '#37A5CC' },
+  { name: 'Houdini', slug: 'houdini', color: '#FF4611' }
+];
+
+export const AI_TOOLS_LIST = [
+  { name: 'Midjourney', slug: 'midjourney', color: '#ffffff' },
+  { name: 'RunwayML', slug: 'runwayml', color: '#FA5B8E' },
+  { name: 'ChatGPT', slug: 'openai', color: '#10A37F' },
+  { name: 'DALL-E', slug: 'openai', color: '#10A37F' },
+  { name: 'Stable Diffusion', slug: 'stabilityai', color: '#ffffff' },
+  { name: 'Topaz Video AI', slug: 'topaz', color: '#ffffff' },
+  { name: 'Luma Dream Machine', slug: 'luma', color: '#ffffff' },
+  { name: 'Pika Labs', slug: 'pika', color: '#ffffff' },
+  { name: 'Kling AI', slug: 'kling', color: '#ffffff' },
+  { name: 'ElevenLabs', slug: 'elevenlabs', color: '#ffffff' },
+  { name: 'Sora', slug: 'openai', color: '#ffffff' },
+  { name: 'Google Veo', slug: 'google', color: '#4285F4' },
+  { name: 'Descript', slug: 'descript', color: '#17E088' },
+  { name: 'Submagic', slug: 'magic', color: '#F6ADF6' }
+];
+
 // --- Helpers ---
 export const getDriveEmbedUrl = (url: string): string | null => {
     if (!url) return null;
-    // Extract ID from common Drive URL patterns
     const patterns = [
         /\/file\/d\/([a-zA-Z0-9_-]+)/,
         /id=([a-zA-Z0-9_-]+)/,
@@ -27,7 +62,7 @@ export const getDriveEmbedUrl = (url: string): string | null => {
             return `https://drive.google.com/file/d/${match[1]}/preview`;
         }
     }
-    return null; // Return null if not a valid Drive link
+    return null;
 };
 
 
@@ -84,24 +119,14 @@ const stringToColor = (str: string, saturation = 60, lightness = 60) => {
   return `hsl(${h}, ${saturation}%, ${lightness}%)`;
 };
 
-export const getIconSlug = (name: string): string => {
-    const n = name.toLowerCase().replace(/[^a-z0-9]/g, '');
-    if (n.includes('davinci')) return 'davinciresolve';
-    if (n.includes('premiere')) return 'adobepremierepro';
-    if (n.includes('aftereffect')) return 'adobeaftereffects';
-    if (n.includes('photoshop')) return 'adobephotoshop';
-    if (n.includes('illustrator')) return 'adobeillustrator';
-    if (n.includes('lightroom')) return 'adobelightroom';
-    if (n.includes('audition')) return 'adobeaudition';
-    if (n.includes('creativecloud')) return 'adobecreativecloud';
-    if (n.includes('finalcut')) return 'apple';
-    if (n.includes('unreal')) return 'unrealengine';
-    if (n.includes('c4d') || n.includes('cinema4d')) return 'cinema4d';
-    if (n.includes('substance')) return 'adobe-substance-3d-painter';
-    return n;
-};
-
 export const getBrandColor = (name: string): string => {
+    // Check our predefined lists first
+    const editTool = EDITING_TOOLS_LIST.find(t => t.name === name);
+    if (editTool) return editTool.color;
+    
+    const aiTool = AI_TOOLS_LIST.find(t => t.name === name);
+    if (aiTool) return aiTool.color;
+
     const n = name.toLowerCase();
     if (n.includes('davinci') || n.includes('resolve')) return '#ff4747';
     if (n.includes('premiere')) return '#9999FF';
@@ -268,17 +293,12 @@ export const checkUsernameAvailable = async (username: string): Promise<boolean>
 };
 
 export const saveToDB = async (data: PortfolioData): Promise<void> => {
-  // Guard against missing UID
   if (!data.uid || data.uid === 'guest') {
      console.warn("Attempted to save data without a valid UID. Skipping.");
      return;
   }
 
   const dataToSave: any = { ...data };
-
-  // CRITICAL: Filter out any Blob URLs that might have been set locally to prevent Firestore bloat/errors
-  // Use a placeholder or ensure they are uploaded before calling saveToDB in components
-  // Here we just ensure we don't crash firestore with data:urls if they slipped through
   
   if (dataToSave.projects) {
       dataToSave.projects = dataToSave.projects.map((p: any) => {
@@ -289,23 +309,19 @@ export const saveToDB = async (data: PortfolioData): Promise<void> => {
       });
   }
   
-  // Remove blobs
   delete dataToSave.profileImageBlob;
   delete dataToSave.showreelThumbnailBlob;
   delete dataToSave.showreelBlob;
 
-  // Save to Firestore using UID
   if (isConfigured && db) {
       try {
-          // Save under UID for user retrieval
           await setDoc(doc(db, COLLECTION_NAME, data.uid), dataToSave);
       } catch (e) {
           console.warn("Firestore save failed", e);
-          throw e; // Propagate error to App.tsx for handling
+          throw e; 
       }
   }
 
-  // Local Storage Backup
   try {
      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(dataToSave));
   } catch (e) {}
@@ -315,20 +331,14 @@ export const loadFromDB = async (identifier?: string): Promise<PortfolioData | n
   if (isConfigured && db) {
       try {
         let docSnap;
-        
-        // 1. Try Direct UID match (Editor Mode)
         if (identifier) {
             const docRef = doc(db, COLLECTION_NAME, identifier);
             try {
                 docSnap = await getDoc(docRef);
-            } catch (e) {
-                // Ignore specific errors if just checking
-            }
+            } catch (e) {}
         }
 
-        // 2. If not found or if identifier looks like a username (Public Mode)
         if (!docSnap || !docSnap.exists()) {
-             // Query by username
              const q = query(collection(db, COLLECTION_NAME), where("username", "==", identifier));
              const querySnap = await getDocs(q);
              if (!querySnap.empty) {
@@ -341,7 +351,7 @@ export const loadFromDB = async (identifier?: string): Promise<PortfolioData | n
         }
       } catch (e) {
         console.warn("Firestore load failed", e);
-        throw e; // Re-throw to handle permissions in App.tsx
+        throw e;
       }
   }
   return null;
