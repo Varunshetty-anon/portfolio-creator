@@ -4,7 +4,6 @@ import { EditorPanel } from './components/EditorPanel';
 import { OnboardingFlow } from './components/OnboardingFlow';
 import { PortfolioData, INITIAL_DATA, DEMO_DATA } from './types';
 import { loadFromDB, saveToDB, isConfigured, auth, loginWithEmail, signupWithEmail, loginWithGoogle, checkUsernameAvailable, checkPortfolioReadiness } from './utils';
-// Added Eye and EyeOff to fix the 'Cannot find name Eye' error and improve UI feedback
 import { Loader2, ShieldAlert, X, PenTool, Eye, EyeOff } from 'lucide-react';
 import { Button } from './components/ui/Button';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -41,22 +40,17 @@ const App: React.FC = () => {
     const initApp = async () => {
         setIsLoading(true);
         
-        // 1. URL Analysis (Handle /v/username and #username)
-        // Hash is most reliable for SPA routing in varied environments
         const path = window.location.pathname;
         const hash = getHash();
         let slug = '';
 
-        // Extract slug from hash first (Priority)
         if (hash && hash !== '#editor' && hash !== '#' && !hash.startsWith('#access_token')) {
             slug = hash.replace('#', '').split('/')[0].split('?')[0];
         } 
-        // Fallback to path extraction
         else if (path.includes('/v/')) {
             slug = path.split('/v/')[1].split('/')[0].split('?')[0];
         }
 
-        // 2. PUBLIC ROUTE (Priority: High)
         if (slug && slug !== 'editor') {
             try {
                 const publicData = await loadFromDB(slug);
@@ -80,7 +74,6 @@ const App: React.FC = () => {
             }
         }
 
-        // 3. EDITOR/HOME ROUTE - Auth Required
         if (isConfigured && auth) {
             onAuthStateChanged(auth, async (user) => {
                 if (user) {
@@ -175,12 +168,20 @@ const App: React.FC = () => {
     if (!dataToSave) return;
     setIsSaving(true);
     try {
+      // Ensure we have the latest UID or identifier for the update
       await saveToDB(dataToSave);
       setHasUnsavedChanges(false);
       if (newData) setData(newData);
+      
+      // Update share link hash if username changed
+      if (dataToSave.username && window.location.hash !== `#${dataToSave.username}`) {
+         window.location.hash = dataToSave.username;
+      }
+      
       setTimeout(() => setIsSaving(false), 800);
     } catch (e: any) {
       setIsSaving(false);
+      console.error("Save failed:", e);
       if (e.code === 'permission-denied') setPermissionError(true);
     }
   };
@@ -296,7 +297,6 @@ const App: React.FC = () => {
                    <div className="relative">
                        <input type={showPassword ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)} className="w-full bg-black/50 border border-zinc-700 rounded-lg px-4 py-3 text-white text-sm focus:border-indigo-500 focus:outline-none pr-10 transition-all" placeholder="••••••••" required />
                        <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white transition-colors">
-                           {/* Corrected: Added Eye icon and implemented visibility toggle with EyeOff */}
                            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                        </button>
                    </div>

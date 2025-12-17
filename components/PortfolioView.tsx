@@ -130,11 +130,11 @@ const HeroContent: React.FC<{ data: PortfolioData; isMobile?: boolean }> = ({ da
             variants={staggerContainer} 
             initial="initial" 
             animate="animate" 
-            className={`flex flex-col relative ${isMobile ? 'items-center text-center px-4 py-12 overflow-hidden' : 'items-start text-left'}`}
+            className={`flex flex-col relative ${isMobile ? 'items-center text-center px-4 py-16 overflow-hidden min-h-[60vh] justify-center' : 'items-start text-left'}`}
         >
             {isMobile && (
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0 opacity-5 select-none pointer-events-none">
-                    <h2 className="text-[25vw] font-display font-black text-white tracking-tighter uppercase whitespace-nowrap">
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0 opacity-5 select-none pointer-events-none w-full text-center">
+                    <h2 className="text-[28vw] font-display font-black text-white tracking-tighter uppercase leading-none whitespace-nowrap">
                         PORTFOLIO
                     </h2>
                 </div>
@@ -142,12 +142,12 @@ const HeroContent: React.FC<{ data: PortfolioData; isMobile?: boolean }> = ({ da
 
             <motion.div 
                 variants={fadeInUp} 
-                className="relative mb-8 group z-10"
+                className="relative mb-10 group z-10"
             >
-                <div className="absolute -inset-4 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full blur-2xl opacity-10 group-hover:opacity-30 transition-opacity duration-500" />
-                <div className={`${isMobile ? 'w-64 h-64' : 'w-48 h-48 lg:w-56 lg:h-56'} rounded-full overflow-hidden border-[8px] border-zinc-900 shadow-[0_0_50px_rgba(0,0,0,0.5)] relative z-10 transition-transform duration-500 hover:scale-[1.02]`}>
+                <div className="absolute -inset-6 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full blur-3xl opacity-10 group-hover:opacity-30 transition-opacity duration-500" />
+                <div className={`${isMobile ? 'w-64 h-64 sm:w-80 sm:h-80' : 'w-48 h-48 lg:w-56 lg:h-56'} rounded-full overflow-hidden border-[8px] border-zinc-900 shadow-[0_0_80px_rgba(0,0,0,0.6)] relative z-10 transition-transform duration-500 hover:scale-[1.03]`}>
                     <img src={data.profileImage} className="w-full h-full object-cover" alt={data.name} loading="lazy" />
-                    <div className={`absolute bottom-8 right-8 w-8 h-8 rounded-full border-4 border-zinc-900 z-20 ${data.availability.status ? 'bg-green-500 shadow-[0_0_15px_#22c55e]' : 'bg-red-500'}`}></div>
+                    <div className={`absolute bottom-8 right-8 ${isMobile ? 'w-10 h-10' : 'w-8 h-8'} rounded-full border-4 border-zinc-900 z-20 ${data.availability.status ? 'bg-green-500 shadow-[0_0_20px_#22c55e]' : 'bg-red-500 shadow-[0_0_20px_#ef4444]'}`}></div>
                 </div>
             </motion.div>
 
@@ -158,7 +158,7 @@ const HeroContent: React.FC<{ data: PortfolioData; isMobile?: boolean }> = ({ da
                         {data.availability.status ? 'Available for Work' : 'Unavailable'}
                     </div>
                     
-                    <h1 className={`${isMobile ? 'text-6xl' : 'text-5xl md:text-7xl lg:text-8xl'} font-display font-black text-white tracking-tighter leading-[0.85] uppercase`}>
+                    <h1 className={`${isMobile ? 'text-6xl sm:text-7xl' : 'text-5xl md:text-7xl lg:text-8xl'} font-display font-black text-white tracking-tighter leading-[0.85] uppercase`}>
                         {data.name || "YOUR NAME"}
                     </h1>
                     

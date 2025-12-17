@@ -1,7 +1,6 @@
-
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { motion } from 'framer-motion'; // Added missing motion import
+import { motion } from 'framer-motion';
 import { PortfolioData, Project, Testimonial } from '../types';
 import { Input, TextArea } from './ui/Input';
 import { Button } from './ui/Button';
@@ -530,7 +529,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
                             showreelUploading ? (
                                 <div className="h-64 border-2 border-dashed border-zinc-700 bg-black/30 rounded-2xl flex flex-col items-center justify-center p-8">
                                     <div className="w-full max-w-sm h-2 bg-zinc-800 rounded-full overflow-hidden mb-4">
-                                        {/* Added motion import to fix missing name error */}
                                         <motion.div 
                                             className="h-full bg-indigo-500" 
                                             initial={{ width: 0 }} 
@@ -622,7 +620,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
                                 {isUploading ? (
                                     <div className="p-6 bg-zinc-800/20 border border-zinc-800/50 rounded-xl flex flex-col items-center gap-3">
                                         <div className="w-full h-1.5 bg-zinc-900 rounded-full overflow-hidden">
-                                            {/* Added motion import to fix missing name error */}
                                             <motion.div className="h-full bg-indigo-500" initial={{ width: 0 }} animate={{ width: `${uploadingState.progress}%` }} />
                                         </div>
                                         <span className="text-xs text-indigo-400 font-mono">UPLOADING... {Math.round(uploadingState.progress)}%</span>
