@@ -9,7 +9,6 @@ service firebase.storage {
     }
 
     // Check Firestore to see if the user's portfolio is currently published.
-    // This aligns storage visibility with the Firestore 'publish.isPublished' flag.
     function isPortfolioPublished(userId) {
       let portfolioPath = /databases/(default)/documents/portfolios/$(userId);
       return firestore.exists(portfolioPath) &&
@@ -17,17 +16,31 @@ service firebase.storage {
     }
 
     // --- USER MEDIA ---
-    // All user content is stored under users/{userId}/...
-    match /users/{userId}/{allPaths=**} {
+    match /users/{userId} {
       
-      // WRITE: Strictly Private.
-      // Only the authenticated owner can upload, delete, or update files.
-      allow write: if isOwner(userId);
+      // 1. Owner Access (Global for User)
+      // Authenticated owners have full R/W access to their entire directory.
+      // This ensures cleanup scripts and editor uploads work everywhere.
+      match /{allPaths=**} {
+        allow read, write: if isOwner(userId);
+      }
       
-      // READ: Conditional Public Access.
-      // 1. The owner can always read their own files (Editor/Preview).
-      // 2. The public can read files ONLY if the portfolio is published.
-      allow read: if isOwner(userId) || isPortfolioPublished(userId);
+      // 2. Public Read Access (Specific Subfolders Only)
+      // Only these folders are exposed, and only if the portfolio is published.
+      
+      match /profile/{allPaths=**} {
+        allow read: if isPortfolioPublished(userId);
+      }
+      
+      match /projects/{allPaths=**} {
+        allow read: if isPortfolioPublished(userId);
+      }
+      
+      match /showreels/{allPaths=**} {
+        allow read: if isPortfolioPublished(userId);
+      }
+      
+      // Note: All other folders (e.g. 'drafts', root files) are implicitly denied to the public.
     }
   }
 }

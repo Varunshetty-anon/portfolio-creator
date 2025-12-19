@@ -650,7 +650,8 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                         const url = URL.createObjectURL(blob);
                         updateField('profileImage', url);
                         setCropModal({ open: false, src: null });
-                        const uploadUrl = await uploadFileToStorage(new File([blob], 'profile.jpg'), `users/${data.uid}/profile_${Date.now()}.jpg`);
+                        // UPDATED: Upload to dedicated profile folder
+                        const uploadUrl = await uploadFileToStorage(new File([blob], 'profile.jpg'), `users/${data.uid}/profile/avatar_${Date.now()}.jpg`);
                         updateField('profileImage', uploadUrl);
                     }}>Save Photo</Button>
                 </div>

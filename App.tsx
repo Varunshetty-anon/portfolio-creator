@@ -54,17 +54,17 @@ const App: React.FC = () => {
 
         // 1. PUBLIC ROUTE CHECK
         // Supports both Hash (#varun) and Path (/v/varun) routing
-        const hash = window.location.hash.replace('#', '');
         const path = window.location.pathname;
+        const hash = window.location.hash.replace('#', '');
         let slug = null;
         
-        if (path.includes('/v/')) {
-            // Extract slug from /v/username/path...
-            const parts = path.split('/v/');
-            if (parts.length > 1) {
-                slug = parts[1].split('/')[0]; // Take segment after /v/ and before next /
-            }
+        // Priority to Path Routing /v/:username
+        // We use a regex to cleanly extract the username segment immediately after /v/
+        const pathMatch = path.match(/^\/v\/([^/]+)/);
+        if (pathMatch) {
+            slug = pathMatch[1];
         } else if (hash && !['editor', 'onboarding'].includes(hash)) {
+            // Fallback to Hash Routing for legacy links or simple hosting
             slug = hash;
         }
 
