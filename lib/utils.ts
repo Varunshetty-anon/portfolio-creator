@@ -62,11 +62,12 @@ export const AI_TOOLS_LIST = [
 // --- Helpers ---
 
 export const getAspectRatioFromDims = (w: number, h: number): '16:9' | '9:16' | '4:3' | '1:1' => {
+  if (!w || !h) return '16:9';
   const ratio = w / h;
-  if (ratio > 1.7) return '16:9';
-  if (ratio < 0.6) return '9:16';
-  if (ratio > 1.3) return '4:3';
-  return '1:1';
+  if (ratio >= 1.6) return '16:9'; // Covers 16:9, 21:9
+  if (ratio <= 0.8) return '9:16'; // Covers 9:16
+  if (ratio >= 1.2 && ratio <= 1.5) return '4:3'; // Covers 4:3
+  return '1:1'; // Covers 1:1 and others
 };
 
 export const probeImageDimensions = (url: string): Promise<{ width: number; height: number }> => {
@@ -127,16 +128,13 @@ export const getVideoMetadata = async (url: string): Promise<{ thumbnail: string
     try {
         if (url.includes('youtube.com') || url.includes('youtu.be')) {
             thumbnail = getYouTubeThumbnail(url);
-            // Attempt to get AR from oEmbed, fallback to 16:9
             try {
                 const res = await fetch(`https://www.youtube.com/oembed?url=${url}&format=json`);
                 const data = await res.json();
                 if (data.width && data.height) {
                     aspectRatio = getAspectRatioFromDims(data.width, data.height);
                 }
-            } catch (e) { 
-                // Ignore oEmbed errors (CORS), default to 16:9
-            }
+            } catch (e) {}
         } 
         else if (url.includes('drive.google.com')) {
             thumbnail = getDriveThumbnail(url);
@@ -145,9 +143,7 @@ export const getVideoMetadata = async (url: string): Promise<{ thumbnail: string
                     // Drive thumbnails usually preserve aspect ratio of the video
                     const dims = await probeImageDimensions(thumbnail);
                     aspectRatio = getAspectRatioFromDims(dims.width, dims.height);
-                } catch (e) { 
-                    // Ignore probe errors, default to 16:9
-                }
+                } catch (e) {}
             }
         }
     } catch (e) {
@@ -380,8 +376,16 @@ export const getPortfolioStats = async (uid: string): Promise<{ views: number; c
 export const uploadFileToStorage = (file: File, path: string, onProgress?: (progress: number) => void): Promise<string> => {
   return new Promise((resolve, reject) => {
     if (!storage) return reject(new Error("Storage not configured"));
+    
     const storageRef = ref(storage, path);
-    const uploadTask = uploadBytesResumable(storageRef, file);
+    // Explicitly set content type to ensure browser handles playback correctly
+    const metadata = {
+        contentType: file.type || 'video/mp4',
+        cacheControl: 'public, max-age=31536000'
+    };
+
+    const uploadTask = uploadBytesResumable(storageRef, file, metadata);
+
     uploadTask.on('state_changed', 
       (snapshot) => {
         const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
@@ -404,11 +408,10 @@ export const generateThumbnailFromVideo = (file: File): Promise<{ url: string; b
     video.muted = true;
     video.src = URL.createObjectURL(file);
     
-    // Set a timeout to prevent infinite hanging
-    const timeout = setTimeout(() => reject(new Error("Video load timeout")), 5000);
+    const timeout = setTimeout(() => reject(new Error("Video load timeout")), 8000);
 
     video.onloadedmetadata = () => {
-        // Seek to 1s or 25% of duration, whichever is smaller, to avoid black frame at 0
+        // Seek to random point to avoid black frame, or 1s
         let seekTime = Math.min(1, video.duration * 0.25);
         if (!isFinite(seekTime)) seekTime = 0;
         video.currentTime = seekTime;
@@ -416,16 +419,18 @@ export const generateThumbnailFromVideo = (file: File): Promise<{ url: string; b
     
     const onSeeked = () => {
       clearTimeout(timeout);
-      const canvas = document.createElement("canvas");
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ratio = video.videoWidth / video.videoHeight;
-      const aspectRatio = getAspectRatioFromDims(video.videoWidth, video.videoHeight);
+      const width = video.videoWidth;
+      const height = video.videoHeight;
+      const aspectRatio = getAspectRatioFromDims(width, height);
 
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      
       const ctx = canvas.getContext("2d");
       if (!ctx) return reject(new Error("Canvas failure"));
       
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      ctx.drawImage(video, 0, 0, width, height);
       canvas.toBlob((blob) => {
         if (blob) resolve({ url: URL.createObjectURL(blob), blob, aspectRatio });
         else reject(new Error("Blob failure"));

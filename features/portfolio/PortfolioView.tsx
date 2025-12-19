@@ -369,7 +369,7 @@ const ShowreelPlayer: React.FC<{ src: string; thumbnail: string }> = React.memo(
                     muted={isMuted}
                     playsInline
                     preload="metadata"
-                    crossOrigin="anonymous"
+                    // Removing crossOrigin="anonymous" to reduce CORS friction for basic playback
                     onCanPlay={() => setIsVideoReady(true)}
                     onWaiting={() => setIsVideoReady(false)} 
                     onPlaying={() => setIsVideoReady(true)}
@@ -460,7 +460,7 @@ const Lightbox: React.FC<{ src: string; type: 'video' | 'image'; title: string; 
                                 preload="metadata" 
                                 className="w-full h-full object-contain" 
                                 playsInline 
-                                crossOrigin="anonymous"
+                                // Removing crossOrigin="anonymous" to reduce CORS friction
                             />
                         )
                     ) : (
