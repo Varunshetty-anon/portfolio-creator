@@ -13,6 +13,17 @@ const ANALYTICS_COL = 'analytics';
 export { isConfigured, auth };
 export const hasCloudStorage = !!storage;
 
+// --- Helper for Timeouts ---
+const withTimeout = <T>(promise: Promise<T>, ms: number = 10000, errorMsg: string = "Request timed out"): Promise<T> => {
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error(errorMsg)), ms);
+        promise.then(
+            (res) => { clearTimeout(timer); resolve(res); },
+            (err) => { clearTimeout(timer); reject(err); }
+        );
+    });
+};
+
 export const EDITING_TOOLS_LIST = [
   { name: 'Premiere Pro', slug: 'adobepremierepro', domain: 'adobe.com', color: '#9999FF' },
   { name: 'After Effects', slug: 'adobeaftereffects', domain: 'adobe.com', color: '#9999FF' },
@@ -234,7 +245,7 @@ export const loadPublicPortfolio = async (slug: string): Promise<PortfolioData |
 
 /**
  * User Onboarding Status - Ensures profile exists.
- * NOW WITH BETTER ERROR HANDLING AND LOGGING.
+ * Protected with timeout to prevent infinite hanging due to network/SW issues.
  */
 export const ensureUserProfile = async (user: User): Promise<UserProfile> => {
     if (!db) throw new Error("Database not initialized");
@@ -244,14 +255,11 @@ export const ensureUserProfile = async (user: User): Promise<UserProfile> => {
     let snap;
     
     try {
-        snap = await getDoc(userRef);
+        // Wrap getDoc in a timeout to fail fast if network/SW is intercepted and stalled
+        snap = await withTimeout(getDoc(userRef), 5000, "Profile check timed out");
     } catch (e: any) {
-        console.warn("Error reading user profile (might be new user):", e.message);
-        // If permission denied or other error, we try to create anyway if the rules allow 'create' but not 'read' of non-existent
-        // But normally 'permission-denied' on read means we can't check existence.
-        // We will assume it doesn't exist and try to create. 
-        // If it DOES exist and we can't read it, create will fail if we use setDoc without merge, or succeed if we overwrite.
-        // We'll proceed to creation attempt.
+        console.warn("Error reading user profile (might be new user or network issue):", e.message);
+        // Fallthrough to creation attempt
     }
     
     if (snap && snap.exists()) {
@@ -270,12 +278,13 @@ export const ensureUserProfile = async (user: User): Promise<UserProfile> => {
     };
     
     try {
-        await setDoc(userRef, newProfile, { merge: true }); // Merge true to be safe
+        // Use setDoc with merge to allow creation without failing if it already exists but was unreadable
+        await withTimeout(setDoc(userRef, newProfile, { merge: true }), 5000, "Profile creation timed out");
         console.log("User profile created successfully.");
         return newProfile;
     } catch (writeError: any) {
         console.error("Failed to create user profile:", writeError);
-        throw new Error("Could not initialize user profile. Please try again.");
+        throw new Error("Could not initialize user profile. Please check your connection and try again.");
     }
 };
 

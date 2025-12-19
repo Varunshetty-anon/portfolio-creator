@@ -1,5 +1,5 @@
 import { initializeApp, FirebaseApp, getApps, getApp } from 'firebase/app';
-import { getFirestore, Firestore } from 'firebase/firestore';
+import { getFirestore, Firestore, initializeFirestore } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 import { getAuth, Auth, GoogleAuthProvider } from 'firebase/auth';
 
@@ -32,7 +32,10 @@ if (isConfigured) {
 
     if (app) {
         try {
-            db = getFirestore(app);
+            // Initialize Firestore with default settings to avoid 'getFirestore' ambiguity
+            // in some environments. We do NOT force long polling here to avoid performance hits,
+            // relying instead on the index.tsx SW cleanup to fix interception errors.
+            db = initializeFirestore(app, {}); 
         } catch (e) {
             console.warn("Firestore initialization failed:", e);
         }
