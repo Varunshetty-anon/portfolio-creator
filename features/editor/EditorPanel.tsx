@@ -5,7 +5,7 @@ import { PortfolioData, Project, Testimonial } from '../../types';
 import { Input, TextArea } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { ToolSelector } from '../../components/ToolSelector';
-import { Plus, Trash2, Video, Wand2, Image as ImageIcon, ChevronDown, Upload, X, LayoutDashboard, Copy, ExternalLink, User, MessageSquare, Loader2, CheckCircle2, Globe, Crop, Settings, LogOut, AlertCircle, Sparkles, Wrench, ZoomIn, ZoomOut, QrCode, Download, AlertTriangle, Eye, Monitor, Smartphone, HelpCircle, Info, BarChart3, MousePointerClick, Save, UploadCloud } from 'lucide-react';
+import { Plus, Trash2, Video, Wand2, Image as ImageIcon, ChevronDown, Upload, X, LayoutDashboard, Copy, ExternalLink, User, MessageSquare, Loader2, CheckCircle2, Globe, Crop, Settings, LogOut, AlertCircle, Sparkles, Wrench, ZoomIn, ZoomOut, QrCode, Download, AlertTriangle, Eye, Monitor, Smartphone, HelpCircle, Info, BarChart3, MousePointerClick, Save, UploadCloud, Link, Youtube, HardDrive } from 'lucide-react';
 import Cropper from 'react-easy-crop';
 import { getCroppedImg, generateThumbnailFromVideo, uploadFileToStorage, hasCloudStorage, generateAiBio, generateAiDescription, downloadQrCode, getYouTubeThumbnail, getDriveThumbnail, generateAiThumbnail, getPortfolioStats } from '../../lib/utils';
 
@@ -35,6 +35,15 @@ const Tooltip = ({ text, children }: { text: string; children?: React.ReactNode 
             </AnimatePresence>
         </div>
     );
+};
+
+const getLinkIndicator = (url: string) => {
+    if (!url) return null;
+    const lower = url.toLowerCase();
+    if (lower.includes('youtube.com') || lower.includes('youtu.be')) return { icon: Youtube, color: 'text-red-500', label: 'YouTube' };
+    if (lower.includes('drive.google.com')) return { icon: HardDrive, color: 'text-blue-500', label: 'Drive' };
+    if (lower.startsWith('http')) return { icon: Link, color: 'text-emerald-500', label: 'Web' };
+    return null;
 };
 
 export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave, onPublish, isSaving, hasUnsavedChanges, onLogout, onDeleteAccount, onPreview }) => {
@@ -121,7 +130,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
   const handleLinkInput = (id: string, val: string) => {
       updateProject(id, { link: val });
       setLinkValidation(id);
-      setTimeout(() => setLinkValidation(null), 1500);
+      setTimeout(() => setLinkValidation(null), 1000);
   };
 
   return (
@@ -289,88 +298,97 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                                     <Button size="sm" onClick={() => updateField('projects', [...data.projects, { id: Date.now().toString(), title: "New Project", description: "Edit summary", thumbnail: "", link: "", category: "Work", type: "video" }])}><Plus size={14}/> Add</Button>
                                 </div>
                                 <div className="space-y-4">
-                                    {data.projects.map(p => (
-                                        <div key={p.id} className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-2xl flex gap-4 relative overflow-hidden group/card">
-                                            
-                                            {/* Project Progress Overlay */}
-                                            {uploadStatus?.id === p.id && (
-                                                <div className="absolute inset-0 bg-black/80 z-20 flex items-center justify-center backdrop-blur-sm">
-                                                    <div className="w-full max-w-[50%]">
-                                                        <div className="h-1 bg-zinc-800 rounded-full overflow-hidden mb-2">
-                                                            <motion.div 
-                                                                className="h-full bg-indigo-500" 
-                                                                initial={{ width: 0 }} 
-                                                                animate={{ width: `${uploadStatus.progress}%` }} 
-                                                            />
-                                                        </div>
-                                                        <p className="text-center text-[10px] font-bold">Uploading...</p>
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            <div className="w-24 h-24 bg-black rounded-lg overflow-hidden shrink-0 border border-zinc-800"><img src={p.thumbnail} className="w-full h-full object-cover"/></div>
-                                            <div className="flex-1 space-y-2">
-                                                <input className="bg-transparent border-none p-0 text-white font-bold w-full focus:ring-0" value={p.title} onChange={e => updateProject(p.id, { title: e.target.value })} />
-                                                <div className="flex gap-2">
-                                                    <select 
-                                                        value={p.type} 
-                                                        onChange={e => updateProject(p.id, { type: e.target.value as 'video'|'image' })}
-                                                        className="bg-black text-[10px] text-zinc-400 border border-zinc-800 rounded px-1"
-                                                    >
-                                                        <option value="video">Video</option>
-                                                        <option value="image">Image</option>
-                                                    </select>
-                                                    <input className="bg-transparent border-none p-0 text-zinc-500 text-xs w-full focus:ring-0" value={p.category} onChange={e => updateProject(p.id, { category: e.target.value })} placeholder="Category" />
-                                                </div>
+                                    {data.projects.map(p => {
+                                        const linkStatus = getLinkIndicator(p.link);
+                                        return (
+                                            <div key={p.id} className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-2xl flex gap-4 relative overflow-hidden group/card">
                                                 
-                                                <div className="flex gap-2 pt-1 items-center">
-                                                    {p.type === 'video' ? (
-                                                        <>
+                                                {/* Project Progress Overlay */}
+                                                {uploadStatus?.id === p.id && (
+                                                    <div className="absolute inset-0 bg-black/80 z-20 flex items-center justify-center backdrop-blur-sm">
+                                                        <div className="w-full max-w-[50%]">
+                                                            <div className="h-1 bg-zinc-800 rounded-full overflow-hidden mb-2">
+                                                                <motion.div 
+                                                                    className="h-full bg-indigo-500" 
+                                                                    initial={{ width: 0 }} 
+                                                                    animate={{ width: `${uploadStatus.progress}%` }} 
+                                                                />
+                                                            </div>
+                                                            <p className="text-center text-[10px] font-bold">Uploading...</p>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                <div className="w-24 h-24 bg-black rounded-lg overflow-hidden shrink-0 border border-zinc-800"><img src={p.thumbnail} className="w-full h-full object-cover"/></div>
+                                                <div className="flex-1 space-y-2">
+                                                    <input className="bg-transparent border-none p-0 text-white font-bold w-full focus:ring-0" value={p.title} onChange={e => updateProject(p.id, { title: e.target.value })} />
+                                                    <div className="flex gap-2">
+                                                        <select 
+                                                            value={p.type} 
+                                                            onChange={e => updateProject(p.id, { type: e.target.value as 'video'|'image' })}
+                                                            className="bg-black text-[10px] text-zinc-400 border border-zinc-800 rounded px-1"
+                                                        >
+                                                            <option value="video">Video</option>
+                                                            <option value="image">Image</option>
+                                                        </select>
+                                                        <input className="bg-transparent border-none p-0 text-zinc-500 text-xs w-full focus:ring-0" value={p.category} onChange={e => updateProject(p.id, { category: e.target.value })} placeholder="Category" />
+                                                    </div>
+                                                    
+                                                    <div className="flex gap-2 pt-1 items-center">
+                                                        {p.type === 'video' ? (
+                                                            <>
+                                                                <Button size="sm" variant="outline" className="h-8 text-[10px]" onClick={() => {
+                                                                    const input = document.createElement('input');
+                                                                    input.type = 'file';
+                                                                    input.accept = 'video/*';
+                                                                    input.onchange = (e: any) => handleProjectVideo(p.id, e.target.files[0]);
+                                                                    input.click();
+                                                                }}>Upload</Button>
+                                                                <div className="relative flex-1 group/input">
+                                                                    <Input 
+                                                                        value={p.link} 
+                                                                        onChange={e => handleLinkInput(p.id, e.target.value)} 
+                                                                        placeholder="Drive/YouTube Link"
+                                                                        className="h-8 text-[10px] py-1 pr-7"
+                                                                    />
+                                                                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none">
+                                                                        <AnimatePresence mode="wait">
+                                                                            {linkValidation === p.id ? (
+                                                                                <motion.div key="loader" initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.5 }}>
+                                                                                    <Loader2 className="animate-spin text-zinc-600" size={12} />
+                                                                                </motion.div>
+                                                                            ) : linkStatus ? (
+                                                                                <motion.div key="icon" initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.5 }} className={linkStatus.color} title={linkStatus.label}>
+                                                                                    <linkStatus.icon size={12} />
+                                                                                </motion.div>
+                                                                            ) : null}
+                                                                        </AnimatePresence>
+                                                                    </div>
+                                                                </div>
+                                                            </>
+                                                        ) : (
                                                             <Button size="sm" variant="outline" className="h-8 text-[10px]" onClick={() => {
                                                                 const input = document.createElement('input');
                                                                 input.type = 'file';
-                                                                input.accept = 'video/*';
-                                                                input.onchange = (e: any) => handleProjectVideo(p.id, e.target.files[0]);
+                                                                input.accept = 'image/*';
+                                                                input.onchange = (e: any) => {
+                                                                    const file = e.target.files[0];
+                                                                    const url = URL.createObjectURL(file);
+                                                                    updateProject(p.id, { link: url, thumbnail: url }); 
+                                                                    uploadFileToStorage(file, `users/${data.uid}/projects/${p.id}_img_${Date.now()}`).then(url => {
+                                                                        updateProject(p.id, { link: url, thumbnail: url });
+                                                                    });
+                                                                };
                                                                 input.click();
-                                                            }}>Upload</Button>
-                                                            <div className="relative flex-1">
-                                                                <Input 
-                                                                    value={p.link} 
-                                                                    onChange={e => handleLinkInput(p.id, e.target.value)} 
-                                                                    placeholder="Drive/YouTube Link"
-                                                                    className="h-8 text-[10px] py-1"
-                                                                />
-                                                                <AnimatePresence>
-                                                                    {linkValidation === p.id && (
-                                                                        <motion.div initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="absolute right-2 top-1/2 -translate-y-1/2 text-green-500">
-                                                                            <Loader2 className="animate-spin" size={12} />
-                                                                        </motion.div>
-                                                                    )}
-                                                                </AnimatePresence>
-                                                            </div>
-                                                        </>
-                                                    ) : (
-                                                        <Button size="sm" variant="outline" className="h-8 text-[10px]" onClick={() => {
-                                                            const input = document.createElement('input');
-                                                            input.type = 'file';
-                                                            input.accept = 'image/*';
-                                                            input.onchange = (e: any) => {
-                                                                const file = e.target.files[0];
-                                                                const url = URL.createObjectURL(file);
-                                                                updateProject(p.id, { link: url, thumbnail: url }); 
-                                                                 uploadFileToStorage(file, `users/${data.uid}/projects/${p.id}_img_${Date.now()}`).then(url => {
-                                                                     updateProject(p.id, { link: url, thumbnail: url });
-                                                                 });
-                                                            };
-                                                            input.click();
-                                                        }}>Upload Image</Button>
-                                                    )}
-                                                    
-                                                    <Button size="sm" variant="ghost" className="h-8 text-[10px] text-red-500" onClick={() => updateField('projects', data.projects.filter(proj => proj.id !== p.id))}><Trash2 size={12}/></Button>
+                                                            }}>Upload Image</Button>
+                                                        )}
+                                                        
+                                                        <Button size="sm" variant="ghost" className="h-8 text-[10px] text-red-500" onClick={() => updateField('projects', data.projects.filter(proj => proj.id !== p.id))}><Trash2 size={12}/></Button>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             </div>
                         </div>

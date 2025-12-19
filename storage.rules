@@ -2,18 +2,32 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
     
+    // --- Helper Functions ---
+    
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // Check Firestore to see if the user's portfolio is currently published.
+    // This aligns storage visibility with the Firestore 'publish.isPublished' flag.
+    function isPortfolioPublished(userId) {
+      let portfolioPath = /databases/(default)/documents/portfolios/$(userId);
+      return firestore.exists(portfolioPath) &&
+             firestore.get(portfolioPath).data.publish.isPublished == true;
+    }
+
     // --- USER MEDIA ---
-    // All uploads go to users/{uid}/...
+    // All user content is stored under users/{userId}/...
     match /users/{userId}/{allPaths=**} {
-      // WRITE: Strictly enforced ownership.
-      // Authenticated users can only upload/delete/update files in their own folder.
-      allow write: if request.auth != null && request.auth.uid == userId;
       
-      // READ: Public Read Access.
-      // Portfolio assets (images, videos) must be publicly readable to load in the
-      // shared portfolio view. Privacy is achieved by the file URL being
-      // hard to guess and only exposed via the published Firestore document.
-      allow read: if true;
+      // WRITE: Strictly Private.
+      // Only the authenticated owner can upload, delete, or update files.
+      allow write: if isOwner(userId);
+      
+      // READ: Conditional Public Access.
+      // 1. The owner can always read their own files (Editor/Preview).
+      // 2. The public can read files ONLY if the portfolio is published.
+      allow read: if isOwner(userId) || isPortfolioPublished(userId);
     }
   }
 }
