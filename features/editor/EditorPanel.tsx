@@ -7,7 +7,7 @@ import { Button } from '../../components/ui/Button';
 import { ToolSelector } from '../../components/ToolSelector';
 import { Plus, Trash2, Video, Wand2, Image as ImageIcon, ChevronDown, Upload, X, LayoutDashboard, Copy, ExternalLink, User, MessageSquare, Loader2, CheckCircle2, Globe, Crop, Settings, LogOut, AlertCircle, Sparkles, Wrench, ZoomIn, ZoomOut, QrCode, Download, AlertTriangle, Eye, Monitor, Smartphone, HelpCircle, Info, BarChart3, MousePointerClick, Save, UploadCloud, Link, Youtube, HardDrive, Database, RotateCcw } from 'lucide-react';
 import Cropper from 'react-easy-crop';
-import { getCroppedImg, generateThumbnailFromVideo, uploadFileToStorage, hasCloudStorage, generateAiBio, generateAiDescription, downloadQrCode, getYouTubeThumbnail, getDriveThumbnail, generateAiThumbnail, getPortfolioStats, cleanupUnusedMedia, saveDraft } from '../../lib/utils';
+import { getCroppedImg, generateThumbnailFromVideo, uploadFileToStorage, hasCloudStorage, generateAiBio, generateAiDescription, downloadQrCode, getVideoMetadata, getDriveThumbnail, generateAiThumbnail, getPortfolioStats, cleanupUnusedMedia, saveDraft } from '../../lib/utils';
 
 interface EditorPanelProps {
   data: PortfolioData;
@@ -160,9 +160,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
 
   // Helper wrapper for auto-save after media operations
   const triggerAutoSave = async (newData: PortfolioData) => {
-      // First update state
       onChange(newData);
-      // Then save to draft
       if (newData.uid) {
           await saveDraft(newData.uid, newData);
       }
@@ -177,23 +175,18 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
     setUploadStatus({ id: projectId, progress: 0, step: 'Processing...' });
 
     try {
-        // 1. Generate Thumbnail & Detect Aspect Ratio
         const { url: thumbBlobUrl, blob: thumbBlob, aspectRatio } = await generateThumbnailFromVideo(file);
         
-        // 2. Upload Video
         setUploadStatus({ id: projectId, progress: 10, step: 'Uploading Video...' });
         const videoPath = `users/${data.uid}/projects/${projectId}_${Date.now()}.mp4`;
         const videoUrl = await uploadFileToStorage(file, videoPath, (p) => {
-            // Scale progress to 10-80% range for video upload
             setUploadStatus({ id: projectId, progress: 10 + (p * 0.7), step: 'Uploading Video...' });
         });
 
-        // 3. Upload Thumbnail
         setUploadStatus({ id: projectId, progress: 85, step: 'Uploading Thumbnail...' });
         const thumbPath = `users/${data.uid}/projects/${projectId}_thumb_${Date.now()}.jpg`;
         const thumbUrl = await uploadFileToStorage(new File([thumbBlob], 'thumb.jpg'), thumbPath);
 
-        // 4. Update State & Auto-Save
         const finalProjects = data.projects.map(p => p.id === projectId ? { 
             ...p, 
             link: videoUrl, 
@@ -208,7 +201,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
 
     } catch (e) {
         console.error("Video Upload Failed", e);
-        // Fallback or error toast could go here
     } finally { 
         setTimeout(() => setUploadStatus(null), 1000); 
     }
@@ -218,22 +210,18 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
     setUploadStatus({ id: 'showreel', progress: 0, step: 'Processing...' });
     
     try {
-        // 1. Generate Thumbnail
         const { blob: thumbBlob } = await generateThumbnailFromVideo(file);
         
-        // 2. Upload Video
         setUploadStatus({ id: 'showreel', progress: 10, step: 'Uploading Video...' });
         const videoPath = `users/${data.uid}/showreels/main_${Date.now()}.mp4`;
         const videoUrl = await uploadFileToStorage(file, videoPath, (p) => {
             setUploadStatus({ id: 'showreel', progress: 10 + (p * 0.7), step: 'Uploading Video...' });
         });
 
-        // 3. Upload Thumbnail
         setUploadStatus({ id: 'showreel', progress: 85, step: 'Uploading Thumbnail...' });
         const thumbPath = `users/${data.uid}/showreels/thumb_${Date.now()}.jpg`;
         const thumbUrl = await uploadFileToStorage(new File([thumbBlob], 'thumb.jpg'), thumbPath);
 
-        // 4. Auto-Save
         const newData = { ...data, showreelLink: videoUrl, showreelThumbnail: thumbUrl };
         await triggerAutoSave(newData);
         
@@ -306,37 +294,22 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
   }
 
   const handleLinkInput = (id: string, val: string) => {
-      // 1. Immediately update the link in state so it doesn't disappear/revert
       const updatedProjects = data.projects.map(p => p.id === id ? { ...p, link: val } : p);
       onChange({ ...data, projects: updatedProjects });
       
-      // 2. Set validation/loading state for UI feedback
       setLinkValidation(id);
       
-      // 3. Auto-fetch thumbnail logic (Debounced effectively by logic flow)
       if (val.length > 10) {
-          let thumb = '';
-          // Check for supported patterns
-          if (val.includes('youtube.com') || val.includes('youtu.be')) {
-              thumb = getYouTubeThumbnail(val) || '';
-          } else if (val.includes('drive.google.com')) {
-              thumb = getDriveThumbnail(val) || '';
-          }
-
-          if (thumb) {
-               console.log("Auto-detected thumbnail:", thumb);
-               // Async update for thumbnail to avoid blocking input
-               setTimeout(() => {
+          setTimeout(async () => {
+              const metadata = await getVideoMetadata(val);
+              if (metadata.thumbnail) {
                    const withThumb = data.projects.map(p => 
-                       p.id === id ? { ...p, link: val, thumbnail: thumb, aspectRatio: '16:9' as const } : p
+                       p.id === id ? { ...p, link: val, thumbnail: metadata.thumbnail, aspectRatio: metadata.aspectRatio } : p
                    );
                    onChange({ ...data, projects: withThumb });
-                   setLinkValidation(null);
-               }, 500);
-          } else {
-              // Clear validation after delay if no thumb found (user might be typing)
-              setTimeout(() => setLinkValidation(null), 1000);
-          }
+              }
+              setLinkValidation(null);
+          }, 800);
       } else {
           setLinkValidation(null);
       }
@@ -344,20 +317,13 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
 
   const handleShowreelLinkInput = (val: string) => {
       updateField('showreelLink', val);
-      
       if (val.length > 10) {
-          let thumb = '';
-          if (val.includes('youtube.com') || val.includes('youtu.be')) {
-              thumb = getYouTubeThumbnail(val) || '';
-          } else if (val.includes('drive.google.com')) {
-              thumb = getDriveThumbnail(val) || '';
-          }
-
-          if (thumb) {
-              setTimeout(() => {
-                  updateField('showreelThumbnail', thumb);
-              }, 500);
-          }
+          setTimeout(async () => {
+              const metadata = await getVideoMetadata(val);
+              if (metadata.thumbnail) {
+                  updateField('showreelThumbnail', metadata.thumbnail);
+              }
+          }, 800);
       }
   }
 
@@ -413,6 +379,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
 
             <main className="flex-1 overflow-y-auto p-8 md:p-12 custom-scrollbar bg-[radial-gradient(circle_at_50%_0%,rgba(99,102,241,0.05),transparent)]">
                 <div className="max-w-3xl mx-auto space-y-12">
+                    {/* ... Dashboard and Profile Sections (Identical to previous, just omitted for brevity unless changes needed) ... */}
                     {activeTab === 'dashboard' && (
                         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
                             <div className="bg-indigo-500/10 border border-indigo-500/20 p-8 rounded-3xl space-y-4">
@@ -425,7 +392,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                                         <span className="px-3 py-1 bg-green-500/20 text-green-500 text-[10px] font-bold uppercase rounded-full border border-green-500/20">Published</span>
                                     )}
                                 </div>
-                                
                                 <div className="flex items-center gap-3 bg-black/50 p-4 rounded-xl border border-zinc-800">
                                     <Globe size={16} className="text-indigo-500" />
                                     <code className="text-xs text-zinc-300 flex-1 truncate">{getShareLink()}</code>
@@ -436,7 +402,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                                      <Button variant="outline" className="w-full py-6 border-dashed" onClick={() => setShowQr(true)}>Get QR Code <QrCode size={14} className="ml-2"/></Button>
                                 </div>
                             </div>
-                            
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl flex flex-col justify-between h-32 relative overflow-hidden">
                                      <div className="absolute right-0 top-0 p-32 bg-indigo-500/5 rounded-full blur-2xl transform translate-x-10 -translate-y-10"></div>
@@ -537,7 +502,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                                     <div className="flex gap-2">
                                         <Button size="sm" variant="ghost" onClick={() => onSave()} icon={<Save size={12} className="text-zinc-500"/>} className="text-xs text-zinc-500 hover:text-white">Save Section</Button>
                                         <Button size="sm" onClick={() => {
-                                            // Add new project to the TOP of the list
                                             const newProject: Project = { 
                                                 id: Date.now().toString(), 
                                                 title: "New Project", 
@@ -545,7 +509,8 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                                                 thumbnail: "", 
                                                 link: "", 
                                                 category: "Work", 
-                                                type: "video" 
+                                                type: "video",
+                                                aspectRatio: '16:9'
                                             };
                                             updateField('projects', [newProject, ...data.projects]);
                                         }}>
@@ -731,6 +696,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
             </main>
         </div>
 
+        {/* ... (Portals unchanged) ... */}
         <AnimatePresence>
             {toast && toast.show && (
                 createPortal(
@@ -793,13 +759,9 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                             setUploadStatus({ id: 'profile', progress: 0 });
                             try {
                                 const blob = await getCroppedImg(cropModal.src, croppedPixels);
-                                // Upload directly without setting blob URL to state to prevent local caching issues
                                 const file = new File([blob], 'avatar.jpg', { type: 'image/jpeg' });
-                                // Add timestamp for cache busting
                                 const path = `users/${data.uid}/profile/avatar_${Date.now()}.jpg`;
-                                
                                 const downloadUrl = await uploadFileToStorage(file, path, (p) => setUploadStatus({ id: 'profile', progress: p }));
-                                
                                 updateField('profileImage', downloadUrl);
                                 setCropModal({ open: false, src: null });
                             } catch (e) {

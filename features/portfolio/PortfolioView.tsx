@@ -293,8 +293,6 @@ const PrimaryToolCard: React.FC<{ toolName: string }> = React.memo(({ toolName }
     );
 });
 
-// Robust Showreel Player
-// Features: Autoplay with IntersectionObserver, Thumbnail Overlay, Shimmer Loading, Muted Start
 const ShowreelPlayer: React.FC<{ src: string; thumbnail: string }> = React.memo(({ src, thumbnail }) => {
     const [isVideoReady, setIsVideoReady] = useState(false);
     const [isMuted, setIsMuted] = useState(true);
@@ -303,7 +301,6 @@ const ShowreelPlayer: React.FC<{ src: string; thumbnail: string }> = React.memo(
     const containerRef = useRef<HTMLDivElement>(null);
     const isInView = useInView(containerRef, { amount: 0.4 });
 
-    // Detect Source Type
     const type = React.useMemo(() => {
         if (!src) return 'none';
         if (src.includes('youtube.com') || src.includes('youtu.be')) return 'youtube';
@@ -312,18 +309,20 @@ const ShowreelPlayer: React.FC<{ src: string; thumbnail: string }> = React.memo(
         return 'direct';
     }, [src]);
 
-    // Handle Autoplay for Direct Video
     useEffect(() => {
         if (type === 'direct' && videoRef.current) {
             if (isInView) {
-                videoRef.current.play().catch(() => {
-                    // Autoplay blocked, wait for interaction
-                });
+                const playPromise = videoRef.current.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(() => {
+                        // Autoplay blocked
+                    });
+                }
             } else {
                 videoRef.current.pause();
             }
         }
-    }, [isInView, type]);
+    }, [isInView, type, src]);
 
     const getEmbedSrc = () => {
         if (type === 'youtube') {
@@ -336,7 +335,6 @@ const ShowreelPlayer: React.FC<{ src: string; thumbnail: string }> = React.memo(
         }
         if (type === 'drive') {
              const dId = getDriveId(src);
-             // Ensure we use the preview endpoint which is iframe embeddable
              return `https://drive.google.com/file/d/${dId}/preview`;
         }
         return src;
@@ -355,17 +353,13 @@ const ShowreelPlayer: React.FC<{ src: string; thumbnail: string }> = React.memo(
                 if (videoRef.current) videoRef.current.muted = !isMuted;
             }}
         >
-            {/* 1. Base Layer: Thumbnail with Shimmer Loading Effect */}
             <div className={`absolute inset-0 z-20 pointer-events-none transition-opacity duration-700 ease-in-out ${isVideoReady ? 'opacity-0' : 'opacity-100'}`}>
-                {/* Reusing ShimmerImage logic but adapted for this overlay container */}
                 <div className="relative w-full h-full">
                     <img src={thumbnail || "https://picsum.photos/800/450"} className="w-full h-full object-cover" alt="Loading" />
-                    {/* Continuous Shimmer Overlay while waiting */}
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -skew-x-12 animate-shimmer" style={{ backgroundSize: '200% 100%' }}></div>
                 </div>
             </div>
 
-            {/* 2. Video Layer */}
             {type === 'direct' ? (
                 <video 
                     ref={videoRef}
@@ -375,10 +369,11 @@ const ShowreelPlayer: React.FC<{ src: string; thumbnail: string }> = React.memo(
                     muted={isMuted}
                     playsInline
                     preload="metadata"
+                    crossOrigin="anonymous"
                     onCanPlay={() => setIsVideoReady(true)}
-                    // When buffering, hide video layer (show thumb) to avoid black frames or frozen frames
                     onWaiting={() => setIsVideoReady(false)} 
                     onPlaying={() => setIsVideoReady(true)}
+                    controls={false}
                 />
             ) : (
                 <iframe 
@@ -387,13 +382,11 @@ const ShowreelPlayer: React.FC<{ src: string; thumbnail: string }> = React.memo(
                     allow="autoplay; fullscreen; picture-in-picture"
                     title="Showreel"
                     onLoad={() => {
-                        // Use a slight delay for iframes to ensure rendering
                         setTimeout(() => setIsVideoReady(true), 1500);
                     }}
                 />
             )}
 
-            {/* 3. Audio Control (Direct only) */}
             {type === 'direct' && isVideoReady && (
                 <div className="absolute bottom-6 right-6 z-30 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                     <button className="w-10 h-10 rounded-full bg-black/60 backdrop-blur-md border border-white/10 flex items-center justify-center text-white hover:bg-white hover:text-black transition-all">
@@ -460,7 +453,15 @@ const Lightbox: React.FC<{ src: string; type: 'video' | 'image'; title: string; 
                         ) : src.includes('youtube') || src.includes('vimeo') ? (
                             <iframe src={src} className="w-full h-full" allow="autoplay; fullscreen" />
                         ) : (
-                            <video src={src} controls autoPlay preload="metadata" className="w-full h-full object-contain" playsInline />
+                            <video 
+                                src={src} 
+                                controls 
+                                autoPlay 
+                                preload="metadata" 
+                                className="w-full h-full object-contain" 
+                                playsInline 
+                                crossOrigin="anonymous"
+                            />
                         )
                     ) : (
                         <img src={src} className="w-full h-full object-contain" alt={title} loading="lazy" />
@@ -482,13 +483,11 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview })
   
   useEffect(() => { 
       if (isPreview) setShowIntro(false); 
-      // Analytics: Track View if strictly public
       if (!isPreview && data.uid) {
           trackPortfolioView(data.uid);
       }
   }, [isPreview, data.uid]);
 
-  // Robust tools logic: ensure we display correctly even if just primary is selected
   const allTools = [...(data.tools || [])];
   if (data.primaryTool && !allTools.includes(data.primaryTool)) { 
       allTools.unshift(data.primaryTool); 
@@ -525,16 +524,13 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview })
       </motion.div>
 
       <div className="lg:flex h-full relative z-10">
-          {/* Main Desktop Sidebar */}
           <aside className="hidden lg:flex lg:w-[45%] xl:w-[40%] lg:h-screen lg:border-r border-zinc-900/30 bg-black/40 backdrop-blur-3xl z-20 flex-col justify-center relative px-12 xl:px-20 overflow-hidden">
              <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(99,102,241,0.05)_0%,transparent_50%)]" />
              <HeroContent data={data} isMobile={false} />
           </aside>
 
-          {/* Scrollable Content Area */}
           <main className="w-full lg:w-[55%] xl:w-[60%] lg:h-screen lg:overflow-y-auto custom-scrollbar relative" ref={containerRef}>
              <div className="p-6 md:p-12 lg:p-20 xl:p-24 space-y-24 pb-48 max-w-6xl mx-auto">
-                 
                  <div className="lg:hidden">
                     <HeroContent data={data} isMobile={true} />
                  </div>
