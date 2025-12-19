@@ -53,13 +53,17 @@ const App: React.FC = () => {
         setIsLoading(true);
 
         // 1. PUBLIC ROUTE CHECK
+        // Supports both Hash (#varun) and Path (/v/varun) routing
         const hash = window.location.hash.replace('#', '');
         const path = window.location.pathname;
         let slug = null;
         
-        // Match /v/:slug or hash based slug
         if (path.includes('/v/')) {
-            slug = path.split('/v/')[1];
+            // Extract slug from /v/username/path...
+            const parts = path.split('/v/');
+            if (parts.length > 1) {
+                slug = parts[1].split('/')[0]; // Take segment after /v/ and before next /
+            }
         } else if (hash && !['editor', 'onboarding'].includes(hash)) {
             slug = hash;
         }
@@ -74,6 +78,7 @@ const App: React.FC = () => {
                 return; // Stop here, public view doesn't need auth
             } else {
                 console.log("Slug not found, defaulting to home");
+                // Optional: setRoute('not-found');
             }
         }
 

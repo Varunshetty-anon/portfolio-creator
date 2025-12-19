@@ -39,11 +39,23 @@ const Tooltip = ({ text, children }: { text: string; children?: React.ReactNode 
 
 const getLinkIndicator = (url: string) => {
     if (!url) return null;
+    
+    // Basic protocol check to avoid valid URL logic on partial typing
+    if (!url.match(/^https?:\/\//)) return null;
+
     const lower = url.toLowerCase();
-    if (lower.includes('youtube.com') || lower.includes('youtu.be')) return { icon: Youtube, color: 'text-red-500', label: 'YouTube' };
-    if (lower.includes('drive.google.com')) return { icon: HardDrive, color: 'text-blue-500', label: 'Drive' };
-    if (lower.startsWith('http')) return { icon: Link, color: 'text-emerald-500', label: 'Web' };
-    return null;
+    
+    if (lower.includes('youtube.com') || lower.includes('youtu.be')) 
+        return { icon: Youtube, color: 'text-red-500', label: 'YouTube', border: '!border-red-500/50 focus:!border-red-500 focus:!ring-red-500/20' };
+    
+    if (lower.includes('drive.google.com')) 
+        return { icon: HardDrive, color: 'text-blue-500', label: 'Drive', border: '!border-blue-500/50 focus:!border-blue-500 focus:!ring-blue-500/20' };
+    
+    if (lower.includes('vimeo.com'))
+        return { icon: Video, color: 'text-sky-500', label: 'Vimeo', border: '!border-sky-500/50 focus:!border-sky-500 focus:!ring-sky-500/20' };
+        
+    // Generic Web Link
+    return { icon: Link, color: 'text-emerald-500', label: 'Web', border: '!border-emerald-500/50 focus:!border-emerald-500 focus:!ring-emerald-500/20' };
 };
 
 export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave, onPublish, isSaving, hasUnsavedChanges, onLogout, onDeleteAccount, onPreview }) => {
@@ -127,7 +139,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
       if (!window.confirm("This will permanently delete unused media files that are not used in your Live Portfolio or current Draft. Continue?")) return;
       setIsCleaning(true);
       try {
-          const count = await cleanupUnusedMedia(data.uid);
+          const count = await cleanupUnusedMedia(data.uid, data);
           alert(`Cleanup complete. Removed ${count} unused files.`);
       } catch (e) {
           alert("Cleanup failed. Please try again.");
@@ -375,7 +387,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                                                                         value={p.link} 
                                                                         onChange={e => handleLinkInput(p.id, e.target.value)} 
                                                                         placeholder="Drive/YouTube Link"
-                                                                        className="h-8 text-[10px] py-1 pr-7"
+                                                                        className={`h-8 text-[10px] py-1 pr-7 ${linkStatus ? linkStatus.border : ''}`}
                                                                     />
                                                                     <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none">
                                                                         <AnimatePresence mode="wait">

@@ -3,16 +3,25 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="
+      default-src 'self';
+      script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://esm.sh https://apis.google.com https://www.gstatic.com https://*.firebaseio.com https://*.googleapis.com;
+      style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+      font-src 'self' https://fonts.gstatic.com;
+      img-src 'self' data: blob: https:;
+      media-src 'self' blob: https:;
+      connect-src 'self' https://esm.sh https://*.googleapis.com https://*.firebaseio.com wss://*;
+      frame-src 'self' https://www.youtube.com https://drive.google.com https://player.vimeo.com;
+    ">
+    <base href="/" />
     <title>Frames - Video Editor Portfolio</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
     <script>
       // CRITICAL: Unregister any existing service workers IMMEDIATELY.
-      // Do not wait for window.load. This must happen before any network requests.
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.getRegistrations().then(function(registrations) {
           for(let registration of registrations) {
-            console.log('Unregistering found SW:', registration);
             registration.unregister();
           }
         }).catch(err => console.error('SW cleanup failed:', err));
@@ -84,5 +93,6 @@
 </head>
   <body>
     <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
   </body>
 </html>

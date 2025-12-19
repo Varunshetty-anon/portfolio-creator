@@ -178,8 +178,10 @@ export const publishPortfolio = async (uid: string, data: PortfolioData): Promis
  * 2. Collect all media URLs used in the current 'liveVersion'
  * 3. List all files in user's storage bucket
  * 4. Delete files not present in step 1 or 2
+ * 
+ * Updated: Accepts currentData to ensure unsaved changes in the editor are protected.
  */
-export const cleanupUnusedMedia = async (uid: string): Promise<number> => {
+export const cleanupUnusedMedia = async (uid: string, currentData?: any): Promise<number> => {
     if (!db || !storage || !uid) return 0;
 
     const protectedPaths = new Set<string>();
@@ -193,7 +195,7 @@ export const cleanupUnusedMedia = async (uid: string): Promise<number> => {
         if (!data) return;
         addProtected(data.profileImage);
         addProtected(data.showreelLink);
-        addProtected(data.showreelThumbnail); // If manually uploaded
+        addProtected(data.showreelThumbnail); 
         if (Array.isArray(data.projects)) {
             data.projects.forEach((p: any) => {
                 addProtected(p.thumbnail);
@@ -203,11 +205,14 @@ export const cleanupUnusedMedia = async (uid: string): Promise<number> => {
     };
 
     try {
-        // 1. Get Draft Content
+        // 1. Protect Current Editor State (Unsaved changes)
+        if (currentData) collectFromContent(currentData);
+
+        // 2. Get Draft Content (Saved)
         const draftSnap = await getDoc(doc(db, PORTFOLIOS_COL, uid, VERSIONS_COL, 'draft'));
         if (draftSnap.exists()) collectFromContent(draftSnap.data());
 
-        // 2. Get Live Content
+        // 3. Get Live Content
         const metaSnap = await getDoc(doc(db, PORTFOLIOS_COL, uid));
         if (metaSnap.exists()) {
             const meta = metaSnap.data() as PortfolioMeta;
@@ -217,7 +222,7 @@ export const cleanupUnusedMedia = async (uid: string): Promise<number> => {
             }
         }
 
-        // 3. List All Files (Recursive)
+        // 4. List All Files (Recursive)
         const userRootRef = ref(storage, `users/${uid}`);
         
         const getAllFiles = async (rootRef: any): Promise<any[]> => {
@@ -234,12 +239,12 @@ export const cleanupUnusedMedia = async (uid: string): Promise<number> => {
 
         const allFiles = await getAllFiles(userRootRef);
 
-        // 4. Determine Files to Delete
+        // 5. Determine Files to Delete
         const filesToDelete = allFiles.filter(fileRef => !protectedPaths.has(fileRef.fullPath));
         
         console.log(`[Cleanup] Found ${allFiles.length} files. Protected: ${protectedPaths.size}. Deleting: ${filesToDelete.length}`);
 
-        // 5. Execute Deletion
+        // 6. Execute Deletion
         await Promise.all(filesToDelete.map(fileRef => deleteObject(fileRef).catch(e => {
             console.warn(`Failed to delete ${fileRef.fullPath}`, e);
         })));
