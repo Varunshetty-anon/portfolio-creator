@@ -32,10 +32,12 @@ if (isConfigured) {
 
     if (app) {
         try {
-            // Initialize Firestore with default settings to avoid 'getFirestore' ambiguity
-            // in some environments. We do NOT force long polling here to avoid performance hits,
-            // relying instead on the index.tsx SW cleanup to fix interception errors.
-            db = initializeFirestore(app, {}); 
+            // Initialize Firestore with experimentalForceLongPolling.
+            // This is CRITICAL to bypass "ServiceWorker intercepted" errors and
+            // unstable WebChannel connections in some environments.
+            db = initializeFirestore(app, {
+                experimentalForceLongPolling: true,
+            }); 
         } catch (e) {
             console.warn("Firestore initialization failed:", e);
         }

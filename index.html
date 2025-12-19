@@ -7,6 +7,18 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
     <script>
+      // CRITICAL: Unregister any existing service workers IMMEDIATELY before the app loads.
+      // This prevents stale SWs from intercepting Firebase Auth/Firestore requests.
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.getRegistrations().then(function(registrations) {
+            for(let registration of registrations) {
+              registration.unregister().then(() => console.log('SW Unregistered'));
+            }
+          });
+        });
+      }
+      
       tailwind.config = {
         theme: {
           extend: {
