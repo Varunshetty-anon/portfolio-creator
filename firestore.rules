@@ -2,34 +2,55 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // USERS: Allow users to read and write their own document. 
-    // This covers create (if not exists), update, and read.
+    // --- Helper Functions ---
+    
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+    
+    // --- USERS COLLECTION ---
+    // Private profile data (email, onboarding status). 
+    // strictly private to the user.
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      // Allow authenticated users to create/read/update their own profile document
+      allow read, write: if isOwner(userId);
     }
 
-    // PORTFOLIOS: Metadata
-    match /portfolios/{portfolioId} {
-      allow read: if true; 
-      allow write: if request.auth != null && request.auth.uid == portfolioId;
-      
-      // VERSIONS: Content snapshots
+    // --- PORTFOLIOS COLLECTION ---
+    // Content container. Keyed by User ID.
+    match /portfolios/{userId} {
+      // 1. Root Document (Metadata & Slug)
+      // Owner: Full Control
+      // Public: Can Get (to check isPublished) and List (to query by slug)
+      allow write: if isOwner(userId);
+      allow get: if true;
+      allow list: if true;
+
+      // 2. Versions Subcollection
+      // This contains both the 'draft' (private) and published snapshots (public)
       match /versions/{versionId} {
-        allow read: if true;
-        allow write: if request.auth != null && request.auth.uid == portfolioId;
+        
+        // DRAFT: Strictly Private.
+        // Explicitly matching 'draft' to ensure no rule overlap allows public access.
+        allow read, write: if versionId == 'draft' && isOwner(userId);
+
+        // PUBLISHED SNAPSHOTS:
+        // Owner: Full Control
+        // Public: Read-only (if it is NOT the draft)
+        allow write: if isOwner(userId);
+        allow read: if versionId != 'draft'; 
       }
     }
-    
-    // ANALYTICS
-    match /analytics/{portfolioId}/events/{eventId} {
-      allow read: if request.auth != null && request.auth.uid == portfolioId;
-      allow write: if true;
-    }
-    
-    // Legacy Stats support
+
+    // --- ANALYTICS COLLECTION ---
+    // Stores views/clicks.
     match /portfolio_stats/{userId} {
-      allow read: if true;
-      allow write: if true;
+      // Owner can see their stats
+      allow read: if isOwner(userId);
+      
+      // Public can Write (to increment counters).
+      // We allow create/update for unauthenticated users for accurate view tracking.
+      allow create, update: if true;
     }
   }
 }

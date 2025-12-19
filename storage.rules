@@ -1,0 +1,19 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // --- USER MEDIA ---
+    // All uploads go to users/{uid}/...
+    match /users/{userId}/{allPaths=**} {
+      // WRITE: Strictly enforced ownership.
+      // Authenticated users can only upload/delete/update files in their own folder.
+      allow write: if request.auth != null && request.auth.uid == userId;
+      
+      // READ: Public Read Access.
+      // Portfolio assets (images, videos) must be publicly readable to load in the
+      // shared portfolio view. Privacy is achieved by the file URL being
+      // hard to guess and only exposed via the published Firestore document.
+      allow read: if true;
+    }
+  }
+}
