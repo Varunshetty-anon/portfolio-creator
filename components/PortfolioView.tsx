@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useScroll, useTransform, useInView } from 'framer-motion';
 import { Mail, Instagram, Play, Twitter, Linkedin, Youtube, X, Volume2, VolumeX, Globe, Maximize2, Star, Sparkles, MonitorPlay, MapPin, Loader2 } from 'lucide-react';
 import { PortfolioData, Project } from '../types';
-import { getBrandColor, getDriveEmbedUrl, EDITING_TOOLS_LIST, AI_TOOLS_LIST } from '../utils';
+import { getBrandColor, getDriveEmbedUrl, EDITING_TOOLS_LIST, AI_TOOLS_LIST, trackPortfolioView, trackPortfolioClick } from '../utils';
 
 interface PortfolioViewProps {
   data: PortfolioData;
@@ -218,7 +218,11 @@ const HeroContent: React.FC<{ data: PortfolioData; isMobile?: boolean }> = ({ da
             </div>
 
             <motion.div variants={fadeInUp} className="pt-8 flex flex-wrap gap-4 justify-center lg:justify-start z-10">
-                <a href={`mailto:${data.contactEmail}`} className="inline-flex items-center gap-2 bg-white text-black px-8 py-4 rounded-full font-bold text-xs tracking-widest uppercase hover:bg-zinc-200 transition-all hover:translate-y-[-2px] shadow-2xl">
+                <a 
+                    href={`mailto:${data.contactEmail}`} 
+                    className="inline-flex items-center gap-2 bg-white text-black px-8 py-4 rounded-full font-bold text-xs tracking-widest uppercase hover:bg-zinc-200 transition-all hover:translate-y-[-2px] shadow-2xl"
+                    onClick={() => trackPortfolioClick(data.uid!, 'email')}
+                >
                     <Mail size={16} /> Get In Touch
                 </a>
                 
@@ -232,6 +236,7 @@ const HeroContent: React.FC<{ data: PortfolioData; isMobile?: boolean }> = ({ da
                                 href={key === 'email' ? `mailto:${val}` : getSocialUrl(key, val as string)} 
                                 target="_blank" 
                                 rel="noopener noreferrer" 
+                                onClick={() => trackPortfolioClick(data.uid!, key)}
                                 className="w-12 h-12 flex items-center justify-center rounded-full bg-zinc-900/80 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 hover:border-zinc-700 transition-all hover:scale-110"
                             >
                                 <Icon size={18} />
@@ -273,16 +278,27 @@ const ShowreelPlayer: React.FC<{ src: string; thumbnail: string }> = ({ src, thu
     const containerRef = useRef<HTMLDivElement>(null);
     const isInView = useInView(containerRef, { amount: 0.3 });
     const [hasError, setHasError] = useState(false);
+    
+    // Check if it is a Drive link
+    const driveEmbed = getDriveEmbedUrl(src);
 
     useEffect(() => {
-        if (videoRef.current) {
+        if (videoRef.current && !driveEmbed) {
             if (isInView) {
                 videoRef.current.play().catch(() => {});
             } else {
                 videoRef.current.pause();
             }
         }
-    }, [isInView]);
+    }, [isInView, driveEmbed]);
+
+    if (driveEmbed) {
+        return (
+             <motion.div ref={containerRef} className="relative w-full aspect-video rounded-3xl overflow-hidden shadow-2xl border border-zinc-800 group" initial={{ opacity: 0, scale: 0.98 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }}>
+                <iframe src={driveEmbed} className="w-full h-full" allow="autoplay; fullscreen" />
+             </motion.div>
+        )
+    }
 
     return (
         <motion.div ref={containerRef} className="relative w-full aspect-video rounded-3xl overflow-hidden shadow-2xl border border-zinc-800 group" initial={{ opacity: 0, scale: 0.98 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }} transition={{ duration: 0.8, ease: [0.32, 0.72, 0, 1] }}>
@@ -400,7 +416,11 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview })
   
   useEffect(() => { 
       if (isPreview) setShowIntro(false); 
-  }, [isPreview]);
+      // Analytics: Track View
+      if (!isPreview && data.uid) {
+          trackPortfolioView(data.uid);
+      }
+  }, [isPreview, data.uid]);
 
   const allTools = [...data.tools];
   if (data.primaryTool && !allTools.includes(data.primaryTool)) { allTools.unshift(data.primaryTool); }
@@ -425,7 +445,11 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview })
             <img src={data.profileImage} className="w-10 h-10 rounded-full border border-zinc-800 object-cover" alt="Profile" />
             <span className="font-display font-black text-white text-lg tracking-tighter uppercase">{data.name}</span>
         </div>
-        <a href={`mailto:${data.contactEmail}`} className="p-3 bg-white text-black rounded-full pointer-events-auto shadow-2xl hover:scale-110 transition-transform">
+        <a 
+            href={`mailto:${data.contactEmail}`} 
+            className="p-3 bg-white text-black rounded-full pointer-events-auto shadow-2xl hover:scale-110 transition-transform"
+            onClick={() => trackPortfolioClick(data.uid!, 'email_header')}
+        >
             <Mail size={18}/>
         </a>
       </motion.div>
@@ -481,7 +505,10 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview })
                           
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-10">
                             {data.projects.map(p => (
-                                <AmbientProjectCard key={p.id} project={p} onClick={() => setSelectedProject(p)} />
+                                <AmbientProjectCard key={p.id} project={p} onClick={() => {
+                                    trackPortfolioClick(data.uid!, `project_${p.id}`);
+                                    setSelectedProject(p);
+                                }} />
                             ))}
                           </div>
                       </section>

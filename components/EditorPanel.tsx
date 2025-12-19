@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -6,9 +5,9 @@ import { PortfolioData, Project, Testimonial } from '../types';
 import { Input, TextArea } from './ui/Input';
 import { Button } from './ui/Button';
 import { ToolSelector } from './ToolSelector';
-import { Plus, Trash2, Video, Wand2, Image as ImageIcon, ChevronDown, Upload, X, LayoutDashboard, Copy, ExternalLink, User, MessageSquare, Loader2, CheckCircle2, Globe, Crop, Settings, LogOut, AlertCircle, Sparkles, Wrench, ZoomIn, ZoomOut, QrCode, Download, AlertTriangle, Eye, Monitor, Smartphone, HelpCircle, Info } from 'lucide-react';
+import { Plus, Trash2, Video, Wand2, Image as ImageIcon, ChevronDown, Upload, X, LayoutDashboard, Copy, ExternalLink, User, MessageSquare, Loader2, CheckCircle2, Globe, Crop, Settings, LogOut, AlertCircle, Sparkles, Wrench, ZoomIn, ZoomOut, QrCode, Download, AlertTriangle, Eye, Monitor, Smartphone, HelpCircle, Info, BarChart3, MousePointerClick } from 'lucide-react';
 import Cropper from 'react-easy-crop';
-import { getCroppedImg, generateThumbnailFromVideo, uploadFileToStorage, hasCloudStorage, generateAiBio, generateAiDescription, checkPortfolioReadiness, downloadQrCode, getYouTubeThumbnail, getDriveThumbnail, generateAiThumbnail } from '../utils';
+import { getCroppedImg, generateThumbnailFromVideo, uploadFileToStorage, hasCloudStorage, generateAiBio, generateAiDescription, checkPortfolioReadiness, downloadQrCode, getYouTubeThumbnail, getDriveThumbnail, generateAiThumbnail, getPortfolioStats } from '../utils';
 
 interface EditorPanelProps {
   data: PortfolioData;
@@ -40,8 +39,11 @@ const Tooltip = ({ text, children }: { text: string; children?: React.ReactNode 
 export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPublish, isSaving, hasUnsavedChanges, onLogout, onDeleteAccount, onPreview }) => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'profile' | 'content' | 'testimonials' | 'tools' | 'settings'>('dashboard');
   const [expandedProject, setExpandedProject] = useState<string | null>(null);
-  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [uploadStatus, setUploadStatus] = useState<{ id: string; progress: number } | null>(null);
+  const [linkValidation, setLinkValidation] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showQr, setShowQr] = useState(false);
+  const [stats, setStats] = useState({ views: 0, clicks: 0 });
   
   // Image Crop State
   const [cropModal, setCropModal] = useState<{ open: boolean; src: string | null }>({ open: false, src: null });
@@ -49,33 +51,70 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
   const [zoom, setZoom] = useState(1);
   const [croppedPixels, setCroppedPixels] = useState<any>(null);
 
-  const updateField = (f: keyof PortfolioData, v: any) => onChange({ ...data, [f]: v });
+  useEffect(() => {
+      if (activeTab === 'dashboard' && data.uid) {
+          getPortfolioStats(data.uid).then(setStats);
+      }
+  }, [activeTab, data.uid]);
 
-  // Speed Optimization: Update local state with Blob URL immediately, then upload in background
+  const updateField = (f: keyof PortfolioData, v: any) => onChange({ ...data, [f]: v });
+  const updateProject = (id: string, updates: Partial<Project>) => {
+      onChange({ ...data, projects: data.projects.map(p => p.id === id ? { ...p, ...updates } : p) });
+  };
+
   const handleProjectVideo = async (projectId: string, file: File) => {
     const localUrl = URL.createObjectURL(file);
     const tempProjects = data.projects.map(p => p.id === projectId ? { ...p, link: localUrl } : p);
     onChange({ ...data, projects: tempProjects });
-    setUploadProgress(1);
+    
+    setUploadStatus({ id: projectId, progress: 1 });
 
     try {
-        const downloadUrl = await uploadFileToStorage(file, `users/${data.uid}/projects/${projectId}_${Date.now()}.mp4`, setUploadProgress);
+        const downloadUrl = await uploadFileToStorage(
+            file, 
+            `users/${data.uid}/projects/${projectId}_${Date.now()}.mp4`, 
+            (p) => setUploadStatus({ id: projectId, progress: p })
+        );
         const finalProjects = data.projects.map(p => p.id === projectId ? { ...p, link: downloadUrl } : p);
         onChange({ ...data, projects: finalProjects });
-    } finally { setUploadProgress(null); }
+    } finally { 
+        setUploadStatus(null); 
+    }
   };
 
   const handleShowreel = async (file: File) => {
     const localUrl = URL.createObjectURL(file);
     updateField('showreelLink', localUrl);
-    setUploadProgress(1);
+    
+    setUploadStatus({ id: 'showreel', progress: 1 });
+    
     try {
-        const downloadUrl = await uploadFileToStorage(file, `users/${data.uid}/showreels/main_${Date.now()}.mp4`, setUploadProgress);
+        const downloadUrl = await uploadFileToStorage(
+            file, 
+            `users/${data.uid}/showreels/main_${Date.now()}.mp4`, 
+            (p) => setUploadStatus({ id: 'showreel', progress: p })
+        );
         updateField('showreelLink', downloadUrl);
-    } finally { setUploadProgress(null); }
+    } finally { 
+        setUploadStatus(null); 
+    }
   };
 
-  const getShareLink = () => `${window.location.origin}${window.location.pathname}#${data.username}`;
+  const getShareLink = () => {
+      const baseUrl = window.location.origin;
+      return `${baseUrl}/#${data.username}`; 
+  };
+  
+  const getQrUrl = () => {
+      return `https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data=${encodeURIComponent(getShareLink())}&format=png`;
+  }
+
+  // Simulate link validation animation
+  const handleLinkInput = (id: string, val: string) => {
+      updateProject(id, { link: val });
+      setLinkValidation(id);
+      setTimeout(() => setLinkValidation(null), 1500);
+  };
 
   return (
     <div className="h-screen flex flex-col bg-black text-white overflow-hidden">
@@ -91,6 +130,21 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
                 <Button variant="outline" size="sm" onClick={onPreview} icon={<Eye size={14}/>}>Preview</Button>
             </div>
         </header>
+        
+         {showQr && createPortal(
+            <div className="fixed inset-0 z-[1000] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in" onClick={() => setShowQr(false)}>
+                <div className="bg-white rounded-2xl p-8 flex flex-col items-center gap-4 max-w-sm w-full" onClick={e => e.stopPropagation()}>
+                    <div className="bg-black p-4 rounded-xl"><img src={getQrUrl()} alt="Portfolio QR" className="w-48 h-48" loading="lazy" /></div>
+                    <div className="text-center">
+                        <h3 className="text-black font-bold text-lg mb-1">Scan to View</h3>
+                        <p className="text-zinc-500 text-xs break-all">{getShareLink()}</p>
+                    </div>
+                    <Button onClick={() => downloadQrCode(getQrUrl(), `${data.username}-portfolio-qr.png`)} className="w-full" icon={<Download size={16}/>}>Download QR</Button>
+                    <Button variant="secondary" onClick={() => setShowQr(false)} className="w-full">Close</Button>
+                </div>
+            </div>,
+            document.body
+        )}
 
         {/* Main Layout */}
         <div className="flex-1 flex overflow-hidden">
@@ -122,8 +176,31 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
                                     <code className="text-xs text-zinc-300 flex-1 truncate">{getShareLink()}</code>
                                     <Button size="sm" onClick={() => { navigator.clipboard.writeText(getShareLink()); alert("Copied!"); }}>Copy</Button>
                                 </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                     <Button variant="outline" className="w-full py-6 border-dashed" onClick={() => window.open(getShareLink(), '_blank')}>Open Public Portfolio <ExternalLink size={14} className="ml-2"/></Button>
+                                     <Button variant="outline" className="w-full py-6 border-dashed" onClick={() => setShowQr(true)}>Get QR Code <QrCode size={14} className="ml-2"/></Button>
+                                </div>
                             </div>
-                            <Button variant="outline" className="w-full py-6 border-dashed" onClick={() => window.open(getShareLink(), '_blank')}>Open Public Portfolio <ExternalLink size={14} className="ml-2"/></Button>
+                            
+                            {/* Analytics Stats */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl flex flex-col justify-between h-32 relative overflow-hidden">
+                                     <div className="absolute right-0 top-0 p-32 bg-indigo-500/5 rounded-full blur-2xl transform translate-x-10 -translate-y-10"></div>
+                                     <div className="flex items-center gap-3 text-zinc-500 mb-2">
+                                         <BarChart3 size={16} />
+                                         <span className="text-xs font-bold uppercase tracking-widest">Total Views</span>
+                                     </div>
+                                     <span className="text-4xl font-display font-black text-white">{stats.views}</span>
+                                </div>
+                                <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl flex flex-col justify-between h-32 relative overflow-hidden">
+                                     <div className="absolute right-0 top-0 p-32 bg-purple-500/5 rounded-full blur-2xl transform translate-x-10 -translate-y-10"></div>
+                                     <div className="flex items-center gap-3 text-zinc-500 mb-2">
+                                         <MousePointerClick size={16} />
+                                         <span className="text-xs font-bold uppercase tracking-widest">Interactions</span>
+                                     </div>
+                                     <span className="text-4xl font-display font-black text-white">{stats.clicks}</span>
+                                </div>
+                            </div>
                         </div>
                     )}
 
@@ -161,13 +238,28 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
                         <div className="space-y-12 animate-in fade-in">
                             <div className="space-y-4">
                                 <h3 className="text-sm font-bold uppercase tracking-widest text-zinc-500">Showreel</h3>
-                                {uploadProgress ? <div className="h-2 bg-zinc-800 rounded-full overflow-hidden"><motion.div className="h-full bg-indigo-500" initial={{ width: 0 }} animate={{ width: `${uploadProgress}%` }} /></div> : null}
-                                <Button className="w-full h-32 border-2 border-dashed border-zinc-800 bg-zinc-950 hover:border-indigo-500" variant="ghost" onClick={() => {
-                                    const input = document.createElement('input');
-                                    input.type = 'file';
-                                    input.onchange = (e: any) => handleShowreel(e.target.files[0]);
-                                    input.click();
-                                }}><Upload className="mr-2"/> {data.showreelLink ? 'Replace Showreel' : 'Upload Showreel'}</Button>
+                                
+                                <div className="relative">
+                                    {uploadStatus?.id === 'showreel' && (
+                                        <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-10 rounded-xl backdrop-blur-sm">
+                                            <div className="flex flex-col items-center gap-2">
+                                                <Loader2 className="animate-spin text-indigo-500" size={24}/>
+                                                <span className="text-[10px] uppercase font-bold text-white">Uploading {Math.round(uploadStatus.progress)}%</span>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <Button className="w-full h-32 border-2 border-dashed border-zinc-800 bg-zinc-950 hover:border-indigo-500 group relative overflow-hidden" variant="ghost" onClick={() => {
+                                        const input = document.createElement('input');
+                                        input.type = 'file';
+                                        input.onchange = (e: any) => handleShowreel(e.target.files[0]);
+                                        input.click();
+                                    }}>
+                                        <div className="absolute inset-0 bg-indigo-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        <Upload className="mr-2 group-hover:scale-110 transition-transform"/> 
+                                        {data.showreelLink ? 'Replace Showreel' : 'Upload Showreel'}
+                                    </Button>
+                                </div>
                             </div>
                             <div className="space-y-6">
                                 <div className="flex justify-between items-center">
@@ -176,18 +268,82 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onPubl
                                 </div>
                                 <div className="space-y-4">
                                     {data.projects.map(p => (
-                                        <div key={p.id} className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-2xl flex gap-4">
+                                        <div key={p.id} className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-2xl flex gap-4 relative overflow-hidden group/card">
+                                            
+                                            {/* Project Progress Overlay */}
+                                            {uploadStatus?.id === p.id && (
+                                                <div className="absolute inset-0 bg-black/80 z-20 flex items-center justify-center backdrop-blur-sm">
+                                                    <div className="w-full max-w-[50%]">
+                                                        <div className="h-1 bg-zinc-800 rounded-full overflow-hidden mb-2">
+                                                            <motion.div 
+                                                                className="h-full bg-indigo-500" 
+                                                                initial={{ width: 0 }} 
+                                                                animate={{ width: `${uploadStatus.progress}%` }} 
+                                                            />
+                                                        </div>
+                                                        <p className="text-center text-[10px] font-bold">Uploading...</p>
+                                                    </div>
+                                                </div>
+                                            )}
+
                                             <div className="w-24 h-24 bg-black rounded-lg overflow-hidden shrink-0 border border-zinc-800"><img src={p.thumbnail} className="w-full h-full object-cover"/></div>
                                             <div className="flex-1 space-y-2">
-                                                <input className="bg-transparent border-none p-0 text-white font-bold w-full focus:ring-0" value={p.title} onChange={e => updateField('projects', data.projects.map(proj => proj.id === p.id ? { ...proj, title: e.target.value } : proj))} />
-                                                <input className="bg-transparent border-none p-0 text-zinc-500 text-xs w-full focus:ring-0" value={p.category} onChange={e => updateField('projects', data.projects.map(proj => proj.id === p.id ? { ...proj, category: e.target.value } : proj))} />
+                                                <input className="bg-transparent border-none p-0 text-white font-bold w-full focus:ring-0" value={p.title} onChange={e => updateProject(p.id, { title: e.target.value })} />
                                                 <div className="flex gap-2">
-                                                    <Button size="sm" variant="outline" className="h-8 text-[10px]" onClick={() => {
-                                                        const input = document.createElement('input');
-                                                        input.type = 'file';
-                                                        input.onchange = (e: any) => handleProjectVideo(p.id, e.target.files[0]);
-                                                        input.click();
-                                                    }}>Upload Video</Button>
+                                                    <select 
+                                                        value={p.type} 
+                                                        onChange={e => updateProject(p.id, { type: e.target.value as 'video'|'image' })}
+                                                        className="bg-black text-[10px] text-zinc-400 border border-zinc-800 rounded px-1"
+                                                    >
+                                                        <option value="video">Video</option>
+                                                        <option value="image">Image</option>
+                                                    </select>
+                                                    <input className="bg-transparent border-none p-0 text-zinc-500 text-xs w-full focus:ring-0" value={p.category} onChange={e => updateProject(p.id, { category: e.target.value })} placeholder="Category" />
+                                                </div>
+                                                
+                                                <div className="flex gap-2 pt-1 items-center">
+                                                    {p.type === 'video' ? (
+                                                        <>
+                                                            <Button size="sm" variant="outline" className="h-8 text-[10px]" onClick={() => {
+                                                                const input = document.createElement('input');
+                                                                input.type = 'file';
+                                                                input.accept = 'video/*';
+                                                                input.onchange = (e: any) => handleProjectVideo(p.id, e.target.files[0]);
+                                                                input.click();
+                                                            }}>Upload</Button>
+                                                            <div className="relative flex-1">
+                                                                <Input 
+                                                                    value={p.link} 
+                                                                    onChange={e => handleLinkInput(p.id, e.target.value)} 
+                                                                    placeholder="Drive/YouTube Link"
+                                                                    className="h-8 text-[10px] py-1"
+                                                                />
+                                                                <AnimatePresence>
+                                                                    {linkValidation === p.id && (
+                                                                        <motion.div initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="absolute right-2 top-1/2 -translate-y-1/2 text-green-500">
+                                                                            <Loader2 className="animate-spin" size={12} />
+                                                                        </motion.div>
+                                                                    )}
+                                                                </AnimatePresence>
+                                                            </div>
+                                                        </>
+                                                    ) : (
+                                                        <Button size="sm" variant="outline" className="h-8 text-[10px]" onClick={() => {
+                                                            const input = document.createElement('input');
+                                                            input.type = 'file';
+                                                            input.accept = 'image/*';
+                                                            input.onchange = (e: any) => {
+                                                                const file = e.target.files[0];
+                                                                const url = URL.createObjectURL(file);
+                                                                updateProject(p.id, { link: url, thumbnail: url }); 
+                                                                 uploadFileToStorage(file, `users/${data.uid}/projects/${p.id}_img_${Date.now()}`).then(url => {
+                                                                     updateProject(p.id, { link: url, thumbnail: url });
+                                                                 });
+                                                            };
+                                                            input.click();
+                                                        }}>Upload Image</Button>
+                                                    )}
+                                                    
                                                     <Button size="sm" variant="ghost" className="h-8 text-[10px] text-red-500" onClick={() => updateField('projects', data.projects.filter(proj => proj.id !== p.id))}><Trash2 size={12}/></Button>
                                                 </div>
                                             </div>

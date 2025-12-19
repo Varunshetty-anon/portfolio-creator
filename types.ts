@@ -58,6 +58,10 @@ export interface PortfolioData {
     username: string; 
     password: string; 
   };
+  stats?: {
+    views: number;
+    clicks: number;
+  };
 }
 
 export const INITIAL_DATA: PortfolioData = {
@@ -87,6 +91,10 @@ export const INITIAL_DATA: PortfolioData = {
   settings: {
     username: "admin",
     password: "password"
+  },
+  stats: {
+    views: 0,
+    clicks: 0
   }
 };
 

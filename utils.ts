@@ -1,7 +1,6 @@
-
 import { PortfolioData, INITIAL_DATA, Project } from './types';
 import { db, storage, auth, googleProvider, isConfigured } from './firebase';
-import { doc, getDoc, setDoc, collection, query, where, getDocs, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, where, getDocs, deleteDoc, addDoc, serverTimestamp, increment } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, User, deleteUser } from 'firebase/auth';
 import { GoogleGenAI } from "@google/genai";
@@ -69,7 +68,6 @@ export const getDriveEmbedUrl = (url: string): string | null => {
   return id ? `https://drive.google.com/file/d/${id}/preview` : null;
 };
 
-// Added missing getDriveThumbnail export for video projects
 export const getDriveThumbnail = (url: string): string | null => {
   const id = getDriveId(url);
   return id ? `https://lh3.googleusercontent.com/u/0/d/${id}=w1000` : null;
@@ -96,6 +94,7 @@ export const saveToDB = async (data: PortfolioData): Promise<void> => {
     delete obj.profileImageBlob;
     delete obj.showreelThumbnailBlob;
     delete obj.showreelBlob;
+    delete obj.stats; // Do not save stats to main doc
     if (obj.projects) {
       obj.projects.forEach((p: any) => {
         delete p.thumbnailBlob;
@@ -107,8 +106,12 @@ export const saveToDB = async (data: PortfolioData): Promise<void> => {
 
   if (isConfigured && db) {
     const docRef = doc(db, COLLECTION_NAME, data.uid);
-    // Overwrite with clean data to ensure absolute state sync
+    // 1. Overwrite main document (Published State)
     await setDoc(docRef, { ...cleanData, lastUpdated: Date.now() });
+    
+    // 2. Save immutable version
+    const versionRef = collection(docRef, 'versions');
+    await addDoc(versionRef, { ...cleanData, savedAt: serverTimestamp() });
   }
   
   localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(cleanData));
@@ -137,6 +140,31 @@ export const loadFromDB = async (identifier: string): Promise<PortfolioData | nu
     console.error("Firestore Load Error:", error);
   }
   return null;
+};
+
+export const trackPortfolioView = async (uid: string) => {
+    if (!isConfigured || !db || !uid) return;
+    try {
+        const statsRef = doc(db, 'portfolio_stats', uid);
+        await setDoc(statsRef, { views: increment(1), lastViewed: serverTimestamp() }, { merge: true });
+    } catch (e) { console.error("Analytics Error", e); }
+};
+
+export const trackPortfolioClick = async (uid: string, type: string) => {
+    if (!isConfigured || !db || !uid) return;
+    try {
+        const statsRef = doc(db, 'portfolio_stats', uid);
+        await setDoc(statsRef, { clicks: increment(1) }, { merge: true });
+    } catch (e) { console.error("Analytics Error", e); }
+};
+
+export const getPortfolioStats = async (uid: string): Promise<{ views: number; clicks: number }> => {
+    if (!isConfigured || !db || !uid) return { views: 0, clicks: 0 };
+    try {
+        const statsRef = doc(db, 'portfolio_stats', uid);
+        const snap = await getDoc(statsRef);
+        return snap.exists() ? (snap.data() as any) : { views: 0, clicks: 0 };
+    } catch (e) { return { views: 0, clicks: 0 }; }
 };
 
 export const uploadFileToStorage = (file: File, path: string, onProgress?: (progress: number) => void): Promise<string> => {
@@ -189,12 +217,11 @@ export const generateThumbnailFromVideo = (file: File): Promise<{ url: string; b
   });
 };
 
-// Added missing getCroppedImg export for profile picture handling
 export const getCroppedImg = (imageSrc: string, pixelCrop: any): Promise<Blob> => {
   return new Promise((resolve, reject) => {
     const image = new Image();
     image.src = imageSrc;
-    image.crossOrigin = 'anonymous'; // Support cross-origin images for canvas operations
+    image.crossOrigin = 'anonymous'; 
     image.onload = () => {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
