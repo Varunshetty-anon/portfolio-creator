@@ -7,18 +7,60 @@ import { Button } from '../../components/ui/Button';
 import { ToolSelector } from '../../components/ToolSelector';
 import { Plus, Trash2, Video, Wand2, Image as ImageIcon, ChevronDown, Upload, X, LayoutDashboard, Copy, ExternalLink, User, MessageSquare, Loader2, CheckCircle2, Globe, Crop, Settings, LogOut, AlertCircle, Sparkles, Wrench, ZoomIn, ZoomOut, QrCode, Download, AlertTriangle, Eye, Monitor, Smartphone, HelpCircle, Info, BarChart3, MousePointerClick, Save, UploadCloud, Link, Youtube, HardDrive, Database, RotateCcw } from 'lucide-react';
 import Cropper from 'react-easy-crop';
-import { getCroppedImg, generateThumbnailFromVideo, uploadFileToStorage, hasCloudStorage, generateAiBio, generateAiDescription, downloadQrCode, getYouTubeThumbnail, getDriveThumbnail, generateAiThumbnail, getPortfolioStats, cleanupUnusedMedia } from '../../lib/utils';
+import { getCroppedImg, generateThumbnailFromVideo, uploadFileToStorage, hasCloudStorage, generateAiBio, generateAiDescription, downloadQrCode, getYouTubeThumbnail, getDriveThumbnail, generateAiThumbnail, getPortfolioStats, cleanupUnusedMedia, saveDraft } from '../../lib/utils';
 
 interface EditorPanelProps {
   data: PortfolioData;
   onChange: (newData: PortfolioData) => void;
-  onSave: () => void;
-  onPublish: () => void;
+  onSave: () => Promise<void>;
+  onPublish: () => Promise<void>;
   isSaving: boolean;
   hasUnsavedChanges: boolean;
   onLogout?: () => void;
   onDeleteAccount?: () => Promise<void>;
   onPreview?: () => void;
+}
+
+// --- Animated Publish Button Component ---
+const PublishButton = ({ onPublish, hasUnsavedChanges }: { onPublish: () => Promise<void>, hasUnsavedChanges: boolean }) => {
+    const [status, setStatus] = useState<'idle' | 'loading' | 'success'>('idle');
+
+    const handleClick = async () => {
+        setStatus('loading');
+        try {
+            await onPublish();
+            setStatus('success');
+            setTimeout(() => setStatus('idle'), 2000);
+        } catch (e) {
+            console.error(e);
+            setStatus('idle');
+        }
+    };
+
+    return (
+        <Button 
+            size="sm" 
+            onClick={handleClick} 
+            disabled={status === 'loading'} 
+            className={`transition-all duration-300 border-none ${status === 'success' ? 'bg-green-500 hover:bg-green-500' : 'bg-indigo-600 hover:bg-indigo-500'} text-white`}
+        >
+            <AnimatePresence mode="wait">
+                {status === 'loading' ? (
+                    <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                        <Loader2 className="animate-spin" size={14}/>
+                    </motion.div>
+                ) : status === 'success' ? (
+                    <motion.div key="success" initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-2">
+                         <CheckCircle2 size={14} /> Published
+                    </motion.div>
+                ) : (
+                    <motion.div key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-2">
+                        <UploadCloud size={14}/> Publish
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </Button>
+    );
 }
 
 const Tooltip = ({ text, children }: { text: string; children?: React.ReactNode }) => {
@@ -43,14 +85,12 @@ const getLinkIndicator = (url: string) => {
     let isValid = false;
     try {
         const u = new URL(url);
-        // Ensure protocol is http or https
         if (['http:', 'https:'].includes(u.protocol)) isValid = true;
     } catch(e) {
         isValid = false;
     }
 
     if (!isValid) {
-        // Show invalid indicator if length is significant (avoids flashing on first char)
         if (url.length > 5) {
              return { 
                  icon: AlertCircle, 
@@ -74,18 +114,17 @@ const getLinkIndicator = (url: string) => {
     if (lower.includes('vimeo.com'))
         return { icon: Video, color: 'text-sky-500', label: 'Vimeo', border: '!border-sky-500/50 focus:!border-sky-500 focus:!ring-sky-500/20' };
         
-    // Generic Web Link
     return { icon: Link, color: 'text-emerald-500', label: 'Web', border: '!border-emerald-500/50 focus:!border-emerald-500 focus:!ring-emerald-500/20' };
 };
 
 export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave, onPublish, isSaving, hasUnsavedChanges, onLogout, onDeleteAccount, onPreview }) => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'profile' | 'content' | 'testimonials' | 'tools' | 'settings'>('dashboard');
-  const [uploadStatus, setUploadStatus] = useState<{ id: string; progress: number } | null>(null);
+  const [uploadStatus, setUploadStatus] = useState<{ id: string; progress: number, step?: string } | null>(null);
   const [linkValidation, setLinkValidation] = useState<string | null>(null);
   
   // Deletion States
-  const [confirmDelete, setConfirmDelete] = useState(false); // For Account
-  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null); // For Projects
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
   const [toast, setToast] = useState<{ show: boolean; message: string; undoData?: { project: Project; index: number } } | null>(null);
   
   const [isDeleting, setIsDeleting] = useState(false);
@@ -107,7 +146,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
       }
   }, [activeTab, data.uid]);
 
-  // Toast Timer Logic
   useEffect(() => {
     if (toast?.show) {
         if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
@@ -120,46 +158,91 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
     }
   }, [toast]);
 
+  // Helper wrapper for auto-save after media operations
+  const triggerAutoSave = async (newData: PortfolioData) => {
+      // First update state
+      onChange(newData);
+      // Then save to draft
+      if (newData.uid) {
+          await saveDraft(newData.uid, newData);
+      }
+  }
+
   const updateField = (f: keyof PortfolioData, v: any) => onChange({ ...data, [f]: v });
   const updateProject = (id: string, updates: Partial<Project>) => {
       onChange({ ...data, projects: data.projects.map(p => p.id === id ? { ...p, ...updates } : p) });
   };
 
   const handleProjectVideo = async (projectId: string, file: File) => {
-    const localUrl = URL.createObjectURL(file);
-    const tempProjects = data.projects.map(p => p.id === projectId ? { ...p, link: localUrl } : p);
-    onChange({ ...data, projects: tempProjects });
-    
-    setUploadStatus({ id: projectId, progress: 1 });
+    setUploadStatus({ id: projectId, progress: 0, step: 'Processing...' });
 
     try {
-        const downloadUrl = await uploadFileToStorage(
-            file, 
-            `users/${data.uid}/projects/${projectId}_${Date.now()}.mp4`, 
-            (p) => setUploadStatus({ id: projectId, progress: p })
-        );
-        const finalProjects = data.projects.map(p => p.id === projectId ? { ...p, link: downloadUrl } : p);
-        onChange({ ...data, projects: finalProjects });
+        // 1. Generate Thumbnail & Detect Aspect Ratio
+        const { url: thumbBlobUrl, blob: thumbBlob, aspectRatio } = await generateThumbnailFromVideo(file);
+        
+        // 2. Upload Video
+        setUploadStatus({ id: projectId, progress: 10, step: 'Uploading Video...' });
+        const videoPath = `users/${data.uid}/projects/${projectId}_${Date.now()}.mp4`;
+        const videoUrl = await uploadFileToStorage(file, videoPath, (p) => {
+            // Scale progress to 10-80% range for video upload
+            setUploadStatus({ id: projectId, progress: 10 + (p * 0.7), step: 'Uploading Video...' });
+        });
+
+        // 3. Upload Thumbnail
+        setUploadStatus({ id: projectId, progress: 85, step: 'Uploading Thumbnail...' });
+        const thumbPath = `users/${data.uid}/projects/${projectId}_thumb_${Date.now()}.jpg`;
+        const thumbUrl = await uploadFileToStorage(new File([thumbBlob], 'thumb.jpg'), thumbPath);
+
+        // 4. Update State & Auto-Save
+        const finalProjects = data.projects.map(p => p.id === projectId ? { 
+            ...p, 
+            link: videoUrl, 
+            thumbnail: thumbUrl,
+            aspectRatio: aspectRatio 
+        } : p);
+        
+        const newData = { ...data, projects: finalProjects };
+        await triggerAutoSave(newData);
+        
+        setUploadStatus({ id: projectId, progress: 100, step: 'Done' });
+
+    } catch (e) {
+        console.error("Video Upload Failed", e);
+        // Fallback or error toast could go here
     } finally { 
-        setUploadStatus(null); 
+        setTimeout(() => setUploadStatus(null), 1000); 
     }
   };
 
   const handleShowreel = async (file: File) => {
-    const localUrl = URL.createObjectURL(file);
-    updateField('showreelLink', localUrl);
-    
-    setUploadStatus({ id: 'showreel', progress: 1 });
+    setUploadStatus({ id: 'showreel', progress: 0, step: 'Processing...' });
     
     try {
-        const downloadUrl = await uploadFileToStorage(
-            file, 
-            `users/${data.uid}/showreels/main_${Date.now()}.mp4`, 
-            (p) => setUploadStatus({ id: 'showreel', progress: p })
-        );
-        updateField('showreelLink', downloadUrl);
+        // 1. Generate Thumbnail
+        const { blob: thumbBlob } = await generateThumbnailFromVideo(file);
+        
+        // 2. Upload Video
+        setUploadStatus({ id: 'showreel', progress: 10, step: 'Uploading Video...' });
+        const videoPath = `users/${data.uid}/showreels/main_${Date.now()}.mp4`;
+        const videoUrl = await uploadFileToStorage(file, videoPath, (p) => {
+            setUploadStatus({ id: 'showreel', progress: 10 + (p * 0.7), step: 'Uploading Video...' });
+        });
+
+        // 3. Upload Thumbnail
+        setUploadStatus({ id: 'showreel', progress: 85, step: 'Uploading Thumbnail...' });
+        const thumbPath = `users/${data.uid}/showreels/thumb_${Date.now()}.jpg`;
+        const thumbUrl = await uploadFileToStorage(new File([thumbBlob], 'thumb.jpg'), thumbPath);
+
+        // 4. Auto-Save
+        const newData = { ...data, showreelLink: videoUrl, showreelThumbnail: thumbUrl };
+        await triggerAutoSave(newData);
+        
+        setUploadStatus({ id: 'showreel', progress: 100, step: 'Done' });
+
+    } catch(e) {
+        console.error(e);
     } finally { 
-        setUploadStatus(null); 
+        setTimeout(() => setUploadStatus(null), 1000); 
     }
   };
 
@@ -167,12 +250,11 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
       if (!onDeleteAccount) return;
       setIsDeleting(true);
       await onDeleteAccount();
-      // App will reload/redirect
   }
 
   const handleCleanup = async () => {
       if (!data.uid) return;
-      if (!window.confirm("This will permanently delete unused media files that are not used in your Live Portfolio or current Draft. Continue?")) return;
+      if (!window.confirm("This will permanently delete unused media files. Continue?")) return;
       setIsCleaning(true);
       try {
           const count = await cleanupUnusedMedia(data.uid, data);
@@ -204,7 +286,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
       if (!toast?.undoData) return;
       const { project, index } = toast.undoData;
       const newProjects = [...data.projects];
-      // Insert back at original index or end
       if (index >= 0 && index <= newProjects.length) {
           newProjects.splice(index, 0, project);
       } else {
@@ -216,8 +297,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
 
   const getShareLink = () => {
       const baseUrl = window.location.origin;
-      // Use Hash routing to ensure compatibility with all hosting environments
-      // This avoids "Cannot GET /v/..." errors on servers that don't support SPA rewrites.
       return `${baseUrl}/#${data.username}`; 
   };
   
@@ -225,7 +304,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
       return `https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data=${encodeURIComponent(getShareLink())}&format=png`;
   }
 
-  // Simulate link validation animation
   const handleLinkInput = (id: string, val: string) => {
       updateProject(id, { link: val });
       setLinkValidation(id);
@@ -234,7 +312,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
 
   return (
     <div className="h-screen flex flex-col bg-black text-white overflow-hidden">
-        {/* Header */}
         <header className="p-4 border-b border-zinc-800 bg-zinc-950 flex justify-between items-center z-50">
             <div className="flex items-baseline gap-2">
                 <h2 className="text-xl font-display font-black tracking-tighter">FRAMES</h2>
@@ -242,12 +319,12 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
             </div>
             <div className="flex items-center gap-3">
                 {hasUnsavedChanges && <span className="text-[10px] text-zinc-500 font-bold uppercase mr-2">Unsaved Changes</span>}
-                <Button size="sm" variant="secondary" onClick={onSave} disabled={isSaving} icon={<Save size={14}/>}>
+                <Button size="sm" variant="secondary" onClick={() => onSave()} disabled={isSaving || !!uploadStatus} icon={<Save size={14}/>}>
                     {isSaving ? 'Saving...' : 'Save Draft'}
                 </Button>
-                <Button size="sm" onClick={onPublish} disabled={isSaving} className="bg-indigo-600 hover:bg-indigo-500 text-white border-none" icon={<UploadCloud size={14}/>}>
-                    {isSaving ? <Loader2 className="animate-spin" size={14}/> : 'Publish Live'}
-                </Button>
+                
+                <PublishButton onPublish={onPublish} hasUnsavedChanges={hasUnsavedChanges} />
+
                 <div className="h-6 w-px bg-zinc-800 mx-1"></div>
                 <Button variant="outline" size="sm" onClick={onPreview} icon={<Eye size={14}/>}>Preview</Button>
             </div>
@@ -268,9 +345,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
             document.body
         )}
 
-        {/* Main Layout */}
         <div className="flex-1 flex overflow-hidden">
-            {/* Sidebar Tabs */}
             <nav className="w-16 border-r border-zinc-900 flex flex-col gap-4 py-8 items-center bg-zinc-950/50">
                 {[
                     { id: 'dashboard', icon: LayoutDashboard },
@@ -285,7 +360,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                 ))}
             </nav>
 
-            {/* Scrollable Editor Area */}
             <main className="flex-1 overflow-y-auto p-8 md:p-12 custom-scrollbar bg-[radial-gradient(circle_at_50%_0%,rgba(99,102,241,0.05),transparent)]">
                 <div className="max-w-3xl mx-auto space-y-12">
                     {activeTab === 'dashboard' && (
@@ -312,7 +386,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                                 </div>
                             </div>
                             
-                            {/* Analytics Stats */}
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-3xl flex flex-col justify-between h-32 relative overflow-hidden">
                                      <div className="absolute right-0 top-0 p-32 bg-indigo-500/5 rounded-full blur-2xl transform translate-x-10 -translate-y-10"></div>
@@ -339,6 +412,11 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                             <div className="flex items-center gap-8">
                                 <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-zinc-800 relative group shrink-0">
                                     <img src={data.profileImage} className="w-full h-full object-cover" />
+                                    {uploadStatus?.id === 'profile' && (
+                                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                                            <Loader2 className="animate-spin text-white" size={24}/>
+                                        </div>
+                                    )}
                                     <button onClick={() => {
                                         const input = document.createElement('input');
                                         input.type = 'file';
@@ -367,18 +445,19 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                     {activeTab === 'content' && (
                         <div className="space-y-12 animate-in fade-in">
                             <div className="space-y-4">
-                                <h3 className="text-sm font-bold uppercase tracking-widest text-zinc-500">Showreel</h3>
-                                
+                                <div className="flex justify-between items-center">
+                                    <h3 className="text-sm font-bold uppercase tracking-widest text-zinc-500">Showreel</h3>
+                                    <Button size="sm" variant="ghost" onClick={() => onSave()} icon={<Save size={12} className="text-zinc-500"/>} className="text-xs text-zinc-500 hover:text-white">Save Section</Button>
+                                </div>
                                 <div className="relative">
                                     {uploadStatus?.id === 'showreel' && (
                                         <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-10 rounded-xl backdrop-blur-sm">
                                             <div className="flex flex-col items-center gap-2">
                                                 <Loader2 className="animate-spin text-indigo-500" size={24}/>
-                                                <span className="text-[10px] uppercase font-bold text-white">Uploading {Math.round(uploadStatus.progress)}%</span>
+                                                <span className="text-[10px] uppercase font-bold text-white">{uploadStatus.step} {Math.round(uploadStatus.progress)}%</span>
                                             </div>
                                         </div>
                                     )}
-
                                     <div className="flex gap-4 items-start">
                                         <div className="flex-1 space-y-2">
                                             <Input 
@@ -404,15 +483,16 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                             <div className="space-y-6">
                                 <div className="flex justify-between items-center">
                                     <h3 className="text-sm font-bold uppercase tracking-widest text-zinc-500">Projects</h3>
-                                    <Button size="sm" onClick={() => updateField('projects', [...data.projects, { id: Date.now().toString(), title: "New Project", description: "Edit summary", thumbnail: "", link: "", category: "Work", type: "video" }])}><Plus size={14}/> Add</Button>
+                                    <div className="flex gap-2">
+                                        <Button size="sm" variant="ghost" onClick={() => onSave()} icon={<Save size={12} className="text-zinc-500"/>} className="text-xs text-zinc-500 hover:text-white">Save Section</Button>
+                                        <Button size="sm" onClick={() => updateField('projects', [...data.projects, { id: Date.now().toString(), title: "New Project", description: "Edit summary", thumbnail: "", link: "", category: "Work", type: "video" }])}><Plus size={14}/> Add</Button>
+                                    </div>
                                 </div>
                                 <div className="space-y-4">
                                     {data.projects.map(p => {
                                         const linkStatus = getLinkIndicator(p.link);
                                         return (
                                             <div key={p.id} className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-2xl flex gap-4 relative overflow-hidden group/card">
-                                                
-                                                {/* Project Progress Overlay */}
                                                 {uploadStatus?.id === p.id && (
                                                     <div className="absolute inset-0 bg-black/80 z-20 flex items-center justify-center backdrop-blur-sm">
                                                         <div className="w-full max-w-[50%]">
@@ -423,12 +503,18 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                                                                     animate={{ width: `${uploadStatus.progress}%` }} 
                                                                 />
                                                             </div>
-                                                            <p className="text-center text-[10px] font-bold">Uploading...</p>
+                                                            <p className="text-center text-[10px] font-bold">{uploadStatus.step}</p>
                                                         </div>
                                                     </div>
                                                 )}
-
-                                                <div className="w-24 h-24 bg-black rounded-lg overflow-hidden shrink-0 border border-zinc-800"><img src={p.thumbnail} className="w-full h-full object-cover"/></div>
+                                                <div className="w-24 h-24 bg-black rounded-lg overflow-hidden shrink-0 border border-zinc-800 relative">
+                                                    <img src={p.thumbnail} className="w-full h-full object-cover"/>
+                                                    {p.aspectRatio && (
+                                                        <div className="absolute bottom-1 right-1 bg-black/70 text-[8px] px-1 rounded text-zinc-300">
+                                                            {p.aspectRatio}
+                                                        </div>
+                                                    )}
+                                                </div>
                                                 <div className="flex-1 space-y-2">
                                                     <input className="bg-transparent border-none p-0 text-white font-bold w-full focus:ring-0" value={p.title} onChange={e => updateProject(p.id, { title: e.target.value })} />
                                                     <div className="flex gap-2">
@@ -543,8 +629,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                                     <Input label="Login Email" value={data.contactEmail} disabled className="opacity-50" />
                                 </div>
                             </div>
-
-                            {/* Storage Management */}
                              <div className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-2xl space-y-4">
                                 <div className="flex items-center gap-2 mb-2">
                                     <Database size={16} className="text-zinc-400" />
@@ -562,7 +646,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                                     {isCleaning ? "Cleaning..." : "Remove Unused Files"}
                                 </Button>
                             </div>
-
                             <div className="p-6 border border-red-900/20 bg-red-900/5 rounded-2xl">
                                 <h4 className="text-red-500 font-bold mb-2 uppercase text-xs tracking-widest flex items-center gap-2"><AlertTriangle size={14}/> Danger Zone</h4>
                                 {!confirmDelete ? (
@@ -583,7 +666,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
             </main>
         </div>
 
-        {/* Undo Toast */}
         <AnimatePresence>
             {toast && toast.show && (
                 createPortal(
@@ -607,17 +689,13 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
             )}
         </AnimatePresence>
 
-        {/* Project Delete Confirmation Modal */}
         {projectToDelete && createPortal(
             <div className="fixed inset-0 z-[1000] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in" onClick={() => setProjectToDelete(null)}>
                 <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 flex flex-col items-center gap-6 max-w-sm w-full text-center shadow-2xl relative overflow-hidden" onClick={e => e.stopPropagation()}>
-                    {/* Subtle background glow */}
                     <div className="absolute inset-0 bg-red-500/5 pointer-events-none" />
-                    
                     <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center text-red-500 mb-2 ring-1 ring-red-500/20 shadow-[0_0_20px_rgba(239,68,68,0.2)]">
                         <Trash2 size={28} />
                     </div>
-                    
                     <div className="space-y-2 relative z-10">
                         <h3 className="text-white font-display font-bold text-2xl tracking-tight">Delete Project?</h3>
                         <p className="text-zinc-400 text-sm leading-relaxed">
@@ -625,7 +703,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                             <span className="text-white font-bold bg-zinc-800 px-2 py-0.5 rounded border border-zinc-700 mx-1">{projectToDelete.title}</span>
                         </p>
                     </div>
-
                     <div className="flex gap-3 w-full mt-2 relative z-10">
                         <Button variant="outline" className="flex-1 border-zinc-700 hover:bg-zinc-800" onClick={() => setProjectToDelete(null)}>Cancel</Button>
                         <Button className="flex-1 bg-red-600 hover:bg-red-500 text-white border-none shadow-lg shadow-red-900/20" onClick={confirmProjectDeletion}>
@@ -637,7 +714,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
             document.body
         )}
 
-        {/* Image Cropper Portal */}
         {cropModal.open && createPortal(
             <div className="fixed inset-0 z-[1000] bg-black flex flex-col p-8">
                 <div className="flex-1 relative bg-zinc-900 rounded-3xl overflow-hidden">
@@ -645,15 +721,32 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                 </div>
                 <div className="py-8 flex justify-center gap-4">
                     <Button variant="outline" onClick={() => setCropModal({ open: false, src: null })}>Cancel</Button>
-                    <Button onClick={async () => {
-                        const blob = await getCroppedImg(cropModal.src!, croppedPixels);
-                        const url = URL.createObjectURL(blob);
-                        updateField('profileImage', url);
-                        setCropModal({ open: false, src: null });
-                        // UPDATED: Upload to dedicated profile folder
-                        const uploadUrl = await uploadFileToStorage(new File([blob], 'profile.jpg'), `users/${data.uid}/profile/avatar_${Date.now()}.jpg`);
-                        updateField('profileImage', uploadUrl);
-                    }}>Save Photo</Button>
+                    <Button 
+                        disabled={uploadStatus?.id === 'profile'}
+                        onClick={async () => {
+                            if (!cropModal.src || !croppedPixels) return;
+                            setUploadStatus({ id: 'profile', progress: 0 });
+                            try {
+                                const blob = await getCroppedImg(cropModal.src, croppedPixels);
+                                // Upload directly without setting blob URL to state to prevent local caching issues
+                                const file = new File([blob], 'avatar.jpg', { type: 'image/jpeg' });
+                                // Add timestamp for cache busting
+                                const path = `users/${data.uid}/profile/avatar_${Date.now()}.jpg`;
+                                
+                                const downloadUrl = await uploadFileToStorage(file, path, (p) => setUploadStatus({ id: 'profile', progress: p }));
+                                
+                                updateField('profileImage', downloadUrl);
+                                setCropModal({ open: false, src: null });
+                            } catch (e) {
+                                console.error("Upload failed", e);
+                                alert("Failed to upload image. Please try again.");
+                            } finally {
+                                setUploadStatus(null);
+                            }
+                        }}
+                    >
+                        {uploadStatus?.id === 'profile' ? <Loader2 className="animate-spin" /> : 'Save Photo'}
+                    </Button>
                 </div>
             </div>,
             document.body

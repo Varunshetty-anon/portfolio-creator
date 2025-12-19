@@ -296,18 +296,30 @@ export const loadEditorState = async (uid: string): Promise<PortfolioData | null
   };
 };
 
+// --- In-Memory Cache for Public Portfolios ---
+const portfolioCache = new Map<string, { data: PortfolioData, timestamp: number }>();
+const CACHE_DURATION = 1000 * 60 * 5; // 5 minutes
+
 /**
  * Loads the Public Portfolio (Live Version) by SLUG.
- * Implements "Server-First" strategy to prevent stale content.
+ * Implements "Server-First" strategy with in-memory caching to prevent staleness and lag.
  */
 export const loadPublicPortfolio = async (slug: string): Promise<PortfolioData | null> => {
   if (!db) return null;
-  console.log("Loading public portfolio for slug:", slug);
+  const cleanSlug = slug.toLowerCase();
+  
+  // 1. Check Cache
+  const cached = portfolioCache.get(cleanSlug);
+  if (cached && (Date.now() - cached.timestamp < CACHE_DURATION)) {
+      console.log("Serving portfolio from cache:", cleanSlug);
+      return cached.data;
+  }
 
-  // 1. Resolve Slug to UID
+  console.log("Loading public portfolio for slug from server:", cleanSlug);
+
+  // 2. Resolve Slug to UID
   // CACHE STRATEGY: Try fetching metadata from server first to ensure we have the latest 'liveVersion' pointer.
-  // This is the "Lightweight Cache Busting" mechanism.
-  const q = query(collection(db, PORTFOLIOS_COL), where("slug", "==", slug.toLowerCase()));
+  const q = query(collection(db, PORTFOLIOS_COL), where("slug", "==", cleanSlug));
   
   let querySnap;
   try {
@@ -326,17 +338,16 @@ export const loadPublicPortfolio = async (slug: string): Promise<PortfolioData |
   const meta = portfolioDoc.data() as PortfolioMeta;
   const uid = portfolioDoc.id;
 
-  // 2. Check if published
+  // 3. Check if published
   if (!meta.publish?.isPublished || !meta.publish?.liveVersion) {
     console.log("Portfolio is not published");
     return null;
   }
 
-  // 3. Load the LIVE version
+  // 4. Load the LIVE version
   const versionId = meta.publish.liveVersion;
   const versionRef = doc(db, PORTFOLIOS_COL, uid, VERSIONS_COL, versionId);
   
-  // CACHE STRATEGY: Try fetching the version doc from server to ensure content is fresh.
   let versionSnap;
   try {
       versionSnap = await getDocFromServer(versionRef);
@@ -352,12 +363,17 @@ export const loadPublicPortfolio = async (slug: string): Promise<PortfolioData |
 
   const content = versionSnap.data() as PortfolioContent;
 
-  return {
+  const result: PortfolioData = {
     ...content,
-    uid, // Public viewers don't need full UID, but handy for analytics
+    uid, 
     meta,
-    stats: { views: 0, clicks: 0 } // Loaded separately via analytics
+    stats: { views: 0, clicks: 0 } 
   };
+  
+  // 5. Update Cache
+  portfolioCache.set(cleanSlug, { data: result, timestamp: Date.now() });
+
+  return result;
 };
 
 /**
@@ -366,10 +382,7 @@ export const loadPublicPortfolio = async (slug: string): Promise<PortfolioData |
  */
 export const ensureUserProfile = async (user: User): Promise<UserProfile> => {
     if (!db) throw new Error("Database not initialized");
-    console.log("Debug: ensureUserProfile checking for", user.uid);
     
-    // CRITICAL FIX: Force token refresh to ensure Firestore sees the auth state correctly
-    // This often resolves 'Missing or insufficient permissions' on new sign-ins
     try {
         await user.getIdToken(true);
     } catch (e) {
@@ -380,21 +393,16 @@ export const ensureUserProfile = async (user: User): Promise<UserProfile> => {
     let profile: UserProfile | null = null;
     
     try {
-        // Try reading first. Wrap in timeout.
         const snap = await withTimeout(getDoc(userRef), 5000, "Read profile timeout");
         if (snap.exists()) {
             profile = snap.data() as UserProfile;
         }
     } catch (e: any) {
-        // If read fails (permissions, network, or just missing), we proceed to create.
         console.log("Profile read failed or missing, proceeding to creation:", e.message);
     }
     
     if (profile) return profile;
 
-    console.log("Creating new user profile...");
-
-    // Create new profile if missing or unreadable
     const newProfile: UserProfile = {
         uid: user.uid,
         email: user.email || '',
@@ -403,12 +411,9 @@ export const ensureUserProfile = async (user: User): Promise<UserProfile> => {
     };
     
     try {
-        // Use setDoc with merge to be safe
         await withTimeout(setDoc(userRef, newProfile, { merge: true }), 5000, "Create profile timeout");
-        console.log("User profile created/verified successfully.");
         return newProfile;
     } catch (writeError: any) {
-        console.error("Critical: Failed to create user profile", writeError);
         throw new Error("Failed to initialize account data. Please check connection.");
     }
 };
@@ -431,6 +436,12 @@ export const completeOnboarding = async (uid: string, initialData: PortfolioData
 export const trackPortfolioView = async (uid: string) => {
     if (!db || !uid) return;
     try {
+        // Throttling: Count view only once per device/browser session using localStorage
+        const storageKey = `frames_view_${uid}`;
+        if (localStorage.getItem(storageKey)) return;
+        
+        localStorage.setItem(storageKey, 'true');
+        
         const statsRef = doc(db, 'portfolio_stats', uid);
         await setDoc(statsRef, { views: increment(1), lastViewed: serverTimestamp() }, { merge: true });
     } catch (e) { console.error("Analytics Error", e); }
@@ -439,6 +450,12 @@ export const trackPortfolioView = async (uid: string) => {
 export const trackPortfolioClick = async (uid: string, type: string) => {
     if (!db || !uid) return;
     try {
+        // Throttling: Count clicks uniquely per type/session to prevent spam
+        const storageKey = `frames_click_${uid}_${type}`;
+        if (sessionStorage.getItem(storageKey)) return;
+
+        sessionStorage.setItem(storageKey, 'true');
+        
         const statsRef = doc(db, 'portfolio_stats', uid);
         await setDoc(statsRef, { clicks: increment(1) }, { merge: true });
     } catch (e) { console.error("Analytics Error", e); }
@@ -476,25 +493,40 @@ export const uploadFileToStorage = (file: File, path: string, onProgress?: (prog
   });
 };
 
-export const generateThumbnailFromVideo = (file: File): Promise<{ url: string; blob: Blob }> => {
+// Generates a thumbnail and detects aspect ratio from a video file
+export const generateThumbnailFromVideo = (file: File): Promise<{ url: string; blob: Blob; aspectRatio: '16:9' | '9:16' | '4:3' | '1:1' }> => {
   return new Promise((resolve, reject) => {
     const video = document.createElement("video");
     video.preload = "metadata";
     video.src = URL.createObjectURL(file);
     video.muted = true;
     video.playsInline = true;
-    video.currentTime = 1; 
+    
+    // Attempt to seek to 1 second, or 0 if duration is short
+    video.onloadedmetadata = () => {
+        video.currentTime = Math.min(1, video.duration);
+    };
     
     const onSeeked = () => {
       const canvas = document.createElement("canvas");
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
+      
+      // Detect Aspect Ratio
+      const ratio = video.videoWidth / video.videoHeight;
+      let aspectRatio: '16:9' | '9:16' | '4:3' | '1:1' = '16:9';
+      
+      if (ratio > 1.7) aspectRatio = '16:9';
+      else if (ratio < 0.6) aspectRatio = '9:16';
+      else if (ratio > 1.3) aspectRatio = '4:3';
+      else aspectRatio = '1:1';
+
       const ctx = canvas.getContext("2d");
       if (!ctx) return reject(new Error("Canvas failure"));
       
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       canvas.toBlob((blob) => {
-        if (blob) resolve({ url: URL.createObjectURL(blob), blob });
+        if (blob) resolve({ url: URL.createObjectURL(blob), blob, aspectRatio });
         else reject(new Error("Blob failure"));
         URL.revokeObjectURL(video.src);
       }, 'image/jpeg', 0.8);

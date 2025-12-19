@@ -49,7 +49,7 @@ const getSocialUrl = (platform: string, handle: string) => {
     }
 };
 
-const ToolIcon: React.FC<{ name: string; className?: string }> = ({ name, className = "w-6 h-6" }) => {
+const ToolIcon = React.memo(({ name, className = "w-6 h-6" }: { name: string; className?: string }) => {
     const tool = [...EDITING_TOOLS_LIST, ...AI_TOOLS_LIST].find(t => t.name === name);
     const [imgSrc, setImgSrc] = useState(tool ? `https://cdn.simpleicons.org/${tool.slug}/white` : '');
     const [hasError, setHasError] = useState(false);
@@ -80,7 +80,7 @@ const ToolIcon: React.FC<{ name: string; className?: string }> = ({ name, classN
     return (
         <img src={imgSrc} alt={name} loading="lazy" className={`${className} object-contain ${useClearbit ? 'rounded-sm' : 'opacity-80'}`} onError={handleError} />
     );
-};
+});
 
 const fadeInUp: Variants = {
     initial: { opacity: 0, y: 30 },
@@ -144,7 +144,6 @@ const IntroOverlay: React.FC<{ name: string; onComplete: () => void }> = ({ name
                 </motion.div>
             </div>
 
-            {/* Sliding Doors Background */}
             <motion.div 
                 className="absolute top-0 left-0 w-1/2 h-full bg-zinc-950 z-[-1]"
                 initial={{ x: 0 }}
@@ -161,7 +160,7 @@ const IntroOverlay: React.FC<{ name: string; onComplete: () => void }> = ({ name
     )
 }
 
-const HeroContent: React.FC<{ data: PortfolioData; isMobile?: boolean }> = ({ data, isMobile = false }) => {
+const HeroContent: React.FC<{ data: PortfolioData; isMobile?: boolean }> = React.memo(({ data, isMobile = false }) => {
     return (
         <motion.div 
             variants={staggerContainer} 
@@ -247,9 +246,9 @@ const HeroContent: React.FC<{ data: PortfolioData; isMobile?: boolean }> = ({ da
             </motion.div>
         </motion.div>
     );
-};
+});
 
-const PrimaryToolCard: React.FC<{ toolName: string }> = ({ toolName }) => {
+const PrimaryToolCard: React.FC<{ toolName: string }> = React.memo(({ toolName }) => {
     if (!toolName) return null;
     const color = getBrandColor(toolName);
     return (
@@ -270,152 +269,168 @@ const PrimaryToolCard: React.FC<{ toolName: string }> = ({ toolName }) => {
             </div>
         </motion.div>
     );
-};
+});
 
-const ShowreelPlayer: React.FC<{ src: string; thumbnail: string }> = ({ src, thumbnail }) => {
+// Robust Showreel Player with Facade Pattern for External Embeds and IntersectionObserver for Direct Video
+const ShowreelPlayer: React.FC<{ src: string; thumbnail: string }> = React.memo(({ src, thumbnail }) => {
+    const [isPlaying, setIsPlaying] = useState(false);
     const [isMuted, setIsMuted] = useState(true);
-    const [isLoading, setIsLoading] = useState(true);
-    const [hasError, setHasError] = useState(false);
+    const [showPlayOverlay, setShowPlayOverlay] = useState(false);
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
-    const isInView = useInView(containerRef, { amount: 0.3 });
     
-    // Determine Type of Video
-    const getEmbedSrc = (url: string) => {
+    // Determine type
+    const getEmbedType = (url: string) => {
         if (!url) return null;
-        
-        // YouTube
-        const ytMatch = url.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/);
-        if (ytMatch && ytMatch[2].length === 11) {
-            return {
-                type: 'youtube',
-                // Muted, Autoplay, Controls hidden, Loop enabled
-                src: `https://www.youtube.com/embed/${ytMatch[2]}?autoplay=1&mute=1&controls=0&loop=1&playlist=${ytMatch[2]}&playsinline=1&rel=0&showinfo=0&modestbranding=1`
-            };
-        }
-
-        // Vimeo
-        const vimeoMatch = url.match(/vimeo\.com\/(?:channels\/(?:\w+\/)?|groups\/(?:[^\/]*)\/videos\/|album\/(?:\d+)\/video\/|video\/|)(\d+)(?:$|\/|\?)/);
-        if (vimeoMatch) {
-             return {
-                type: 'vimeo',
-                src: `https://player.vimeo.com/video/${vimeoMatch[1]}?autoplay=1&muted=1&loop=1&background=1&autopause=0`
-            };
-        }
-
-        // Drive
-        const driveId = getDriveId(url);
-        if (driveId) {
-            return {
-                type: 'drive',
-                src: `https://drive.google.com/file/d/${driveId}/preview`
-            };
-        }
-
-        // Direct File
-        return { type: 'video', src: url };
+        if (url.includes('youtube') || url.includes('youtu.be')) return 'youtube';
+        if (url.includes('vimeo')) return 'vimeo';
+        if (url.includes('drive.google.com')) return 'drive';
+        return 'video';
     };
 
-    const videoConfig = getEmbedSrc(src);
+    const type = getEmbedType(src);
 
-    // Effect for Direct Video Autoplay/Pause based on viewport
+    // Facade for Embeds: Return thumbnail until interaction
+    if (type !== 'video' && !isPlaying) {
+        return (
+            <motion.div 
+                className="relative w-full aspect-video rounded-3xl overflow-hidden shadow-2xl border border-zinc-800 bg-black group cursor-pointer"
+                initial={{ opacity: 0, scale: 0.98 }} 
+                whileInView={{ opacity: 1, scale: 1 }} 
+                viewport={{ once: true }}
+                onClick={() => setIsPlaying(true)}
+            >
+                <img src={thumbnail || "https://picsum.photos/800/450"} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" alt="Showreel" loading="lazy" />
+                <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-transparent transition-colors">
+                     <div className="w-20 h-20 rounded-full bg-white/10 backdrop-blur-md border border-white/30 flex items-center justify-center text-white shadow-2xl group-hover:scale-110 transition-transform">
+                         <Play size={32} fill="white" className="ml-1" />
+                     </div>
+                </div>
+            </motion.div>
+        );
+    }
+
+    // Embed Player (YouTube/Vimeo/Drive)
+    if (type !== 'video' && isPlaying) {
+         let embedSrc = src;
+         if (type === 'youtube') {
+             const ytId = src.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/)?.[2];
+             embedSrc = `https://www.youtube.com/embed/${ytId}?autoplay=1&rel=0&showinfo=0&modestbranding=1`;
+         } else if (type === 'vimeo') {
+             const vId = src.match(/vimeo\.com\/(?:channels\/(?:\w+\/)?|groups\/(?:[^\/]*)\/videos\/|album\/(?:\d+)\/video\/|video\/|)(\d+)(?:$|\/|\?)/)?.[1];
+             embedSrc = `https://player.vimeo.com/video/${vId}?autoplay=1&background=0`;
+         } else if (type === 'drive') {
+             const dId = getDriveId(src);
+             embedSrc = `https://drive.google.com/file/d/${dId}/preview?autoplay=1`;
+         }
+
+         return (
+             <div className="relative w-full aspect-video rounded-3xl overflow-hidden shadow-2xl border border-zinc-800 bg-black">
+                 <iframe 
+                    src={embedSrc}
+                    className="w-full h-full" 
+                    allow="autoplay; fullscreen; picture-in-picture"
+                    title="Showreel"
+                />
+             </div>
+         );
+    }
+
+    // Direct Video Player with IntersectionObserver
+    return <DirectVideoPlayer src={src} thumbnail={thumbnail} />
+});
+
+// Extracted Direct Player Logic
+const DirectVideoPlayer: React.FC<{ src: string; thumbnail: string }> = ({ src, thumbnail }) => {
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [isMuted, setIsMuted] = useState(true);
+    const [needsInteraction, setNeedsInteraction] = useState(false);
+    
     useEffect(() => {
-        if (videoRef.current && videoConfig?.type === 'video') {
-            if (isInView) {
-                videoRef.current.play().catch(e => console.log("Autoplay prevented:", e));
-            } else {
-                videoRef.current.pause();
-            }
-        }
-    }, [isInView, videoConfig]);
+        const video = videoRef.current;
+        const container = containerRef.current;
+        if (!video || !container) return;
 
-    if (!src) return null;
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    // Only load content when close to viewing
+                    if (video.preload === 'none') {
+                        video.preload = 'metadata';
+                    }
+                    
+                    const playPromise = video.play();
+                    if (playPromise !== undefined) {
+                        playPromise.catch(error => {
+                            console.log("Autoplay prevented, showing overlay", error);
+                            setNeedsInteraction(true);
+                        });
+                    }
+                } else {
+                    video.pause();
+                }
+            });
+        }, { threshold: 0.5 }); // Play when 50% visible
+
+        observer.observe(container);
+        return () => observer.disconnect();
+    }, [src]);
 
     return (
-        <motion.div 
-            ref={containerRef} 
-            className="relative w-full aspect-video rounded-3xl overflow-hidden shadow-2xl border border-zinc-800 bg-black group"
-            initial={{ opacity: 0, scale: 0.98 }} 
-            whileInView={{ opacity: 1, scale: 1 }} 
-            viewport={{ once: true }}
-        >
-            {/* Loading Indicator */}
-            {isLoading && !hasError && (
-                <div className="absolute inset-0 z-20 flex items-center justify-center bg-zinc-900/10 backdrop-blur-sm">
-                    <Loader2 className="w-10 h-10 text-indigo-500 animate-spin" />
-                </div>
-            )}
-
-            {/* Error State */}
-            {hasError && (
-                <div className="absolute inset-0 z-30 flex items-center justify-center bg-zinc-950">
-                     <img src={thumbnail} className="absolute inset-0 w-full h-full object-cover opacity-50" alt="Showreel Thumbnail" />
-                     <div className="relative z-10 flex flex-col items-center gap-4 p-6 bg-black/60 backdrop-blur-md rounded-2xl border border-zinc-800">
-                         <AlertCircle className="text-red-500" size={32} />
-                         <div className="text-center">
-                            <p className="text-white font-bold mb-1">Playback Error</p>
-                            <p className="text-zinc-400 text-xs">Video could not be played automatically.</p>
-                         </div>
-                         <a href={src} target="_blank" rel="noopener noreferrer" className="px-6 py-2 bg-white text-black text-xs font-bold uppercase tracking-widest rounded-full hover:scale-105 transition-transform flex items-center gap-2">
-                             <Play size={14} fill="black" /> Watch Externally
-                         </a>
+        <div ref={containerRef} className="relative w-full aspect-video rounded-3xl overflow-hidden shadow-2xl border border-zinc-800 bg-black group" onClick={() => {
+            if (videoRef.current) {
+                if (needsInteraction) {
+                    videoRef.current.play();
+                    setNeedsInteraction(false);
+                }
+                setIsMuted(!isMuted);
+            }
+        }}>
+            <video 
+                ref={videoRef} 
+                src={src} 
+                poster={thumbnail} 
+                className="w-full h-full object-cover" 
+                loop 
+                muted={isMuted} 
+                playsInline 
+                preload="none" 
+            />
+            
+            {/* Play Overlay if Autoplay blocked or initial state */}
+            {needsInteraction && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/40 z-20 pointer-events-none">
+                     <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center">
+                         <Play fill="white" size={24} />
                      </div>
                 </div>
             )}
 
-            {/* Player Logic */}
-            {videoConfig?.type === 'video' ? (
-                // Direct Video (MP4/WebM)
-                <>
-                    <video 
-                        ref={videoRef} 
-                        src={src} 
-                        poster={thumbnail} 
-                        className="w-full h-full object-cover" 
-                        loop 
-                        muted={isMuted} 
-                        playsInline 
-                        // We rely on intersection observer to play, but adding autoPlay helps in some browsers
-                        autoPlay
-                        preload="metadata"
-                        onWaiting={() => setIsLoading(true)}
-                        onPlaying={() => setIsLoading(false)}
-                        onCanPlay={() => setIsLoading(false)}
-                        onError={() => { setIsLoading(false); setHasError(true); }}
-                        onClick={() => setIsMuted(!isMuted)} // Click to toggle mute
-                        style={{ cursor: 'pointer' }}
-                    />
-                    {!hasError && (
-                        <div className="absolute bottom-6 right-6 z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                            <button onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }} className="w-12 h-12 rounded-full bg-black/60 backdrop-blur-md border border-white/10 flex items-center justify-center text-white hover:bg-white hover:text-black transition-all hover:scale-110 shadow-lg">
-                                {isMuted ? <VolumeX size={20}/> : <Volume2 size={20}/>}
-                            </button>
-                        </div>
-                    )}
-                </>
-            ) : (
-                // IFRAME Embeds (YouTube, Vimeo, Drive)
-                // Note: We remove pointer-events-none to allow user interaction (unmute) if needed, 
-                // but keep it clean initially.
-                <iframe 
-                    src={videoConfig?.src}
-                    className="w-full h-full" 
-                    allow="autoplay; fullscreen; picture-in-picture"
-                    title="Showreel"
-                    onLoad={() => setIsLoading(false)}
-                    onError={() => { setIsLoading(false); setHasError(true); }}
-                />
-            )}
-        </motion.div>
-    );
-};
+            {/* Mute Toggle */}
+            <div className={`absolute bottom-6 right-6 z-20 transition-opacity duration-300 ${needsInteraction ? 'opacity-0' : 'opacity-0 group-hover:opacity-100'}`}>
+                <button 
+                    onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }} 
+                    className="w-10 h-10 rounded-full bg-black/60 backdrop-blur-md border border-white/10 flex items-center justify-center text-white hover:bg-white hover:text-black transition-all"
+                >
+                    {isMuted ? <VolumeX size={18}/> : <Volume2 size={18}/>}
+                </button>
+            </div>
+        </div>
+    )
+}
 
-const AmbientProjectCard: React.FC<{ project: Project; onClick: () => void }> = ({ project, onClick }) => {
+const AmbientProjectCard: React.FC<{ project: Project; onClick: () => void }> = React.memo(({ project, onClick }) => {
     const isVideo = project.type === 'video';
     const isPortrait = project.aspectRatio === '9:16';
+    const isSquare = project.aspectRatio === '1:1';
+    
+    // Determine grid span based on aspect ratio
+    const spanClass = isPortrait ? 'row-span-2' : '';
+    
     return (
         <motion.div 
-            className={`relative group cursor-pointer w-full rounded-3xl overflow-hidden bg-zinc-900 border border-zinc-800 hover:border-zinc-600 transition-all duration-500 hover:scale-[1.02] shadow-2xl ${isPortrait ? 'aspect-[9/16]' : 'aspect-video'}`} 
+            className={`relative group cursor-pointer w-full rounded-3xl overflow-hidden bg-zinc-900 border border-zinc-800 hover:border-zinc-600 transition-all duration-500 hover:scale-[1.02] shadow-2xl ${spanClass} ${isPortrait ? 'aspect-[9/16]' : isSquare ? 'aspect-square' : 'aspect-video'}`} 
             initial={{ opacity: 0, y: 20 }} 
             whileInView={{ opacity: 1, y: 0 }} 
             viewport={{ once: true, margin: "-50px" }} 
@@ -441,9 +456,9 @@ const AmbientProjectCard: React.FC<{ project: Project; onClick: () => void }> = 
             </div>
         </motion.div>
     )
-}
+});
 
-const Lightbox: React.FC<{ src: string; type: 'video' | 'image'; title: string; aspectRatio?: '16:9' | '9:16'; onClose: () => void }> = ({ src, type, title, aspectRatio, onClose }) => {
+const Lightbox: React.FC<{ src: string; type: 'video' | 'image'; title: string; aspectRatio?: '16:9' | '9:16' | '4:3' | '1:1'; onClose: () => void }> = ({ src, type, title, aspectRatio, onClose }) => {
     const driveEmbed = getDriveEmbedUrl(src);
     const isPortrait = aspectRatio === '9:16';
     return (
@@ -572,7 +587,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview })
                             </div>
                           </motion.div>
                           
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-10">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-10 auto-rows-max">
                             {data.projects.map(p => (
                                 <AmbientProjectCard key={p.id} project={p} onClick={() => {
                                     trackPortfolioClick(data.uid!, `project_${p.id}`);

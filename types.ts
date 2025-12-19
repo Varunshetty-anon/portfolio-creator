@@ -6,7 +6,7 @@ export interface Project {
   link: string; // Can be direct URL or Google Drive link
   driveLink?: string; 
   category: string;
-  aspectRatio?: '16:9' | '9:16';
+  aspectRatio?: '16:9' | '9:16' | '4:3' | '1:1';
   type: 'video' | 'image'; 
 }
 
