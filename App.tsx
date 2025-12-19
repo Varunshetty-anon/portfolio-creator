@@ -224,7 +224,9 @@ const App: React.FC = () => {
 
   // PUBLIC VIEW
   if (route === 'public' && data) {
-      return <PortfolioView data={data} isPreview={false} />;
+      // Keying by liveVersion ensures React completely remounts the component 
+      // if the portfolio version has changed, clearing internal image caches and state.
+      return <PortfolioView key={data.meta?.publish?.liveVersion || 'latest'} data={data} isPreview={false} />;
   }
 
   // ONBOARDING VIEW

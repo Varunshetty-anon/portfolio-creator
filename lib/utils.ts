@@ -1,6 +1,6 @@
 import { PortfolioData, PortfolioContent, UserProfile, PortfolioMeta, INITIAL_DATA, Project } from '../types';
 import { db, storage, auth, googleProvider, isConfigured } from './firebase';
-import { doc, getDoc, setDoc, collection, query, where, getDocs, deleteDoc, addDoc, serverTimestamp, increment, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, where, getDocs, deleteDoc, addDoc, serverTimestamp, increment, writeBatch, getDocsFromServer, getDocFromServer } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL, listAll, deleteObject } from 'firebase/storage';
 import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, User, deleteUser, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import { GoogleGenAI } from "@google/genai";
@@ -198,15 +198,24 @@ export const loadEditorState = async (uid: string): Promise<PortfolioData | null
 
 /**
  * Loads the Public Portfolio (Live Version) by SLUG.
- * Strictly avoids loading drafts.
+ * Implements "Server-First" strategy to prevent stale content.
  */
 export const loadPublicPortfolio = async (slug: string): Promise<PortfolioData | null> => {
   if (!db) return null;
   console.log("Loading public portfolio for slug:", slug);
 
   // 1. Resolve Slug to UID
+  // CACHE STRATEGY: Try fetching metadata from server first to ensure we have the latest 'liveVersion' pointer.
+  // This is the "Lightweight Cache Busting" mechanism.
   const q = query(collection(db, PORTFOLIOS_COL), where("slug", "==", slug.toLowerCase()));
-  const querySnap = await getDocs(q);
+  
+  let querySnap;
+  try {
+      querySnap = await getDocsFromServer(q);
+  } catch (e) {
+      console.warn("Server fetch failed, falling back to cache", e);
+      querySnap = await getDocs(q);
+  }
 
   if (querySnap.empty) {
     console.log("No portfolio found for slug");
@@ -226,7 +235,15 @@ export const loadPublicPortfolio = async (slug: string): Promise<PortfolioData |
   // 3. Load the LIVE version
   const versionId = meta.publish.liveVersion;
   const versionRef = doc(db, PORTFOLIOS_COL, uid, VERSIONS_COL, versionId);
-  const versionSnap = await getDoc(versionRef);
+  
+  // CACHE STRATEGY: Try fetching the version doc from server to ensure content is fresh.
+  let versionSnap;
+  try {
+      versionSnap = await getDocFromServer(versionRef);
+  } catch (e) {
+      console.warn("Version server fetch failed, falling back to cache", e);
+      versionSnap = await getDoc(versionRef);
+  }
 
   if (!versionSnap.exists()) {
     console.error("Live version document missing:", versionId);
@@ -251,6 +268,14 @@ export const ensureUserProfile = async (user: User): Promise<UserProfile> => {
     if (!db) throw new Error("Database not initialized");
     console.log("Debug: ensureUserProfile checking for", user.uid);
     
+    // CRITICAL FIX: Force token refresh to ensure Firestore sees the auth state correctly
+    // This often resolves 'Missing or insufficient permissions' on new sign-ins
+    try {
+        await user.getIdToken(true);
+    } catch (e) {
+        console.warn("Token refresh failed, proceeding anyway", e);
+    }
+
     const userRef = doc(db, USERS_COL, user.uid);
     let profile: UserProfile | null = null;
     
