@@ -10,7 +10,7 @@ import {
     saveDraft, 
     publishPortfolio, 
     completeOnboarding, 
-    getUserProfile, 
+    ensureUserProfile, 
     isConfigured, 
     auth, 
     loginWithEmail, 
@@ -81,10 +81,12 @@ const App: React.FC = () => {
         if (isConfigured && auth) {
             const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
                 if (user) {
+                    console.log("Debug: Auth User Detected", user.uid);
                     try {
-                        const userProfile = await getUserProfile(user.uid);
+                        // Ensure user profile exists in Firestore, create if new
+                        const userProfile = await ensureUserProfile(user);
                         
-                        if (!userProfile || !userProfile.onboarded) {
+                        if (!userProfile.onboarded) {
                              // User exists but not onboarded
                              const cleanUsername = (user.displayName?.split(' ')[0] || user.email?.split('@')[0] || 'user').toLowerCase() + Math.floor(Math.random()*1000);
                              const initialData: PortfolioData = { 
@@ -104,10 +106,12 @@ const App: React.FC = () => {
                         }
                     } catch (e) {
                         console.error("Auth load error", e);
-                        // If error loading profile, stay on home but allow retry
+                        setAuthError("Failed to load profile details.");
+                        setIsAuthProcessing(false); // Ensure button stops spinning on error
                     }
                 } else {
                     setRoute('home');
+                    setIsAuthProcessing(false);
                 }
                 setIsLoading(false);
             });
@@ -132,6 +136,7 @@ const App: React.FC = () => {
         } else {
             await loginWithEmail(email, password);
         }
+        // Success handled by onAuthStateChanged
     } catch (err: any) {
         setAuthError(err.message.replace('Firebase:', '').trim());
         setIsAuthProcessing(false);
@@ -144,14 +149,12 @@ const App: React.FC = () => {
       setIsAuthProcessing(true);
       try {
           await loginWithGoogle();
-          // Success is handled by onAuthStateChanged listener in initApp.
-          // We do NOT set isAuthProcessing(false) here because we want to 
-          // keep the loading state until the route changes to 'editor' or 'onboarding',
-          // effectively unmounting this login form.
+          // We intentionally do NOT setIsAuthProcessing(false) here.
+          // The onAuthStateChanged listener will handle the state transition or error.
+          // If we set it to false here, the loading spinner would stop before the redirect happens.
       } catch (e: any) { 
           console.error("Google Auth Failed:", e);
           
-          // Friendly error messages for common issues
           let msg = e.message;
           if (msg.includes('popup-closed-by-user')) msg = "Login cancelled.";
           if (msg.includes('network-request-failed')) msg = "Network error. Check your connection.";

@@ -233,8 +233,30 @@ export const loadPublicPortfolio = async (slug: string): Promise<PortfolioData |
 };
 
 /**
- * User Onboarding Status
+ * User Onboarding Status - Ensures profile exists
  */
+export const ensureUserProfile = async (user: User): Promise<UserProfile> => {
+    if (!db) throw new Error("Database not initialized");
+    const userRef = doc(db, USERS_COL, user.uid);
+    const snap = await getDoc(userRef);
+    
+    if (snap.exists()) {
+        return snap.data() as UserProfile;
+    }
+    
+    // Create new profile if missing
+    const newProfile: UserProfile = {
+        uid: user.uid,
+        email: user.email || '',
+        onboarded: false,
+        createdAt: Date.now()
+    };
+    
+    // Check if we can write (rules might block if auth is weird, but we are auth'd)
+    await setDoc(userRef, newProfile);
+    return newProfile;
+};
+
 export const getUserProfile = async (uid: string): Promise<UserProfile | null> => {
     if (!db) return null;
     const snap = await getDoc(doc(db, USERS_COL, uid));
