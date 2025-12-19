@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useScroll, useTransform, useInView, Variants } from 'framer-motion';
-import { Mail, Instagram, Play, Twitter, Linkedin, Youtube, X, Volume2, VolumeX, Globe, Maximize2, Star, Sparkles, MonitorPlay, MapPin, Loader2 } from 'lucide-react';
+import { Mail, Instagram, Play, Twitter, Linkedin, Youtube, X, Volume2, VolumeX, Globe, Maximize2, Star, Sparkles, MonitorPlay, MapPin, Loader2, AlertCircle } from 'lucide-react';
 import { PortfolioData, Project } from '../../types';
-import { getBrandColor, getDriveEmbedUrl, EDITING_TOOLS_LIST, AI_TOOLS_LIST, trackPortfolioView, trackPortfolioClick } from '../../lib/utils';
+import { getBrandColor, getDriveEmbedUrl, EDITING_TOOLS_LIST, AI_TOOLS_LIST, trackPortfolioView, trackPortfolioClick, getDriveId } from '../../lib/utils';
 
 interface PortfolioViewProps {
   data: PortfolioData;
@@ -274,41 +274,100 @@ const PrimaryToolCard: React.FC<{ toolName: string }> = ({ toolName }) => {
 
 const ShowreelPlayer: React.FC<{ src: string; thumbnail: string }> = ({ src, thumbnail }) => {
     const [isMuted, setIsMuted] = useState(true);
+    const [isLoading, setIsLoading] = useState(true);
+    const [hasError, setHasError] = useState(false);
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const isInView = useInView(containerRef, { amount: 0.3 });
-    const [hasError, setHasError] = useState(false);
     
-    const driveEmbed = getDriveEmbedUrl(src);
+    // Determine Type of Video
+    const getEmbedSrc = (url: string) => {
+        if (!url) return null;
+        
+        // YouTube
+        const ytMatch = url.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/);
+        if (ytMatch && ytMatch[2].length === 11) {
+            return {
+                type: 'youtube',
+                // Muted, Autoplay, Controls hidden, Loop enabled
+                src: `https://www.youtube.com/embed/${ytMatch[2]}?autoplay=1&mute=1&controls=0&loop=1&playlist=${ytMatch[2]}&playsinline=1&rel=0&showinfo=0&modestbranding=1`
+            };
+        }
 
+        // Vimeo
+        const vimeoMatch = url.match(/vimeo\.com\/(?:channels\/(?:\w+\/)?|groups\/(?:[^\/]*)\/videos\/|album\/(?:\d+)\/video\/|video\/|)(\d+)(?:$|\/|\?)/);
+        if (vimeoMatch) {
+             return {
+                type: 'vimeo',
+                src: `https://player.vimeo.com/video/${vimeoMatch[1]}?autoplay=1&muted=1&loop=1&background=1&autopause=0`
+            };
+        }
+
+        // Drive
+        const driveId = getDriveId(url);
+        if (driveId) {
+            return {
+                type: 'drive',
+                src: `https://drive.google.com/file/d/${driveId}/preview`
+            };
+        }
+
+        // Direct File
+        return { type: 'video', src: url };
+    };
+
+    const videoConfig = getEmbedSrc(src);
+
+    // Effect for Direct Video Autoplay/Pause based on viewport
     useEffect(() => {
-        if (videoRef.current && !driveEmbed) {
+        if (videoRef.current && videoConfig?.type === 'video') {
             if (isInView) {
-                videoRef.current.play().catch(() => {});
+                videoRef.current.play().catch(e => console.log("Autoplay prevented:", e));
             } else {
                 videoRef.current.pause();
             }
         }
-    }, [isInView, driveEmbed]);
+    }, [isInView, videoConfig]);
 
-    if (driveEmbed) {
-        return (
-             <motion.div ref={containerRef} className="relative w-full aspect-video rounded-3xl overflow-hidden shadow-2xl border border-zinc-800 group" initial={{ opacity: 0, scale: 0.98 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }}>
-                <iframe 
-                    src={driveEmbed} 
-                    className="w-full h-full pointer-events-none" 
-                    allow="autoplay; fullscreen"
-                    title="Showreel"
-                />
-             </motion.div>
-        )
-    }
+    if (!src) return null;
 
     return (
-        <motion.div ref={containerRef} className="relative w-full aspect-video rounded-3xl overflow-hidden shadow-2xl border border-zinc-800 group" initial={{ opacity: 0, scale: 0.98 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }} transition={{ duration: 0.8, ease: [0.32, 0.72, 0, 1] }}>
-            <div className="relative h-full w-full bg-black z-10">
-                 {!hasError ? (
-                     <video 
+        <motion.div 
+            ref={containerRef} 
+            className="relative w-full aspect-video rounded-3xl overflow-hidden shadow-2xl border border-zinc-800 bg-black group"
+            initial={{ opacity: 0, scale: 0.98 }} 
+            whileInView={{ opacity: 1, scale: 1 }} 
+            viewport={{ once: true }}
+        >
+            {/* Loading Indicator */}
+            {isLoading && !hasError && (
+                <div className="absolute inset-0 z-20 flex items-center justify-center bg-zinc-900/10 backdrop-blur-sm">
+                    <Loader2 className="w-10 h-10 text-indigo-500 animate-spin" />
+                </div>
+            )}
+
+            {/* Error State */}
+            {hasError && (
+                <div className="absolute inset-0 z-30 flex items-center justify-center bg-zinc-950">
+                     <img src={thumbnail} className="absolute inset-0 w-full h-full object-cover opacity-50" alt="Showreel Thumbnail" />
+                     <div className="relative z-10 flex flex-col items-center gap-4 p-6 bg-black/60 backdrop-blur-md rounded-2xl border border-zinc-800">
+                         <AlertCircle className="text-red-500" size={32} />
+                         <div className="text-center">
+                            <p className="text-white font-bold mb-1">Playback Error</p>
+                            <p className="text-zinc-400 text-xs">Video could not be played automatically.</p>
+                         </div>
+                         <a href={src} target="_blank" rel="noopener noreferrer" className="px-6 py-2 bg-white text-black text-xs font-bold uppercase tracking-widest rounded-full hover:scale-105 transition-transform flex items-center gap-2">
+                             <Play size={14} fill="black" /> Watch Externally
+                         </a>
+                     </div>
+                </div>
+            )}
+
+            {/* Player Logic */}
+            {videoConfig?.type === 'video' ? (
+                // Direct Video (MP4/WebM)
+                <>
+                    <video 
                         ref={videoRef} 
                         src={src} 
                         poster={thumbnail} 
@@ -316,28 +375,37 @@ const ShowreelPlayer: React.FC<{ src: string; thumbnail: string }> = ({ src, thu
                         loop 
                         muted={isMuted} 
                         playsInline 
-                        autoPlay 
+                        // We rely on intersection observer to play, but adding autoPlay helps in some browsers
+                        autoPlay
                         preload="metadata"
-                        onError={() => setHasError(true)} 
-                     />
-                 ) : (
-                     <div className="w-full h-full relative">
-                        <img src={thumbnail} className="w-full h-full object-cover opacity-60" alt="Showreel" loading="lazy" />
-                        <div className="absolute inset-0 flex items-center justify-center">
-                            <a href={src} target="_blank" rel="noopener noreferrer" className="px-6 py-3 bg-white text-black text-sm font-bold rounded-full flex items-center gap-2 hover:scale-105 transition-transform">
-                                <Play size={16} fill="black" /> Watch Showreel
-                            </a>
+                        onWaiting={() => setIsLoading(true)}
+                        onPlaying={() => setIsLoading(false)}
+                        onCanPlay={() => setIsLoading(false)}
+                        onError={() => { setIsLoading(false); setHasError(true); }}
+                        onClick={() => setIsMuted(!isMuted)} // Click to toggle mute
+                        style={{ cursor: 'pointer' }}
+                    />
+                    {!hasError && (
+                        <div className="absolute bottom-6 right-6 z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                            <button onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }} className="w-12 h-12 rounded-full bg-black/60 backdrop-blur-md border border-white/10 flex items-center justify-center text-white hover:bg-white hover:text-black transition-all hover:scale-110 shadow-lg">
+                                {isMuted ? <VolumeX size={20}/> : <Volume2 size={20}/>}
+                            </button>
                         </div>
-                     </div>
-                 )}
-                 {!hasError && (
-                     <div className="absolute bottom-6 right-6 z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                         <button onClick={() => setIsMuted(!isMuted)} className="w-12 h-12 rounded-full bg-black/60 backdrop-blur-md border border-white/10 flex items-center justify-center text-white hover:bg-white hover:text-black transition-all hover:scale-110">
-                            {isMuted ? <VolumeX size={20}/> : <Volume2 size={20}/>}
-                         </button>
-                     </div>
-                 )}
-            </div>
+                    )}
+                </>
+            ) : (
+                // IFRAME Embeds (YouTube, Vimeo, Drive)
+                // Note: We remove pointer-events-none to allow user interaction (unmute) if needed, 
+                // but keep it clean initially.
+                <iframe 
+                    src={videoConfig?.src}
+                    className="w-full h-full" 
+                    allow="autoplay; fullscreen; picture-in-picture"
+                    title="Showreel"
+                    onLoad={() => setIsLoading(false)}
+                    onError={() => { setIsLoading(false); setHasError(true); }}
+                />
+            )}
         </motion.div>
     );
 };

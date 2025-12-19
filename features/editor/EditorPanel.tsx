@@ -5,7 +5,7 @@ import { PortfolioData, Project, Testimonial } from '../../types';
 import { Input, TextArea } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { ToolSelector } from '../../components/ToolSelector';
-import { Plus, Trash2, Video, Wand2, Image as ImageIcon, ChevronDown, Upload, X, LayoutDashboard, Copy, ExternalLink, User, MessageSquare, Loader2, CheckCircle2, Globe, Crop, Settings, LogOut, AlertCircle, Sparkles, Wrench, ZoomIn, ZoomOut, QrCode, Download, AlertTriangle, Eye, Monitor, Smartphone, HelpCircle, Info, BarChart3, MousePointerClick, Save, UploadCloud, Link, Youtube, HardDrive, Database } from 'lucide-react';
+import { Plus, Trash2, Video, Wand2, Image as ImageIcon, ChevronDown, Upload, X, LayoutDashboard, Copy, ExternalLink, User, MessageSquare, Loader2, CheckCircle2, Globe, Crop, Settings, LogOut, AlertCircle, Sparkles, Wrench, ZoomIn, ZoomOut, QrCode, Download, AlertTriangle, Eye, Monitor, Smartphone, HelpCircle, Info, BarChart3, MousePointerClick, Save, UploadCloud, Link, Youtube, HardDrive, Database, RotateCcw } from 'lucide-react';
 import Cropper from 'react-easy-crop';
 import { getCroppedImg, generateThumbnailFromVideo, uploadFileToStorage, hasCloudStorage, generateAiBio, generateAiDescription, downloadQrCode, getYouTubeThumbnail, getDriveThumbnail, generateAiThumbnail, getPortfolioStats, cleanupUnusedMedia } from '../../lib/utils';
 
@@ -40,8 +40,28 @@ const Tooltip = ({ text, children }: { text: string; children?: React.ReactNode 
 const getLinkIndicator = (url: string) => {
     if (!url) return null;
     
-    // Basic protocol check to avoid valid URL logic on partial typing
-    if (!url.match(/^https?:\/\//)) return null;
+    let isValid = false;
+    try {
+        const u = new URL(url);
+        // Ensure protocol is http or https
+        if (['http:', 'https:'].includes(u.protocol)) isValid = true;
+    } catch(e) {
+        isValid = false;
+    }
+
+    if (!isValid) {
+        // Show invalid indicator if length is significant (avoids flashing on first char)
+        if (url.length > 5) {
+             return { 
+                 icon: AlertCircle, 
+                 color: 'text-amber-500', 
+                 label: 'Invalid URL (Format: https://...)', 
+                 border: '!border-amber-500/50 focus:!border-amber-500 focus:!ring-amber-500/20',
+                 isError: true 
+             };
+        }
+        return null;
+    }
 
     const lower = url.toLowerCase();
     
@@ -66,6 +86,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
   // Deletion States
   const [confirmDelete, setConfirmDelete] = useState(false); // For Account
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null); // For Projects
+  const [toast, setToast] = useState<{ show: boolean; message: string; undoData?: { project: Project; index: number } } | null>(null);
   
   const [isDeleting, setIsDeleting] = useState(false);
   const [isCleaning, setIsCleaning] = useState(false);
@@ -78,11 +99,26 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
   const [zoom, setZoom] = useState(1);
   const [croppedPixels, setCroppedPixels] = useState<any>(null);
 
+  const toastTimerRef = useRef<any>(null);
+
   useEffect(() => {
       if (activeTab === 'dashboard' && data.uid) {
           getPortfolioStats(data.uid).then(setStats);
       }
   }, [activeTab, data.uid]);
+
+  // Toast Timer Logic
+  useEffect(() => {
+    if (toast?.show) {
+        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+        toastTimerRef.current = setTimeout(() => {
+            setToast(null);
+        }, 5000);
+    }
+    return () => {
+        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    }
+  }, [toast]);
 
   const updateField = (f: keyof PortfolioData, v: any) => onChange({ ...data, [f]: v });
   const updateProject = (id: string, updates: Partial<Project>) => {
@@ -150,9 +186,32 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
   
   const confirmProjectDeletion = () => {
       if (projectToDelete) {
-          updateField('projects', data.projects.filter(p => p.id !== projectToDelete.id));
+          const idx = data.projects.findIndex(p => p.id === projectToDelete.id);
+          const newProjects = data.projects.filter(p => p.id !== projectToDelete.id);
+          updateField('projects', newProjects);
+          
+          setToast({
+              show: true,
+              message: `Deleted "${projectToDelete.title}"`,
+              undoData: { project: projectToDelete, index: idx }
+          });
+          
           setProjectToDelete(null);
       }
+  };
+
+  const handleUndo = () => {
+      if (!toast?.undoData) return;
+      const { project, index } = toast.undoData;
+      const newProjects = [...data.projects];
+      // Insert back at original index or end
+      if (index >= 0 && index <= newProjects.length) {
+          newProjects.splice(index, 0, project);
+      } else {
+          newProjects.push(project);
+      }
+      updateField('projects', newProjects);
+      setToast(null);
   };
 
   const getShareLink = () => {
@@ -320,16 +379,26 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                                         </div>
                                     )}
 
-                                    <Button className="w-full h-32 border-2 border-dashed border-zinc-800 bg-zinc-950 hover:border-indigo-500 group relative overflow-hidden" variant="ghost" onClick={() => {
-                                        const input = document.createElement('input');
-                                        input.type = 'file';
-                                        input.onchange = (e: any) => handleShowreel(e.target.files[0]);
-                                        input.click();
-                                    }}>
-                                        <div className="absolute inset-0 bg-indigo-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                        <Upload className="mr-2 group-hover:scale-110 transition-transform"/> 
-                                        {data.showreelLink ? 'Replace Showreel' : 'Upload Showreel'}
-                                    </Button>
+                                    <div className="flex gap-4 items-start">
+                                        <div className="flex-1 space-y-2">
+                                            <Input 
+                                                placeholder="Or paste YouTube / Vimeo / Drive Link..." 
+                                                value={data.showreelLink} 
+                                                onChange={e => updateField('showreelLink', e.target.value)}
+                                                className="bg-black/50"
+                                            />
+                                            <p className="text-[10px] text-zinc-500">Supported: YouTube, Vimeo, Google Drive, or Direct Upload.</p>
+                                        </div>
+                                        <Button className="h-10 border-2 border-dashed border-zinc-800 bg-zinc-950 hover:border-indigo-500 group relative overflow-hidden" variant="ghost" onClick={() => {
+                                            const input = document.createElement('input');
+                                            input.type = 'file';
+                                            input.onchange = (e: any) => handleShowreel(e.target.files[0]);
+                                            input.click();
+                                        }}>
+                                            <Upload className="mr-2 group-hover:scale-110 transition-transform" size={16}/> 
+                                            Upload File
+                                        </Button>
+                                    </div>
                                 </div>
                             </div>
                             <div className="space-y-6">
@@ -423,7 +492,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                                                             }}>Upload Image</Button>
                                                         )}
                                                         
-                                                        <Button size="sm" variant="ghost" className="h-8 text-[10px] text-red-500" onClick={() => setProjectToDelete(p)}><Trash2 size={12}/></Button>
+                                                        <Button size="sm" variant="ghost" className="h-8 text-[10px] text-red-500 hover:text-red-400 hover:bg-red-500/10" onClick={() => setProjectToDelete(p)}><Trash2 size={12}/></Button>
                                                     </div>
                                                 </div>
                                             </div>
@@ -514,22 +583,54 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
             </main>
         </div>
 
+        {/* Undo Toast */}
+        <AnimatePresence>
+            {toast && toast.show && (
+                createPortal(
+                    <motion.div 
+                        initial={{ opacity: 0, y: 20, scale: 0.9 }} 
+                        animate={{ opacity: 1, y: 0, scale: 1 }} 
+                        exit={{ opacity: 0, y: 20, scale: 0.9 }}
+                        className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[2000] bg-zinc-800 text-white pl-4 pr-2 py-2 rounded-full shadow-2xl flex items-center gap-4 border border-zinc-700/50 backdrop-blur-md"
+                    >
+                        <span className="text-xs font-medium text-zinc-200">{toast.message}</span>
+                        <div className="h-4 w-px bg-zinc-700"></div>
+                        <button onClick={handleUndo} className="text-indigo-400 text-xs font-bold uppercase tracking-wider hover:text-indigo-300 hover:bg-indigo-500/10 px-3 py-1.5 rounded-full transition-colors flex items-center gap-2">
+                            <RotateCcw size={12}/> Undo
+                        </button>
+                        <button onClick={() => setToast(null)} className="p-1 hover:bg-zinc-700 rounded-full text-zinc-500 hover:text-white transition-colors">
+                            <X size={14}/>
+                        </button>
+                    </motion.div>,
+                    document.body
+                )
+            )}
+        </AnimatePresence>
+
         {/* Project Delete Confirmation Modal */}
         {projectToDelete && createPortal(
             <div className="fixed inset-0 z-[1000] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in" onClick={() => setProjectToDelete(null)}>
-                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 flex flex-col items-center gap-4 max-w-sm w-full text-center" onClick={e => e.stopPropagation()}>
-                    <div className="w-12 h-12 bg-red-500/10 rounded-full flex items-center justify-center text-red-500 mb-2">
-                        <AlertCircle size={24} />
+                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 flex flex-col items-center gap-6 max-w-sm w-full text-center shadow-2xl relative overflow-hidden" onClick={e => e.stopPropagation()}>
+                    {/* Subtle background glow */}
+                    <div className="absolute inset-0 bg-red-500/5 pointer-events-none" />
+                    
+                    <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center text-red-500 mb-2 ring-1 ring-red-500/20 shadow-[0_0_20px_rgba(239,68,68,0.2)]">
+                        <Trash2 size={28} />
                     </div>
-                    <div>
-                        <h3 className="text-white font-bold text-lg mb-2">Delete Project?</h3>
-                        <p className="text-zinc-400 text-sm">
-                            Are you sure you want to delete <span className="text-white font-bold">"{projectToDelete.title}"</span>? This action cannot be undone.
+                    
+                    <div className="space-y-2 relative z-10">
+                        <h3 className="text-white font-display font-bold text-2xl tracking-tight">Delete Project?</h3>
+                        <p className="text-zinc-400 text-sm leading-relaxed">
+                            You are about to permanently delete <br/>
+                            <span className="text-white font-bold bg-zinc-800 px-2 py-0.5 rounded border border-zinc-700 mx-1">{projectToDelete.title}</span>
                         </p>
                     </div>
-                    <div className="flex gap-3 w-full mt-4">
-                        <Button variant="outline" className="flex-1" onClick={() => setProjectToDelete(null)}>Cancel</Button>
-                        <Button className="flex-1 bg-red-600 hover:bg-red-700 text-white border-none" onClick={confirmProjectDeletion}>Delete</Button>
+
+                    <div className="flex gap-3 w-full mt-2 relative z-10">
+                        <Button variant="outline" className="flex-1 border-zinc-700 hover:bg-zinc-800" onClick={() => setProjectToDelete(null)}>Cancel</Button>
+                        <Button className="flex-1 bg-red-600 hover:bg-red-500 text-white border-none shadow-lg shadow-red-900/20" onClick={confirmProjectDeletion}>
+                            Delete
+                        </Button>
                     </div>
                 </div>
             </div>,
