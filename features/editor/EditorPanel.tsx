@@ -157,7 +157,9 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
 
   const getShareLink = () => {
       const baseUrl = window.location.origin;
-      return `${baseUrl}/v/${data.username}`; // Use /v/ route for public view
+      // Use Hash routing to ensure compatibility with all hosting environments
+      // This avoids "Cannot GET /v/..." errors on servers that don't support SPA rewrites.
+      return `${baseUrl}/#${data.username}`; 
   };
   
   const getQrUrl = () => {
