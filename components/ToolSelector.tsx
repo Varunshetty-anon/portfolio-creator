@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Check, Star } from 'lucide-react';
-import { EDITING_TOOLS_LIST, AI_TOOLS_LIST } from '../utils';
+import { EDITING_TOOLS_LIST, AI_TOOLS_LIST } from '../lib/utils';
 
 interface ToolSelectorProps {
   type: 'editing' | 'ai';

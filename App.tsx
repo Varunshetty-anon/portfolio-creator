@@ -1,21 +1,37 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { PortfolioView } from './components/PortfolioView';
-import { EditorPanel } from './components/EditorPanel';
-import { OnboardingFlow } from './components/OnboardingFlow';
-import { PortfolioData, INITIAL_DATA, DEMO_DATA } from './types';
-import { loadFromDB, saveToDB, isConfigured, auth, loginWithEmail, signupWithEmail, loginWithGoogle, checkUsernameAvailable, deletePortfolioFromDB, deleteUserAuth } from './utils';
+import { PortfolioView } from './features/portfolio/PortfolioView';
+import { EditorPanel } from './features/editor/EditorPanel';
+import { OnboardingFlow } from './features/onboarding/OnboardingFlow';
+import { PortfolioData, INITIAL_DATA } from './types';
+import { 
+    loadPublicPortfolio, 
+    loadEditorState, 
+    saveDraft, 
+    publishPortfolio, 
+    completeOnboarding, 
+    getUserProfile, 
+    isConfigured, 
+    auth, 
+    loginWithEmail, 
+    signupWithEmail, 
+    loginWithGoogle, 
+    checkUsernameAvailable, 
+    deletePortfolioFromDB, 
+    deleteUserAuth 
+} from './lib/utils';
 import { Loader2, Eye, EyeOff, PenTool } from 'lucide-react';
 import { Button } from './components/ui/Button';
 import { Input } from './components/ui/Input';
 import { onAuthStateChanged, User } from 'firebase/auth';
 
 const App: React.FC = () => {
-  const [route, setRoute] = useState<'home' | 'editor' | 'public'>('home');
+  const [route, setRoute] = useState<'home' | 'editor' | 'onboarding' | 'public'>('home');
   const [editorViewMode, setEditorViewMode] = useState<'edit' | 'preview'>('edit');
   const [data, setData] = useState<PortfolioData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [showOnboarding, setShowOnboarding] = useState(false);
+  
+  // Editor States
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
@@ -28,6 +44,7 @@ const App: React.FC = () => {
   const [authError, setAuthError] = useState('');
   const [isAuthProcessing, setIsAuthProcessing] = useState(false);
 
+  // Ref to hold current data for sync operations
   const dataRef = useRef<PortfolioData | null>(null);
   useEffect(() => { dataRef.current = data; }, [data]);
 
@@ -35,63 +52,60 @@ const App: React.FC = () => {
     const initApp = async () => {
         setIsLoading(true);
 
-        // 1. STRICT PUBLIC ROUTE CHECK
-        // If a public slug is detected, we load public data and RETURN immediately.
-        // This prevents any Auth listeners or editor logic from initializing.
+        // 1. PUBLIC ROUTE CHECK
         const hash = window.location.hash.replace('#', '');
         const path = window.location.pathname;
-        
         let slug = null;
+        
+        // Match /v/:slug or hash based slug
         if (path.includes('/v/')) {
             slug = path.split('/v/')[1];
-        } else if (hash && hash !== 'editor') {
+        } else if (hash && !['editor', 'onboarding'].includes(hash)) {
             slug = hash;
         }
 
         if (slug) {
             console.log("Detected public slug:", slug);
-            const publicData = await loadFromDB(slug);
+            const publicData = await loadPublicPortfolio(slug);
             if (publicData) {
                 setData(publicData);
                 setRoute('public');
                 setIsLoading(false);
-                return; // CRITICAL: Stop execution here. No auth check for public viewers.
+                return; // Stop here, public view doesn't need auth
+            } else {
+                console.log("Slug not found, defaulting to home");
             }
         }
 
-        // 2. EDITOR / AUTH CHECK
-        // Only proceed here if NO public slug was found.
+        // 2. AUTH CHECK (For Editor/Onboarding)
         if (isConfigured && auth) {
             const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
                 if (user) {
                     try {
-                        const userPortfolio = await loadFromDB(user.uid);
-                        if (userPortfolio) {
-                            setData(userPortfolio);
-                            if (!userPortfolio.name) setShowOnboarding(true);
-                        } else {
-                            const cleanUsername = (user.displayName?.split(' ')[0] || user.email?.split('@')[0] || 'user').toLowerCase() + Math.floor(Math.random()*1000);
-                            const newProfile: PortfolioData = { 
+                        const userProfile = await getUserProfile(user.uid);
+                        
+                        if (!userProfile || !userProfile.onboarded) {
+                             // User exists but not onboarded
+                             const cleanUsername = (user.displayName?.split(' ')[0] || user.email?.split('@')[0] || 'user').toLowerCase() + Math.floor(Math.random()*1000);
+                             const initialData: PortfolioData = { 
                                 ...INITIAL_DATA, 
                                 uid: user.uid, 
                                 contactEmail: user.email || '', 
                                 username: cleanUsername,
                                 name: user.displayName || ''
                             };
-                            setData(newProfile);
-                            await saveToDB(newProfile);
-                            setShowOnboarding(true);
+                            setData(initialData);
+                            setRoute('onboarding');
+                        } else {
+                            // User is onboarded, load Editor State (Draft)
+                            const draftData = await loadEditorState(user.uid);
+                            setData(draftData || INITIAL_DATA);
+                            setRoute('editor');
                         }
-                        setRoute('editor');
-                        if (window.location.hash !== '#editor') window.location.hash = 'editor';
                     } catch (e) {
                         console.error("Auth load error", e);
                     }
                 } else {
-                    // Strict Guard: If trying to access editor while logged out, force home
-                    if (window.location.hash === '#editor') {
-                        window.location.hash = '';
-                    }
                     setRoute('home');
                 }
                 setIsLoading(false);
@@ -134,19 +148,43 @@ const App: React.FC = () => {
       }
   };
 
-  const handleSaveAndPublish = async () => {
-    if (!dataRef.current) return;
+  // --- Editor Actions ---
+
+  const handleSaveDraft = async () => {
+    if (!dataRef.current || !dataRef.current.uid) return;
     setIsSaving(true);
     try {
-      await saveToDB(dataRef.current);
+      await saveDraft(dataRef.current.uid, dataRef.current);
       setHasUnsavedChanges(false);
-      // Ensure sync before "finishing"
-      await new Promise(r => setTimeout(r, 500)); 
       setIsSaving(false);
     } catch (e: any) {
       alert("Save failed: " + e.message);
       setIsSaving(false);
     }
+  };
+
+  const handlePublish = async () => {
+    if (!dataRef.current || !dataRef.current.uid) return;
+    setIsSaving(true);
+    try {
+        await publishPortfolio(dataRef.current.uid, dataRef.current);
+        const updated = await loadEditorState(dataRef.current.uid);
+        if (updated) setData(updated);
+        setHasUnsavedChanges(false);
+        setIsSaving(false);
+        alert("Portfolio Published Successfully!");
+    } catch (e: any) {
+        alert("Publish failed: " + e.message);
+        setIsSaving(false);
+    }
+  };
+
+  const handleOnboardingComplete = async (completedData: PortfolioData) => {
+      if (!auth?.currentUser) return;
+      await completeOnboarding(auth.currentUser.uid, completedData);
+      const draftData = await loadEditorState(auth.currentUser.uid);
+      setData(draftData);
+      setRoute('editor');
   };
 
   const handleLogout = async () => {
@@ -165,17 +203,18 @@ const App: React.FC = () => {
       );
   }
 
-  // PUBLIC VIEW - Strictly Isolated
+  // PUBLIC VIEW
   if (route === 'public' && data) {
       return <PortfolioView data={data} isPreview={false} />;
   }
 
-  // EDITOR VIEW - Guarded by Auth
+  // ONBOARDING VIEW
+  if (route === 'onboarding' && data) {
+      return <OnboardingFlow data={data} onComplete={handleOnboardingComplete} />;
+  }
+
+  // EDITOR VIEW
   if (route === 'editor' && data) {
-    if (showOnboarding) {
-        return <OnboardingFlow data={data} onComplete={(d) => { setData(d); setShowOnboarding(false); saveToDB(d); }} />;
-    }
-    
     if (editorViewMode === 'preview') {
         return (
             <div className="relative h-screen w-full bg-black overflow-hidden">
@@ -191,15 +230,20 @@ const App: React.FC = () => {
       <EditorPanel 
         data={data} 
         onChange={(d) => { setData(d); setHasUnsavedChanges(true); }} 
-        onPublish={handleSaveAndPublish}
+        onSave={handleSaveDraft}
+        onPublish={handlePublish}
         isSaving={isSaving}
         hasUnsavedChanges={hasUnsavedChanges}
         onLogout={handleLogout}
         onDeleteAccount={async () => {
-            if(window.confirm("Permanent Wipe. Are you sure?")) {
-                await deletePortfolioFromDB(data.uid!);
-                await deleteUserAuth();
-                window.location.reload();
+            if(window.confirm("Permanent Wipe. Are you sure? This cannot be undone.")) {
+                try {
+                    await deletePortfolioFromDB(data.uid!);
+                    await deleteUserAuth();
+                    window.location.reload();
+                } catch(e) {
+                    alert("Delete failed. Please re-login and try again.");
+                }
             }
         }}
         onPreview={() => setEditorViewMode('preview')}
