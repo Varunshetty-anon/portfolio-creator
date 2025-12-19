@@ -104,6 +104,7 @@ const App: React.FC = () => {
                         }
                     } catch (e) {
                         console.error("Auth load error", e);
+                        // If error loading profile, stay on home but allow retry
                     }
                 } else {
                     setRoute('home');
@@ -138,13 +139,25 @@ const App: React.FC = () => {
   };
 
   const handleGoogleAuth = async () => {
+      if (isAuthProcessing) return; // Prevent double clicks
       setAuthError('');
       setIsAuthProcessing(true);
       try {
           await loginWithGoogle();
+          // Success is handled by onAuthStateChanged listener in initApp.
+          // We do NOT set isAuthProcessing(false) here because we want to 
+          // keep the loading state until the route changes to 'editor' or 'onboarding',
+          // effectively unmounting this login form.
       } catch (e: any) { 
-          setAuthError(e.message); 
-          setIsAuthProcessing(false);
+          console.error("Google Auth Failed:", e);
+          
+          // Friendly error messages for common issues
+          let msg = e.message;
+          if (msg.includes('popup-closed-by-user')) msg = "Login cancelled.";
+          if (msg.includes('network-request-failed')) msg = "Network error. Check your connection.";
+          
+          setAuthError(msg); 
+          setIsAuthProcessing(false); // Reset loading state so user can retry
       }
   };
 

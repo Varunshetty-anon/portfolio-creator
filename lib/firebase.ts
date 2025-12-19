@@ -1,4 +1,4 @@
-import { initializeApp, FirebaseApp } from 'firebase/app';
+import { initializeApp, FirebaseApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, Firestore } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 import { getAuth, Auth, GoogleAuthProvider } from 'firebase/auth';
@@ -24,7 +24,8 @@ let googleProvider: GoogleAuthProvider | undefined;
 
 if (isConfigured) {
     try {
-        app = initializeApp(firebaseConfig);
+        // Prevent double initialization in React Strict Mode or hot reloads
+        app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
     } catch (e) {
         console.error("Firebase App initialization failed:", e);
     }
@@ -45,6 +46,9 @@ if (isConfigured) {
         try {
             auth = getAuth(app);
             googleProvider = new GoogleAuthProvider();
+            googleProvider.setCustomParameters({
+                prompt: 'select_account'
+            });
         } catch (e) {
             console.warn("Firebase Auth initialization failed:", e);
         }

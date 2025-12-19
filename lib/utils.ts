@@ -2,7 +2,7 @@ import { PortfolioData, PortfolioContent, UserProfile, PortfolioMeta, INITIAL_DA
 import { db, storage, auth, googleProvider, isConfigured } from './firebase';
 import { doc, getDoc, setDoc, collection, query, where, getDocs, deleteDoc, addDoc, serverTimestamp, increment, writeBatch } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL, listAll, deleteObject } from 'firebase/storage';
-import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, User, deleteUser } from 'firebase/auth';
+import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, User, deleteUser, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import { GoogleGenAI } from "@google/genai";
 
 const USERS_COL = 'users';
@@ -253,11 +253,6 @@ export const completeOnboarding = async (uid: string, initialData: PortfolioData
 export const trackPortfolioView = async (uid: string) => {
     if (!db || !uid) return;
     try {
-        // Atomic increment on analytics/event doc? 
-        // Requirements say public write but no read for analytics.
-        // We will do a simple increment on the portfolio_stats collection for compatibility
-        // OR add an event to subcollection. 
-        // Let's stick to the simplest proven method:
         const statsRef = doc(db, 'portfolio_stats', uid);
         await setDoc(statsRef, { views: increment(1), lastViewed: serverTimestamp() }, { merge: true });
     } catch (e) { console.error("Analytics Error", e); }
@@ -427,7 +422,13 @@ export const downloadQrCode = async (url: string, filename: string) => {
 
 export const loginWithEmail = (e: string, p: string) => signInWithEmailAndPassword(auth!, e, p);
 export const signupWithEmail = (e: string, p: string) => createUserWithEmailAndPassword(auth!, e, p);
-export const loginWithGoogle = () => signInWithPopup(auth!, googleProvider!);
+
+export const loginWithGoogle = async () => {
+    if (!auth || !googleProvider) throw new Error("Firebase Auth not initialized correctly");
+    // Ensure auth persistence to prevent redirect loops or dropped sessions
+    await setPersistence(auth, browserLocalPersistence);
+    return await signInWithPopup(auth, googleProvider);
+};
 
 // --- Account Management ---
 
