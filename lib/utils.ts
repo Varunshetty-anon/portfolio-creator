@@ -86,7 +86,9 @@ export const getDriveEmbedUrl = (url: string): string | null => {
 
 export const getDriveThumbnail = (url: string): string | null => {
   const id = getDriveId(url);
-  return id ? `https://lh3.googleusercontent.com/u/0/d/${id}=w1000` : null;
+  // Use a public proxy or fallback since Drive doesn't expose public thumbnails reliably without API key.
+  // This is a common hack for public drive files.
+  return id ? `https://lh3.googleusercontent.com/d/${id}=w1000` : null;
 };
 
 export const getStoragePathFromUrl = (url: string): string | null => {

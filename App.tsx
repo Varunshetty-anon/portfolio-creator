@@ -182,8 +182,9 @@ const App: React.FC = () => {
       setHasUnsavedChanges(false);
       setIsSaving(false);
     } catch (e: any) {
-      alert("Save failed: " + e.message);
+      console.error("Save failed: ", e);
       setIsSaving(false);
+      throw e; // Propagate to caller if needed
     }
   };
 
@@ -196,10 +197,10 @@ const App: React.FC = () => {
         if (updated) setData(updated);
         setHasUnsavedChanges(false);
         setIsSaving(false);
-        alert("Portfolio Published Successfully!");
     } catch (e: any) {
-        alert("Publish failed: " + e.message);
+        console.error("Publish failed: ", e);
         setIsSaving(false);
+        throw e; // Propagate to UI button for error state
     }
   };
 
@@ -268,7 +269,7 @@ const App: React.FC = () => {
                     await deleteUserAuth();
                     window.location.reload();
                 } catch(e) {
-                    alert("Delete failed. Please re-login and try again.");
+                    console.error("Delete failed", e);
                 }
             }
         }}

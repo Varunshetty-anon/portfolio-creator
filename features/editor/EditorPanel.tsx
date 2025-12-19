@@ -258,9 +258,10 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
       setIsCleaning(true);
       try {
           const count = await cleanupUnusedMedia(data.uid, data);
-          alert(`Cleanup complete. Removed ${count} unused files.`);
+          setToast({ show: true, message: `Cleanup complete. Removed ${count} files.` });
       } catch (e) {
-          alert("Cleanup failed. Please try again.");
+          console.error("Cleanup failed", e);
+          setToast({ show: true, message: "Cleanup failed. Please try again." });
       } finally {
           setIsCleaning(false);
       }
@@ -305,10 +306,51 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
   }
 
   const handleLinkInput = (id: string, val: string) => {
+      // Optimistic update
       updateProject(id, { link: val });
       setLinkValidation(id);
+      
+      // Auto-fetch thumbnail for external links
+      if (val.length > 10) {
+          // Detect Type
+          let thumb = '';
+          if (val.includes('youtube.com') || val.includes('youtu.be')) {
+              thumb = getYouTubeThumbnail(val) || '';
+          } else if (val.includes('drive.google.com')) {
+              thumb = getDriveThumbnail(val) || '';
+          }
+
+          if (thumb) {
+               console.log("Auto-detected thumbnail:", thumb);
+               // Defer slightly to allow typing to finish
+               setTimeout(() => {
+                   updateProject(id, { thumbnail: thumb, aspectRatio: '16:9' });
+               }, 500);
+          }
+      }
+
       setTimeout(() => setLinkValidation(null), 1000);
   };
+
+  const handleShowreelLinkInput = (val: string) => {
+      updateField('showreelLink', val);
+      
+      // Auto-fetch thumbnail
+      if (val.length > 10) {
+          let thumb = '';
+          if (val.includes('youtube.com') || val.includes('youtu.be')) {
+              thumb = getYouTubeThumbnail(val) || '';
+          } else if (val.includes('drive.google.com')) {
+              thumb = getDriveThumbnail(val) || '';
+          }
+
+          if (thumb) {
+              setTimeout(() => {
+                  updateField('showreelThumbnail', thumb);
+              }, 500);
+          }
+      }
+  }
 
   return (
     <div className="h-screen flex flex-col bg-black text-white overflow-hidden">
@@ -378,7 +420,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                                 <div className="flex items-center gap-3 bg-black/50 p-4 rounded-xl border border-zinc-800">
                                     <Globe size={16} className="text-indigo-500" />
                                     <code className="text-xs text-zinc-300 flex-1 truncate">{getShareLink()}</code>
-                                    <Button size="sm" onClick={() => { navigator.clipboard.writeText(getShareLink()); alert("Copied!"); }}>Copy</Button>
+                                    <Button size="sm" onClick={() => { navigator.clipboard.writeText(getShareLink()); }}>Copy</Button>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                      <Button variant="outline" className="w-full py-6 border-dashed" onClick={() => window.open(getShareLink(), '_blank')}>Open Public Portfolio <ExternalLink size={14} className="ml-2"/></Button>
@@ -463,7 +505,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                                             <Input 
                                                 placeholder="Or paste YouTube / Vimeo / Drive Link..." 
                                                 value={data.showreelLink} 
-                                                onChange={e => updateField('showreelLink', e.target.value)}
+                                                onChange={e => handleShowreelLinkInput(e.target.value)}
                                                 className="bg-black/50"
                                             />
                                             <p className="text-[10px] text-zinc-500">Supported: YouTube, Vimeo, Google Drive, or Direct Upload.</p>
@@ -739,7 +781,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                                 setCropModal({ open: false, src: null });
                             } catch (e) {
                                 console.error("Upload failed", e);
-                                alert("Failed to upload image. Please try again.");
                             } finally {
                                 setUploadStatus(null);
                             }
