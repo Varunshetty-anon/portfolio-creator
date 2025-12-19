@@ -9,44 +9,31 @@ service cloud.firestore {
 
     // USERS: Private profile data
     match /users/{userId} {
+      // Explicitly allow create (for onboarding), read, and write for the owner
+      allow create: if isOwner(userId);
       allow read: if isOwner(userId);
-      allow write: if isOwner(userId); // Users manage their own profile metadata
+      allow write: if isOwner(userId);
     }
 
     // PORTFOLIOS: High-level metadata (slug, publish status)
     match /portfolios/{portfolioId} {
-      // Public can read basic metadata to resolve slugs (needed for routing)
       allow read: if true; 
-      // Only owner can update the main portfolio doc (publish status, stats)
       allow write: if isOwner(portfolioId);
       
       // VERSIONS: Content snapshots
       match /versions/{versionId} {
-        // Owner can read/write drafts and versions
         allow write: if isOwner(portfolioId);
-        
-        // Editor (owner) can read everything.
-        // Public can ONLY read if this version is the live version.
-        // Note: In client-side logic, we fetch the ID from the parent doc first.
-        // We allow read if auth owner OR if the parent document says this is the live version.
-        // For simplicity and cost in rules, we allow read if the parent portfolio exists and is published,
-        // but strict data fetching in the app ensures we only pull the correct one.
         allow read: if isOwner(portfolioId) || true; 
-        // Ideally: resource.id == get(/databases/$(database)/documents/portfolios/$(portfolioId)).data.publish.liveVersion
-        // But allowing public read on versions is acceptable if the 'draft' ID is hard to guess 
-        // or if we rely on the app to only link to the live version.
-        // To strictly protect drafts:
-        allow read: if isOwner(portfolioId) || (versionId != 'draft');
       }
     }
     
     // ANALYTICS: Write-only for public (logging events), Owner read
     match /analytics/{portfolioId}/events/{eventId} {
       allow read: if isOwner(portfolioId);
-      allow write: if true; // Public can log views/clicks
+      allow write: if true;
     }
     
-    // Legacy Stats support (optional, for increment counters)
+    // Legacy Stats support
     match /portfolio_stats/{userId} {
       allow read: if true;
       allow write: if true;

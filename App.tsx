@@ -83,7 +83,8 @@ const App: React.FC = () => {
                 if (user) {
                     console.log("Debug: Auth User Detected", user.uid);
                     try {
-                        // Ensure user profile exists in Firestore, create if new
+                        // Ensure user profile exists in Firestore, create if new.
+                        // This MUST happen before we try to read other data.
                         const userProfile = await ensureUserProfile(user);
                         
                         if (!userProfile.onboarded) {
@@ -104,15 +105,18 @@ const App: React.FC = () => {
                             setData(draftData || INITIAL_DATA);
                             setRoute('editor');
                         }
-                    } catch (e) {
+                    } catch (e: any) {
                         console.error("Auth load error", e);
-                        setAuthError("Failed to load profile details.");
-                        setIsAuthProcessing(false); // Ensure button stops spinning on error
+                        setAuthError("Failed to initialize account: " + e.message);
+                        // Important: Stop the auth spinner in the form, and global loader
+                        setIsAuthProcessing(false); 
                     }
                 } else {
                     setRoute('home');
                     setIsAuthProcessing(false);
                 }
+                
+                // Always stop loading after auth check resolution
                 setIsLoading(false);
             });
             return () => unsubscribe();
@@ -151,7 +155,6 @@ const App: React.FC = () => {
           await loginWithGoogle();
           // We intentionally do NOT setIsAuthProcessing(false) here.
           // The onAuthStateChanged listener will handle the state transition or error.
-          // If we set it to false here, the loading spinner would stop before the redirect happens.
       } catch (e: any) { 
           console.error("Google Auth Failed:", e);
           

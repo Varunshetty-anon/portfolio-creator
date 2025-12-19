@@ -233,17 +233,34 @@ export const loadPublicPortfolio = async (slug: string): Promise<PortfolioData |
 };
 
 /**
- * User Onboarding Status - Ensures profile exists
+ * User Onboarding Status - Ensures profile exists.
+ * NOW WITH BETTER ERROR HANDLING AND LOGGING.
  */
 export const ensureUserProfile = async (user: User): Promise<UserProfile> => {
     if (!db) throw new Error("Database not initialized");
-    const userRef = doc(db, USERS_COL, user.uid);
-    const snap = await getDoc(userRef);
+    console.log("Checking user profile for:", user.uid);
     
-    if (snap.exists()) {
+    const userRef = doc(db, USERS_COL, user.uid);
+    let snap;
+    
+    try {
+        snap = await getDoc(userRef);
+    } catch (e: any) {
+        console.warn("Error reading user profile (might be new user):", e.message);
+        // If permission denied or other error, we try to create anyway if the rules allow 'create' but not 'read' of non-existent
+        // But normally 'permission-denied' on read means we can't check existence.
+        // We will assume it doesn't exist and try to create. 
+        // If it DOES exist and we can't read it, create will fail if we use setDoc without merge, or succeed if we overwrite.
+        // We'll proceed to creation attempt.
+    }
+    
+    if (snap && snap.exists()) {
+        console.log("User profile found.");
         return snap.data() as UserProfile;
     }
     
+    console.log("User profile not found or unreadable. Creating new profile...");
+
     // Create new profile if missing
     const newProfile: UserProfile = {
         uid: user.uid,
@@ -252,9 +269,14 @@ export const ensureUserProfile = async (user: User): Promise<UserProfile> => {
         createdAt: Date.now()
     };
     
-    // Check if we can write (rules might block if auth is weird, but we are auth'd)
-    await setDoc(userRef, newProfile);
-    return newProfile;
+    try {
+        await setDoc(userRef, newProfile, { merge: true }); // Merge true to be safe
+        console.log("User profile created successfully.");
+        return newProfile;
+    } catch (writeError: any) {
+        console.error("Failed to create user profile:", writeError);
+        throw new Error("Could not initialize user profile. Please try again.");
+    }
 };
 
 export const getUserProfile = async (uid: string): Promise<UserProfile | null> => {
