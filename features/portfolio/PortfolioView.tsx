@@ -336,6 +336,7 @@ const ShowreelPlayer: React.FC<{ src: string; thumbnail: string }> = React.memo(
         }
         if (type === 'drive') {
              const dId = getDriveId(src);
+             // Ensure we use the preview endpoint which is iframe embeddable
              return `https://drive.google.com/file/d/${dId}/preview`;
         }
         return src;
@@ -382,7 +383,7 @@ const ShowreelPlayer: React.FC<{ src: string; thumbnail: string }> = React.memo(
             ) : (
                 <iframe 
                     src={getEmbedSrc()}
-                    className="w-full h-full pointer-events-none" 
+                    className="w-full h-full" 
                     allow="autoplay; fullscreen; picture-in-picture"
                     title="Showreel"
                     onLoad={() => {

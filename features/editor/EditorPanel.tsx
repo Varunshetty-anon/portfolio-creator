@@ -95,7 +95,7 @@ const getLinkIndicator = (url: string) => {
              return { 
                  icon: AlertCircle, 
                  color: 'text-amber-500', 
-                 label: 'Invalid URL (Format: https://...)', 
+                 label: 'Invalid URL', 
                  border: '!border-amber-500/50 focus:!border-amber-500 focus:!ring-amber-500/20',
                  isError: true 
              };
@@ -306,14 +306,17 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
   }
 
   const handleLinkInput = (id: string, val: string) => {
-      // Optimistic update
-      updateProject(id, { link: val });
+      // 1. Immediately update the link in state so it doesn't disappear/revert
+      const updatedProjects = data.projects.map(p => p.id === id ? { ...p, link: val } : p);
+      onChange({ ...data, projects: updatedProjects });
+      
+      // 2. Set validation/loading state for UI feedback
       setLinkValidation(id);
       
-      // Auto-fetch thumbnail for external links
+      // 3. Auto-fetch thumbnail logic (Debounced effectively by logic flow)
       if (val.length > 10) {
-          // Detect Type
           let thumb = '';
+          // Check for supported patterns
           if (val.includes('youtube.com') || val.includes('youtu.be')) {
               thumb = getYouTubeThumbnail(val) || '';
           } else if (val.includes('drive.google.com')) {
@@ -322,20 +325,26 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
 
           if (thumb) {
                console.log("Auto-detected thumbnail:", thumb);
-               // Defer slightly to allow typing to finish
+               // Async update for thumbnail to avoid blocking input
                setTimeout(() => {
-                   updateProject(id, { thumbnail: thumb, aspectRatio: '16:9' });
+                   const withThumb = data.projects.map(p => 
+                       p.id === id ? { ...p, link: val, thumbnail: thumb, aspectRatio: '16:9' as const } : p
+                   );
+                   onChange({ ...data, projects: withThumb });
+                   setLinkValidation(null);
                }, 500);
+          } else {
+              // Clear validation after delay if no thumb found (user might be typing)
+              setTimeout(() => setLinkValidation(null), 1000);
           }
+      } else {
+          setLinkValidation(null);
       }
-
-      setTimeout(() => setLinkValidation(null), 1000);
   };
 
   const handleShowreelLinkInput = (val: string) => {
       updateField('showreelLink', val);
       
-      // Auto-fetch thumbnail
       if (val.length > 10) {
           let thumb = '';
           if (val.includes('youtube.com') || val.includes('youtu.be')) {
@@ -527,7 +536,21 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                                     <h3 className="text-sm font-bold uppercase tracking-widest text-zinc-500">Projects</h3>
                                     <div className="flex gap-2">
                                         <Button size="sm" variant="ghost" onClick={() => onSave()} icon={<Save size={12} className="text-zinc-500"/>} className="text-xs text-zinc-500 hover:text-white">Save Section</Button>
-                                        <Button size="sm" onClick={() => updateField('projects', [...data.projects, { id: Date.now().toString(), title: "New Project", description: "Edit summary", thumbnail: "", link: "", category: "Work", type: "video" }])}><Plus size={14}/> Add</Button>
+                                        <Button size="sm" onClick={() => {
+                                            // Add new project to the TOP of the list
+                                            const newProject: Project = { 
+                                                id: Date.now().toString(), 
+                                                title: "New Project", 
+                                                description: "Edit summary", 
+                                                thumbnail: "", 
+                                                link: "", 
+                                                category: "Work", 
+                                                type: "video" 
+                                            };
+                                            updateField('projects', [newProject, ...data.projects]);
+                                        }}>
+                                            <Plus size={14}/> Add
+                                        </Button>
                                     </div>
                                 </div>
                                 <div className="space-y-4">

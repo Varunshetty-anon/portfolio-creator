@@ -65,6 +65,8 @@ export const getYouTubeThumbnail = (url: string): string | null => {
   if (!url) return null;
   const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
   const match = url.match(regExp);
+  // Return maxresdefault immediately if ID matches. 
+  // The UI ShimmerImage handles 404s/fallbacks if this particular thumbnail doesn't exist.
   return (match && match[2].length === 11) ? `https://img.youtube.com/vi/${match[2]}/maxresdefault.jpg` : null;
 };
 
@@ -80,14 +82,15 @@ export const getDriveId = (url: string): string | null => {
 
 export const getDriveEmbedUrl = (url: string): string | null => {
   const id = getDriveId(url);
-  // Add autoplay and mute params for consistent behavior
-  return id ? `https://drive.google.com/file/d/${id}/preview?autoplay=1&mute=1` : null;
+  // Using the preview endpoint is the standard way to embed Drive videos reliably
+  return id ? `https://drive.google.com/file/d/${id}/preview` : null;
 };
 
 export const getDriveThumbnail = (url: string): string | null => {
   const id = getDriveId(url);
-  // Use a public proxy or fallback since Drive doesn't expose public thumbnails reliably without API key.
-  // This is a common hack for public drive files.
+  // We optimistically return the public proxy link. 
+  // If the file is not public, this might fail, but the UI has a fallback placeholder.
+  // This prevents waiting for a metadata check that might fail CORS.
   return id ? `https://lh3.googleusercontent.com/d/${id}=w1000` : null;
 };
 
