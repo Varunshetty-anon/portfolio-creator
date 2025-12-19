@@ -378,7 +378,7 @@ export const uploadFileToStorage = (file: File, path: string, onProgress?: (prog
     if (!storage) return reject(new Error("Storage not configured"));
     
     const storageRef = ref(storage, path);
-    // Explicitly set content type to ensure browser handles playback correctly
+    // CRITICAL: Explicitly set content type and cache control for video streaming
     const metadata = {
         contentType: file.type || 'video/mp4',
         cacheControl: 'public, max-age=31536000'
