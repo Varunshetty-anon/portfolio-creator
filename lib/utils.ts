@@ -249,27 +249,27 @@ export const loadPublicPortfolio = async (slug: string): Promise<PortfolioData |
  */
 export const ensureUserProfile = async (user: User): Promise<UserProfile> => {
     if (!db) throw new Error("Database not initialized");
-    console.log("Checking user profile for:", user.uid);
+    console.log("Debug: ensureUserProfile checking for", user.uid);
     
     const userRef = doc(db, USERS_COL, user.uid);
-    let snap;
+    let profile: UserProfile | null = null;
     
     try {
-        // Wrap getDoc in a timeout to fail fast if network/SW is intercepted and stalled
-        snap = await withTimeout(getDoc(userRef), 5000, "Profile check timed out");
+        // Try reading first. Wrap in timeout.
+        const snap = await withTimeout(getDoc(userRef), 5000, "Read profile timeout");
+        if (snap.exists()) {
+            profile = snap.data() as UserProfile;
+        }
     } catch (e: any) {
-        console.warn("Error reading user profile (might be new user or network issue):", e.message);
-        // Fallthrough to creation attempt
+        // If read fails (permissions, network, or just missing), we proceed to create.
+        console.log("Profile read failed or missing, proceeding to creation:", e.message);
     }
     
-    if (snap && snap.exists()) {
-        console.log("User profile found.");
-        return snap.data() as UserProfile;
-    }
-    
-    console.log("User profile not found or unreadable. Creating new profile...");
+    if (profile) return profile;
 
-    // Create new profile if missing
+    console.log("Creating new user profile...");
+
+    // Create new profile if missing or unreadable
     const newProfile: UserProfile = {
         uid: user.uid,
         email: user.email || '',
@@ -278,13 +278,13 @@ export const ensureUserProfile = async (user: User): Promise<UserProfile> => {
     };
     
     try {
-        // Use setDoc with merge to allow creation without failing if it already exists but was unreadable
-        await withTimeout(setDoc(userRef, newProfile, { merge: true }), 5000, "Profile creation timed out");
-        console.log("User profile created successfully.");
+        // Use setDoc with merge to be safe
+        await withTimeout(setDoc(userRef, newProfile, { merge: true }), 5000, "Create profile timeout");
+        console.log("User profile created/verified successfully.");
         return newProfile;
     } catch (writeError: any) {
-        console.error("Failed to create user profile:", writeError);
-        throw new Error("Could not initialize user profile. Please check your connection and try again.");
+        console.error("Critical: Failed to create user profile", writeError);
+        throw new Error("Failed to initialize account data. Please check connection.");
     }
 };
 

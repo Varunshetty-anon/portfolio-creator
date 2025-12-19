@@ -81,7 +81,7 @@ const App: React.FC = () => {
         if (isConfigured && auth) {
             const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
                 if (user) {
-                    console.log("Debug: Auth User Detected", user.uid);
+                    console.log("DEBUG: User authenticated", user.uid);
                     try {
                         // Ensure user profile exists in Firestore, create if new.
                         // This MUST happen before we try to read other data.
@@ -107,7 +107,7 @@ const App: React.FC = () => {
                         }
                     } catch (e: any) {
                         console.error("Auth load error", e);
-                        setAuthError("Failed to initialize account: " + e.message);
+                        setAuthError("Account initialization failed. " + e.message);
                         // Important: Stop the auth spinner in the form, and global loader
                         setIsAuthProcessing(false); 
                     }
