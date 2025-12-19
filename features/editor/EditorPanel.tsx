@@ -5,9 +5,9 @@ import { PortfolioData, Project, Testimonial } from '../../types';
 import { Input, TextArea } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { ToolSelector } from '../../components/ToolSelector';
-import { Plus, Trash2, Video, Wand2, Image as ImageIcon, ChevronDown, Upload, X, LayoutDashboard, Copy, ExternalLink, User, MessageSquare, Loader2, CheckCircle2, Globe, Crop, Settings, LogOut, AlertCircle, Sparkles, Wrench, ZoomIn, ZoomOut, QrCode, Download, AlertTriangle, Eye, Monitor, Smartphone, HelpCircle, Info, BarChart3, MousePointerClick, Save, UploadCloud, Link, Youtube, HardDrive } from 'lucide-react';
+import { Plus, Trash2, Video, Wand2, Image as ImageIcon, ChevronDown, Upload, X, LayoutDashboard, Copy, ExternalLink, User, MessageSquare, Loader2, CheckCircle2, Globe, Crop, Settings, LogOut, AlertCircle, Sparkles, Wrench, ZoomIn, ZoomOut, QrCode, Download, AlertTriangle, Eye, Monitor, Smartphone, HelpCircle, Info, BarChart3, MousePointerClick, Save, UploadCloud, Link, Youtube, HardDrive, Database } from 'lucide-react';
 import Cropper from 'react-easy-crop';
-import { getCroppedImg, generateThumbnailFromVideo, uploadFileToStorage, hasCloudStorage, generateAiBio, generateAiDescription, downloadQrCode, getYouTubeThumbnail, getDriveThumbnail, generateAiThumbnail, getPortfolioStats } from '../../lib/utils';
+import { getCroppedImg, generateThumbnailFromVideo, uploadFileToStorage, hasCloudStorage, generateAiBio, generateAiDescription, downloadQrCode, getYouTubeThumbnail, getDriveThumbnail, generateAiThumbnail, getPortfolioStats, cleanupUnusedMedia } from '../../lib/utils';
 
 interface EditorPanelProps {
   data: PortfolioData;
@@ -50,8 +50,13 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
   const [activeTab, setActiveTab] = useState<'dashboard' | 'profile' | 'content' | 'testimonials' | 'tools' | 'settings'>('dashboard');
   const [uploadStatus, setUploadStatus] = useState<{ id: string; progress: number } | null>(null);
   const [linkValidation, setLinkValidation] = useState<string | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  
+  // Deletion States
+  const [confirmDelete, setConfirmDelete] = useState(false); // For Account
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null); // For Projects
+  
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isCleaning, setIsCleaning] = useState(false);
   const [showQr, setShowQr] = useState(false);
   const [stats, setStats] = useState({ views: 0, clicks: 0 });
   
@@ -116,6 +121,27 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
       await onDeleteAccount();
       // App will reload/redirect
   }
+
+  const handleCleanup = async () => {
+      if (!data.uid) return;
+      if (!window.confirm("This will permanently delete unused media files that are not used in your Live Portfolio or current Draft. Continue?")) return;
+      setIsCleaning(true);
+      try {
+          const count = await cleanupUnusedMedia(data.uid);
+          alert(`Cleanup complete. Removed ${count} unused files.`);
+      } catch (e) {
+          alert("Cleanup failed. Please try again.");
+      } finally {
+          setIsCleaning(false);
+      }
+  };
+  
+  const confirmProjectDeletion = () => {
+      if (projectToDelete) {
+          updateField('projects', data.projects.filter(p => p.id !== projectToDelete.id));
+          setProjectToDelete(null);
+      }
+  };
 
   const getShareLink = () => {
       const baseUrl = window.location.origin;
@@ -383,7 +409,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                                                             }}>Upload Image</Button>
                                                         )}
                                                         
-                                                        <Button size="sm" variant="ghost" className="h-8 text-[10px] text-red-500" onClick={() => updateField('projects', data.projects.filter(proj => proj.id !== p.id))}><Trash2 size={12}/></Button>
+                                                        <Button size="sm" variant="ghost" className="h-8 text-[10px] text-red-500" onClick={() => setProjectToDelete(p)}><Trash2 size={12}/></Button>
                                                     </div>
                                                 </div>
                                             </div>
@@ -434,6 +460,26 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                                     <Input label="Login Email" value={data.contactEmail} disabled className="opacity-50" />
                                 </div>
                             </div>
+
+                            {/* Storage Management */}
+                             <div className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-2xl space-y-4">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <Database size={16} className="text-zinc-400" />
+                                    <h4 className="font-bold">Storage & Media</h4>
+                                </div>
+                                <p className="text-xs text-zinc-500 mb-4">
+                                    Clean up unused media files to free up space. This will permanently delete any images or videos that are not currently used in your published portfolio or saved draft.
+                                </p>
+                                <Button 
+                                    variant="outline" 
+                                    onClick={handleCleanup} 
+                                    disabled={isCleaning}
+                                    icon={isCleaning ? <Loader2 className="animate-spin" size={14}/> : <Trash2 size={14}/>}
+                                >
+                                    {isCleaning ? "Cleaning..." : "Remove Unused Files"}
+                                </Button>
+                            </div>
+
                             <div className="p-6 border border-red-900/20 bg-red-900/5 rounded-2xl">
                                 <h4 className="text-red-500 font-bold mb-2 uppercase text-xs tracking-widest flex items-center gap-2"><AlertTriangle size={14}/> Danger Zone</h4>
                                 {!confirmDelete ? (
@@ -453,6 +499,28 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                 </div>
             </main>
         </div>
+
+        {/* Project Delete Confirmation Modal */}
+        {projectToDelete && createPortal(
+            <div className="fixed inset-0 z-[1000] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in" onClick={() => setProjectToDelete(null)}>
+                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 flex flex-col items-center gap-4 max-w-sm w-full text-center" onClick={e => e.stopPropagation()}>
+                    <div className="w-12 h-12 bg-red-500/10 rounded-full flex items-center justify-center text-red-500 mb-2">
+                        <AlertCircle size={24} />
+                    </div>
+                    <div>
+                        <h3 className="text-white font-bold text-lg mb-2">Delete Project?</h3>
+                        <p className="text-zinc-400 text-sm">
+                            Are you sure you want to delete <span className="text-white font-bold">"{projectToDelete.title}"</span>? This action cannot be undone.
+                        </p>
+                    </div>
+                    <div className="flex gap-3 w-full mt-4">
+                        <Button variant="outline" className="flex-1" onClick={() => setProjectToDelete(null)}>Cancel</Button>
+                        <Button className="flex-1 bg-red-600 hover:bg-red-700 text-white border-none" onClick={confirmProjectDeletion}>Delete</Button>
+                    </div>
+                </div>
+            </div>,
+            document.body
+        )}
 
         {/* Image Cropper Portal */}
         {cropModal.open && createPortal(

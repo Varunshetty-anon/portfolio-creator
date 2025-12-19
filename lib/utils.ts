@@ -89,6 +89,20 @@ export const getDriveThumbnail = (url: string): string | null => {
   return id ? `https://lh3.googleusercontent.com/u/0/d/${id}=w1000` : null;
 };
 
+export const getStoragePathFromUrl = (url: string): string | null => {
+    try {
+        if (!url || !url.includes('firebasestorage.googleapis.com')) return null;
+        const decoded = decodeURIComponent(url);
+        // Firebase Storage URLs usually follow: .../b/[bucket]/o/[path]?token=...
+        // We look for the path after /o/
+        const regex = /\/o\/([^?]+)/;
+        const match = decoded.match(regex);
+        return match ? match[1] : null;
+    } catch (e) {
+        return null;
+    }
+}
+
 // --- Core Database Logic ---
 
 /**
@@ -155,6 +169,87 @@ export const publishPortfolio = async (uid: string, data: PortfolioData): Promis
     },
     slug: data.username // Update slug map
   }, { merge: true });
+};
+
+/**
+ * Clean up unused media files from Firebase Storage
+ * Logic:
+ * 1. Collect all media URLs used in 'draft'
+ * 2. Collect all media URLs used in the current 'liveVersion'
+ * 3. List all files in user's storage bucket
+ * 4. Delete files not present in step 1 or 2
+ */
+export const cleanupUnusedMedia = async (uid: string): Promise<number> => {
+    if (!db || !storage || !uid) return 0;
+
+    const protectedPaths = new Set<string>();
+
+    const addProtected = (url: string | undefined) => {
+        const path = getStoragePathFromUrl(url || '');
+        if (path) protectedPaths.add(path);
+    };
+
+    const collectFromContent = (data: any) => {
+        if (!data) return;
+        addProtected(data.profileImage);
+        addProtected(data.showreelLink);
+        addProtected(data.showreelThumbnail); // If manually uploaded
+        if (Array.isArray(data.projects)) {
+            data.projects.forEach((p: any) => {
+                addProtected(p.thumbnail);
+                if (p.link) addProtected(p.link);
+            });
+        }
+    };
+
+    try {
+        // 1. Get Draft Content
+        const draftSnap = await getDoc(doc(db, PORTFOLIOS_COL, uid, VERSIONS_COL, 'draft'));
+        if (draftSnap.exists()) collectFromContent(draftSnap.data());
+
+        // 2. Get Live Content
+        const metaSnap = await getDoc(doc(db, PORTFOLIOS_COL, uid));
+        if (metaSnap.exists()) {
+            const meta = metaSnap.data() as PortfolioMeta;
+            if (meta.publish?.liveVersion) {
+                const liveSnap = await getDoc(doc(db, PORTFOLIOS_COL, uid, VERSIONS_COL, meta.publish.liveVersion));
+                if (liveSnap.exists()) collectFromContent(liveSnap.data());
+            }
+        }
+
+        // 3. List All Files (Recursive)
+        const userRootRef = ref(storage, `users/${uid}`);
+        
+        const getAllFiles = async (rootRef: any): Promise<any[]> => {
+            let files: any[] = [];
+            const res = await listAll(rootRef);
+            files = [...files, ...res.items];
+            // Recursively check subfolders
+            for (const folder of res.prefixes) {
+                const folderFiles = await getAllFiles(folder);
+                files = [...files, ...folderFiles];
+            }
+            return files;
+        };
+
+        const allFiles = await getAllFiles(userRootRef);
+
+        // 4. Determine Files to Delete
+        const filesToDelete = allFiles.filter(fileRef => !protectedPaths.has(fileRef.fullPath));
+        
+        console.log(`[Cleanup] Found ${allFiles.length} files. Protected: ${protectedPaths.size}. Deleting: ${filesToDelete.length}`);
+
+        // 5. Execute Deletion
+        await Promise.all(filesToDelete.map(fileRef => deleteObject(fileRef).catch(e => {
+            console.warn(`Failed to delete ${fileRef.fullPath}`, e);
+        })));
+
+        return filesToDelete.length;
+
+    } catch (e) {
+        console.error("Cleanup failed:", e);
+        return 0;
+    }
 };
 
 /**
