@@ -9,11 +9,16 @@ service cloud.firestore {
     }
     
     // --- USERS COLLECTION ---
-    // Private profile data (email, onboarding status). 
-    // strictly private to the user.
+    // Private profile data (email, onboarding status) and nested user settings.
+    // Strictly private to the user.
     match /users/{userId} {
       // Allow authenticated users to create/read/update their own profile document
       allow read, write: if isOwner(userId);
+
+      // Allow authenticated users to read/write any subcollection under their user document
+      match /{document=**} {
+        allow read, write: if isOwner(userId);
+      }
     }
 
     // --- PORTFOLIOS COLLECTION ---
@@ -30,15 +35,16 @@ service cloud.firestore {
       // This contains both the 'draft' (private) and published snapshots (public)
       match /versions/{versionId} {
         
-        // DRAFT: Strictly Private.
-        // Explicitly matching 'draft' to ensure no rule overlap allows public access.
-        allow read, write: if versionId == 'draft' && isOwner(userId);
-
-        // PUBLISHED SNAPSHOTS:
-        // Owner: Full Control
-        // Public: Read-only (if it is NOT the draft)
+        // Write: Only owner can write (drafts or snapshots)
         allow write: if isOwner(userId);
-        allow read: if versionId != 'draft'; 
+
+        // Read: 
+        // 1. Owner can read everything (including draft).
+        // 2. Public can read ONLY if it is NOT the draft AND matches the liveVersion.
+        allow read: if isOwner(userId) || (
+          versionId != 'draft' && 
+          get(/databases/$(database)/documents/portfolios/$(userId)).data.publish.liveVersion == versionId
+        );
       }
     }
 
