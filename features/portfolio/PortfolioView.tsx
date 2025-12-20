@@ -103,13 +103,6 @@ const VideoPlayer: React.FC<{
     const effectiveAspectRatio = detectedRatio || aspectRatio || '16:9';
     const cssAspectRatio = useMemo(() => effectiveAspectRatio.replace(':', '/'), [effectiveAspectRatio]);
     
-    const isVertical = useMemo(() => {
-        try {
-            const [w, h] = cssAspectRatio.split('/').map(n => Number(n));
-            return w < h;
-        } catch { return false; }
-    }, [cssAspectRatio]);
-
     // --- Ambience Sync Logic (Dual Video Strategy) ---
     useEffect(() => {
         if (!ambience || !isNative || !videoRef.current || !ambienceRef.current || hasError) return;
@@ -139,9 +132,10 @@ const VideoPlayer: React.FC<{
             main.removeEventListener('waiting', syncPause);
             main.removeEventListener('playing', syncPlay);
         };
-    }, [ambience, isNative, hasError, src]); // Re-bind if src changes
+    }, [ambience, isNative, hasError, src]); 
 
     // --- Intersection Observer for Autoplay ---
+    // Only runs if autoplay is explicitly true
     useEffect(() => {
         const video = videoRef.current;
         if (!video || !autoplay || !isNative || hasError) return;
@@ -150,8 +144,10 @@ const VideoPlayer: React.FC<{
             (entries) => {
                 entries.forEach((entry) => {
                     if (entry.isIntersecting) {
-                        video.muted = muted; // Ensure muted for autoplay policy
-                        video.play().catch(() => { /* Silent fail - user interaction might be needed */ });
+                        video.muted = muted; // Ensure muted setting is applied before play
+                        video.play().catch((e) => { 
+                             console.warn("Autoplay blocked", e);
+                        });
                     } else {
                         video.pause();
                     }
@@ -190,6 +186,7 @@ const VideoPlayer: React.FC<{
         const { videoWidth, videoHeight } = e.currentTarget;
         if (videoWidth && videoHeight) {
             const r = videoWidth / videoHeight;
+            // Precise ratio detection for smoother layout
             if (Math.abs(r - 9/16) < 0.05) setDetectedRatio('9:16');
             else if (Math.abs(r - 16/9) < 0.05) setDetectedRatio('16:9');
             else if (Math.abs(r - 4/3) < 0.05) setDetectedRatio('4:3');
@@ -201,15 +198,14 @@ const VideoPlayer: React.FC<{
 
     const handleError = () => {
         setHasError(true);
-        setIsLoaded(true); // Stop loading spinner, show fallback
+        setIsLoaded(true); 
     };
 
     // --- NATIVE VIDEO RENDER ---
-    // Used for Showreels (Strict) and Direct Files (Drive/Dropbox/Uploads)
     if (isNative) {
         return (
              <div 
-                className={`relative bg-[#050505] ${isVertical ? 'w-full h-auto lg:w-auto lg:h-full' : 'w-full h-full'} ${className}`} 
+                className={`relative bg-[#050505] ${className}`} 
                 style={{ aspectRatio: cssAspectRatio }}
             >
                 {/* Ambience Glow (Dual Video) */}
@@ -242,7 +238,8 @@ const VideoPlayer: React.FC<{
                         src={normalizedSrc}
                         className="relative w-full h-full object-cover z-10 rounded-2xl bg-black" 
                         loop 
-                        muted={muted} 
+                        autoPlay={autoplay}
+                        muted={muted}
                         playsInline 
                         preload="auto"
                         controls={controls}
@@ -277,8 +274,6 @@ const VideoPlayer: React.FC<{
     }
 
     // --- IFRAME RENDER ---
-    // Only for Client Works (Not Showreel) using YouTube/Vimeo
-    // Showreel must strictly be native, so if we reach here and isShowreel=true, we render fallback.
     if (isShowreel) {
         return (
              <div 
@@ -297,7 +292,6 @@ const VideoPlayer: React.FC<{
         <div 
             className={`
                 relative bg-[#050505] overflow-hidden rounded-2xl
-                ${isVertical ? 'w-full h-auto lg:w-auto lg:h-full' : 'w-full h-full'} 
                 ${className}
             `} 
             style={{ aspectRatio: cssAspectRatio }}
@@ -402,7 +396,8 @@ const IntroOverlay: React.FC<{ data: PortfolioData; onComplete: () => void; isIm
 
 const ProjectCard: React.FC<{ project: Project; onClick: () => void; className?: string }> = ({ project, onClick, className = '' }) => {
     const displayAspectRatio = useMemo(() => {
-        if (project.aspectRatio === '9:16') return '3/4'; 
+        // CHANGED: Use true aspect ratio for vertical videos to prevent black bars/cropping issues
+        if (project.aspectRatio === '9:16') return '9/16'; 
         return project.aspectRatio ? project.aspectRatio.replace(':', '/') : '16/9';
     }, [project.aspectRatio]);
 
@@ -520,18 +515,22 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                             className="w-full max-w-7xl max-h-[90vh] flex flex-col lg:flex-row bg-[#09090b] rounded-3xl overflow-hidden border border-zinc-800 shadow-2xl" 
                             onClick={e => e.stopPropagation()}
                         >
-                            <div className="flex-1 bg-black relative flex items-center justify-center min-h-[40vh] lg:min-h-0 overflow-hidden">
-                                <div className={`flex items-center justify-center ${selectedProject.aspectRatio === '9:16' ? 'h-full w-auto aspect-[9/16] lg:max-h-full' : 'w-full aspect-video lg:max-h-full'} max-h-[85vh] max-w-full`}>
-                                    <VideoPlayer 
+                            {/* Video Section - Fixed flex layout to allow natural aspect ratio scaling */}
+                            <div className="flex-1 bg-black relative flex items-center justify-center min-h-[40vh] lg:min-h-0 overflow-hidden p-4">
+                                <div className="relative w-auto h-auto max-w-full max-h-full flex items-center justify-center">
+                                     <VideoPlayer 
                                         src={selectedProject.link} 
                                         thumbnail={selectedProject.thumbnail} 
-                                        autoplay={true} 
+                                        autoplay={false} // CHANGED: Disabled autoplay for projects
                                         muted={false} 
                                         controls={true}
                                         aspectRatio={selectedProject.aspectRatio}
+                                        className="max-h-[80vh] w-auto h-auto mx-auto"
                                     />
                                 </div>
                             </div>
+                            
+                            {/* Details Section */}
                             <div className="w-full lg:w-[400px] p-8 lg:p-10 border-t lg:border-t-0 lg:border-l border-zinc-800 overflow-y-auto bg-[#09090b] shrink-0">
                                 <h2 className="text-3xl md:text-4xl font-display font-bold text-white mb-4 leading-tight">{selectedProject.title}</h2>
                                 <div className="flex flex-wrap gap-2 mb-8">
@@ -651,7 +650,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                                     onToggleMute={() => setIsShowreelMuted(!isShowreelMuted)}
                                     ambience={true}
                                     isShowreel={true}
-                                    className="scale-[1.01] group-hover:scale-100 transition-transform duration-1000"
+                                    className="w-full h-full scale-[1.01] group-hover:scale-100 transition-transform duration-1000"
                                 />
                             </div>
                         </section>

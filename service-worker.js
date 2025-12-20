@@ -26,6 +26,7 @@ self.addEventListener('fetch', (event) => {
     url.hostname.includes('googleapis') ||
     url.hostname.includes('firebaseio') ||
     url.hostname.includes('drive.google.com') ||
+    url.hostname.includes('googleusercontent.com') ||
     url.hostname.includes('dropbox.com') ||
     url.hostname.includes('dropboxusercontent.com') ||
     url.pathname.match(/\.(mp4|webm|mov|m4v|ogg|avi|mkv)$/i)
