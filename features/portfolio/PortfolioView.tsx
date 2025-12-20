@@ -285,7 +285,7 @@ const ProjectCard: React.FC<{ project: Project; onClick: () => void; className?:
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-20px" }}
             onClick={onClick}
-            className={`group cursor-pointer relative rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800/50 shadow-lg ${className}`}
+            className={`group cursor-pointer relative rounded-lg overflow-hidden bg-zinc-900 border border-zinc-800/50 hover:border-zinc-700 transition-colors shadow-lg ${className}`}
             style={{ aspectRatio: project.aspectRatio ? project.aspectRatio.replace(':', '/') : '16/9' }}
         >
             <img 
@@ -564,8 +564,8 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                                 </div>
 
                                 {/* Desktop: Two Balanced Columns with Compact Spacing */}
-                                <div className="hidden md:flex gap-4 items-start">
-                                    <div className="w-1/2 space-y-4">
+                                <div className="hidden md:flex gap-3 items-start">
+                                    <div className="w-1/2 space-y-3">
                                         {projectColumns[0].map(project => (
                                             <ProjectCard 
                                                 key={project.id} 
@@ -574,7 +574,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                                             />
                                         ))}
                                     </div>
-                                    <div className="w-1/2 space-y-4">
+                                    <div className="w-1/2 space-y-3">
                                         {projectColumns[1].map(project => (
                                             <ProjectCard 
                                                 key={project.id} 
@@ -586,7 +586,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                                 </div>
 
                                 {/* Mobile: Single Stack with Compact Spacing */}
-                                <div className="md:hidden space-y-6">
+                                <div className="md:hidden space-y-3">
                                     {safeData.projects.map(project => (
                                         <ProjectCard 
                                             key={project.id} 
