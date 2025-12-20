@@ -59,15 +59,45 @@ export const AI_TOOLS_LIST = [
   { name: 'Submagic', slug: 'submagic', domain: 'submagic.co', color: '#F6ADF6' }
 ];
 
+export const PROJECT_CONTENT_TYPES = [
+    "Brand Trailer",
+    "Ad / Promotional Spot",
+    "Music Video", 
+    "Short Film", 
+    "Documentary", 
+    "Social Media Content", 
+    "Corporate", 
+    "Wedding", 
+    "Gaming", 
+    "Vlog",
+    "Showreel",
+    "Other"
+];
+
+export const PROJECT_SUBJECT_MATTERS = [
+    "Beauty & Fashion", 
+    "Tech", 
+    "Lifestyle", 
+    "Automotive", 
+    "Travel", 
+    "Sports", 
+    "Narrative", 
+    "Education",
+    "Real Estate",
+    "Food & Beverage",
+    "Other"
+];
+
 // --- Helpers ---
 
 export const getAspectRatioFromDims = (w: number, h: number): '16:9' | '9:16' | '4:3' | '1:1' => {
   if (!w || !h) return '16:9';
   const ratio = w / h;
-  if (ratio >= 1.6) return '16:9'; // Covers 16:9, 21:9
-  if (ratio <= 0.8) return '9:16'; // Covers 9:16
-  if (ratio >= 1.2 && ratio <= 1.5) return '4:3'; // Covers 4:3
-  return '1:1'; // Covers 1:1 and others
+  // Adjusted thresholds for better detection
+  if (ratio >= 1.5) return '16:9'; // 1.5+ (3:2, 16:9, 21:9)
+  if (ratio <= 0.85) return '9:16'; // < 0.85 (9:16, 4:5 vertical)
+  if (ratio > 0.85 && ratio < 1.15) return '1:1'; // ~1 (1:1)
+  return '4:3'; // Everything else falls to 4:3ish
 };
 
 export const probeImageDimensions = (url: string): Promise<{ width: number; height: number }> => {
@@ -141,9 +171,13 @@ export const getVideoMetadata = async (url: string): Promise<{ thumbnail: string
             if (thumbnail) {
                 try {
                     // Drive thumbnails usually preserve aspect ratio of the video
+                    // We must fetch this client-side to be sure
                     const dims = await probeImageDimensions(thumbnail);
                     aspectRatio = getAspectRatioFromDims(dims.width, dims.height);
-                } catch (e) {}
+                } catch (e) {
+                    // Fallback to 16:9 if probe fails, but Drive usually allows w1000 access
+                    console.warn("Drive thumbnail probe failed", e);
+                }
             }
         }
     } catch (e) {

@@ -1,3 +1,4 @@
+
 export interface Project {
   id: string;
   title: string;
@@ -5,9 +6,14 @@ export interface Project {
   thumbnail: string;
   link: string; // Can be direct URL or Google Drive link
   driveLink?: string; 
-  category: string;
+  category: string; // Deprecated in favor of contentType/subjectMatter but kept for compatibility
   aspectRatio?: '16:9' | '9:16' | '4:3' | '1:1';
   type: 'video' | 'image'; 
+  
+  // Enhanced Metadata
+  contentType?: string;
+  subjectMatter?: string;
+  softwareUsed?: string[]; // List of tool names
 }
 
 export interface Testimonial {

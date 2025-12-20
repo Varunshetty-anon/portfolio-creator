@@ -82,7 +82,6 @@ const ToolIcon = React.memo(({ name, className = "w-6 h-6" }: { name: string; cl
     );
 });
 
-// Reusable Image Component with Shimmer Loading State
 const ShimmerImage: React.FC<{ src: string; alt: string; className?: string }> = ({ src, alt, className }) => {
     const [isLoaded, setIsLoaded] = useState(false);
     
@@ -111,11 +110,6 @@ const fadeInUp: Variants = {
 
 const staggerContainer: Variants = {
     animate: { transition: { staggerChildren: 0.1 } }
-};
-
-const titleReveal: Variants = {
-    initial: { y: 100, opacity: 0 },
-    whileInView: { y: 0, opacity: 1, transition: { duration: 0.8, ease: "circOut" } }
 };
 
 const IntroOverlay: React.FC<{ name: string; onComplete: () => void }> = ({ name, onComplete }) => {
@@ -422,7 +416,7 @@ const AmbientProjectCard: React.FC<{ project: Project; onClick: () => void }> = 
             <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent opacity-80 group-hover:opacity-100 transition-opacity duration-300"></div>
             <div className="absolute bottom-0 left-0 w-full p-8 flex flex-col justify-end h-full">
                  <div className="translate-y-4 group-hover:translate-y-0 transition-transform duration-500 ease-out">
-                    <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-indigo-400 mb-2 block">{project.category}</span>
+                    {(project.contentType || project.category) && <span className="text-[10px] font-bold uppercase tracking-[0.3em] text-indigo-400 mb-2 block">{project.contentType || project.category}</span>}
                     <h3 className="text-2xl md:text-3xl font-display font-bold text-white leading-tight mb-2 tracking-tighter">{project.title}</h3>
                     <p className="text-zinc-400 text-sm line-clamp-2 opacity-0 group-hover:opacity-100 transition-opacity duration-500 delay-100 font-light">
                         {project.description}
@@ -438,38 +432,99 @@ const AmbientProjectCard: React.FC<{ project: Project; onClick: () => void }> = 
     )
 });
 
-const Lightbox: React.FC<{ src: string; type: 'video' | 'image'; title: string; aspectRatio?: '16:9' | '9:16' | '4:3' | '1:1'; onClose: () => void }> = ({ src, type, title, aspectRatio, onClose }) => {
-    const driveEmbed = getDriveEmbedUrl(src);
-    const isPortrait = aspectRatio === '9:16';
+const Lightbox: React.FC<{ project: Project; onClose: () => void }> = ({ project, onClose }) => {
+    const driveEmbed = getDriveEmbedUrl(project.link);
+    const isPortrait = project.aspectRatio === '9:16';
+    const isSquare = project.aspectRatio === '1:1';
+    
     return (
-        <motion.div className="fixed inset-0 z-[1000] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-4 md:p-12" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}>
-            <button className="absolute top-8 right-8 p-4 bg-zinc-800/50 rounded-full hover:bg-white hover:text-black transition-all text-white z-[1100] group">
+        <motion.div 
+            className="fixed inset-0 z-[1000] bg-black/95 backdrop-blur-3xl flex items-center justify-center p-0 md:p-8" 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }} 
+            onClick={onClose}
+        >
+            <button className="absolute top-4 right-4 md:top-8 md:right-8 p-3 bg-zinc-800/50 rounded-full hover:bg-white hover:text-black transition-all text-white z-[1100] group">
                 <X size={24} className="group-hover:rotate-90 transition-transform"/>
             </button>
-            <motion.div className={`w-full ${isPortrait ? 'max-w-md h-[85vh]' : 'max-w-7xl'} flex flex-col items-center relative`} initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} onClick={e => e.stopPropagation()}>
-                <div className={`w-full ${isPortrait ? 'h-full' : 'aspect-video'} rounded-3xl overflow-hidden shadow-[0_0_100px_rgba(0,0,0,1)] bg-black relative border border-zinc-800`}>
-                    {type === 'video' ? (
-                        driveEmbed ? (
-                            <iframe src={driveEmbed} className="w-full h-full" allow="autoplay; fullscreen" />
-                        ) : src.includes('youtube') || src.includes('vimeo') ? (
-                            <iframe src={src} className="w-full h-full" allow="autoplay; fullscreen" />
+
+            <motion.div 
+                className="w-full h-full md:max-w-6xl md:h-auto md:max-h-[90vh] bg-black md:bg-zinc-900/30 md:border border-zinc-800 rounded-none md:rounded-3xl overflow-hidden flex flex-col md:flex-row shadow-2xl relative" 
+                initial={{ scale: 0.95, opacity: 0 }} 
+                animate={{ scale: 1, opacity: 1 }} 
+                exit={{ scale: 0.95, opacity: 0 }} 
+                onClick={e => e.stopPropagation()}
+            >
+                {/* Video/Image Section - Flexible */}
+                <div className={`flex-1 relative bg-black flex items-center justify-center overflow-hidden ${isPortrait ? 'md:max-w-lg mx-auto md:border-r border-zinc-800' : 'md:border-r border-zinc-800'}`}>
+                    <div className={`relative w-full ${isPortrait ? 'h-full md:aspect-[9/16]' : isSquare ? 'aspect-square max-h-full' : 'aspect-video w-full'}`}>
+                         {project.type === 'video' ? (
+                            driveEmbed ? (
+                                <iframe src={driveEmbed} className="w-full h-full" allow="autoplay; fullscreen" />
+                            ) : project.link.includes('youtube') || project.link.includes('vimeo') ? (
+                                <iframe src={project.link} className="w-full h-full" allow="autoplay; fullscreen" />
+                            ) : (
+                                <video 
+                                    src={project.link} 
+                                    controls 
+                                    autoPlay 
+                                    preload="metadata" 
+                                    className="w-full h-full object-contain" 
+                                    playsInline 
+                                    crossOrigin={undefined} 
+                                    onError={(e) => console.error("Lightbox Video Error:", e.currentTarget.error)}
+                                />
+                            )
                         ) : (
-                            <video 
-                                src={src} 
-                                controls 
-                                autoPlay 
-                                preload="metadata" 
-                                className="w-full h-full object-contain" 
-                                playsInline 
-                                crossOrigin={undefined} // EXPLICITLY UNDEFINED
-                                onError={(e) => console.error("Lightbox Video Error:", e.currentTarget.error)}
-                            />
-                        )
-                    ) : (
-                        <img src={src} className="w-full h-full object-contain" alt={title} loading="lazy" />
-                    )}
+                            <img src={project.link || project.thumbnail} className="w-full h-full object-contain" alt={project.title} loading="lazy" />
+                        )}
+                    </div>
                 </div>
-                <h2 className="mt-8 text-3xl font-display font-bold text-white text-center tracking-tighter uppercase">{title}</h2>
+
+                {/* Metadata Sidebar - Fixed width on desktop, stacked on mobile */}
+                <div className="w-full md:w-80 lg:w-96 shrink-0 bg-zinc-900/80 backdrop-blur-xl border-t md:border-t-0 md:border-l border-zinc-800 flex flex-col h-[40vh] md:h-auto md:min-h-full overflow-y-auto custom-scrollbar">
+                     <div className="p-6 md:p-8 space-y-8">
+                         <div>
+                             <h2 className="text-2xl md:text-3xl font-display font-bold text-white tracking-tighter leading-tight mb-4">{project.title}</h2>
+                             <p className="text-zinc-400 text-sm leading-relaxed">{project.description || "No description provided."}</p>
+                         </div>
+                         
+                         <div className="space-y-6">
+                             {project.contentType && (
+                                 <div>
+                                     <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Content Type</h4>
+                                     <span className="inline-block px-3 py-1 bg-zinc-800 border border-zinc-700 rounded-full text-xs font-medium text-white shadow-lg">
+                                         {project.contentType}
+                                     </span>
+                                 </div>
+                             )}
+
+                             {project.subjectMatter && (
+                                 <div>
+                                     <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Subject Matter</h4>
+                                     <span className="inline-block px-3 py-1 bg-zinc-800 border border-zinc-700 rounded-full text-xs font-medium text-white shadow-lg">
+                                         {project.subjectMatter}
+                                     </span>
+                                 </div>
+                             )}
+
+                             {project.softwareUsed && project.softwareUsed.length > 0 && (
+                                 <div>
+                                     <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Editing Software</h4>
+                                     <div className="flex flex-wrap gap-2">
+                                         {project.softwareUsed.map(tool => (
+                                             <div key={tool} className="flex items-center gap-2 px-3 py-1.5 bg-zinc-800/50 border border-zinc-700 rounded-lg text-xs font-medium text-zinc-300">
+                                                 <ToolIcon name={tool} className="w-4 h-4" />
+                                                 {tool}
+                                             </div>
+                                         ))}
+                                     </div>
+                                 </div>
+                             )}
+                         </div>
+                     </div>
+                </div>
             </motion.div>
         </motion.div>
     )
@@ -518,134 +573,122 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview })
         </div>
         <a 
             href={`mailto:${data.contactEmail}`} 
-            className="p-3 bg-white text-black rounded-full pointer-events-auto shadow-2xl hover:scale-110 transition-transform"
-            onClick={() => trackPortfolioClick(data.uid!, 'email_header')}
+            className="hidden md:flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white text-white hover:text-black rounded-full text-xs font-bold uppercase transition-all pointer-events-auto backdrop-blur-md border border-white/10"
         >
-            <Mail size={18}/>
+            <Mail size={14} /> Hire Me
         </a>
       </motion.div>
 
-      <div className="lg:flex h-full relative z-10">
-          <aside className="hidden lg:flex lg:w-[45%] xl:w-[40%] lg:h-screen lg:border-r border-zinc-900/30 bg-black/40 backdrop-blur-3xl z-20 flex-col justify-center relative px-12 xl:px-20 overflow-hidden">
-             <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(99,102,241,0.05)_0%,transparent_50%)]" />
-             <HeroContent data={data} isMobile={false} />
-          </aside>
+      <div className="relative z-10 container mx-auto px-4 md:px-8 pb-32">
+          {/* Hero Section */}
+          <div className="min-h-screen flex flex-col justify-center py-20">
+              <HeroContent data={data} isMobile={false} />
+          </div>
 
-          <main className="w-full lg:w-[55%] xl:w-[60%] lg:h-screen lg:overflow-y-auto custom-scrollbar relative" ref={containerRef}>
-             <div className="p-6 md:p-12 lg:p-20 xl:p-24 space-y-24 pb-48 max-w-6xl mx-auto">
-                 <div className="lg:hidden">
-                    <HeroContent data={data} isMobile={true} />
-                 </div>
-
-                  {data.showreelLink && (
-                      <section className="space-y-8">
-                           <motion.div 
-                            className="flex flex-col items-center lg:items-start"
-                            initial={{ opacity: 0, x: -20 }}
-                            whileInView={{ opacity: 1, x: 0 }}
-                            viewport={{ once: true }}
-                           >
-                               <span className="text-zinc-600 font-display font-bold text-xs tracking-[0.4em] uppercase mb-4">Featured</span>
-                               <h2 className="text-6xl md:text-8xl lg:text-9xl font-display font-black text-white tracking-tighter uppercase leading-[0.8] mb-8">SHOWREEL</h2>
-                           </motion.div>
-                           <ShowreelPlayer src={data.showreelLink} thumbnail={data.showreelThumbnail} />
-                      </section>
-                  )}
-
-                  {data.projects.length > 0 && (
-                      <section className="space-y-12">
-                          <motion.div 
-                            className="flex items-end justify-between border-b border-zinc-800/50 pb-8" 
-                            variants={titleReveal} 
-                            initial="initial" 
-                            whileInView="whileInView" 
-                            viewport={{ once: true, margin: "-10%" }}
-                          >
-                            <div className="space-y-2">
-                                <span className="text-zinc-600 font-display font-bold text-xs tracking-[0.4em] uppercase">Portfolio</span>
-                                <h2 className="text-6xl md:text-8xl lg:text-9xl font-display font-black text-white tracking-tighter uppercase leading-[0.8]">MY<br/>WORKS</h2>
-                            </div>
-                            <div className="flex flex-col items-end">
-                                <span className="text-5xl font-display font-bold text-indigo-500">{data.projects.length}</span>
-                                <span className="text-zinc-500 font-display font-bold text-[10px] tracking-widest uppercase">Selects</span>
-                            </div>
-                          </motion.div>
-                          
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-10 auto-rows-max">
-                            {data.projects.map(p => (
-                                <AmbientProjectCard key={p.id} project={p} onClick={() => {
-                                    trackPortfolioClick(data.uid!, `project_${p.id}`);
-                                    setSelectedProject(p);
-                                }} />
-                            ))}
-                          </div>
-                      </section>
-                  )}
-
-                  {hasAnyTools && (
-                      <section className="space-y-12">
-                          <motion.div className="flex items-center gap-4 border-b border-zinc-900 pb-6" initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }}>
-                              <div className="p-3 bg-indigo-500/10 rounded-2xl text-indigo-400">
-                                 <MonitorPlay size={24}/>
-                              </div>
-                              <h2 className="text-4xl font-display font-black text-white uppercase tracking-tight">EXPERTISE</h2>
-                          </motion.div>
-
-                          <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-                            {data.primaryTool && (<PrimaryToolCard toolName={data.primaryTool} />)}
-                            {secondaryTools.map(tool => (
-                                <motion.div 
-                                    key={tool} 
-                                    initial={{ opacity: 0, scale: 0.95 }} 
-                                    whileInView={{ opacity: 1, scale: 1 }} 
-                                    viewport={{ once: true }} 
-                                    transition={{ duration: 0.4 }} 
-                                    className="flex flex-col items-center justify-center gap-4 p-8 bg-zinc-900/20 border border-zinc-800 rounded-3xl hover:bg-zinc-900/40 hover:border-zinc-700 transition-all hover:translate-y-[-4px]"
-                                >
-                                    <ToolIcon name={tool} className="w-10 h-10 opacity-60" />
-                                    <span className="text-[11px] font-bold text-zinc-500 uppercase tracking-[0.2em]">{tool}</span>
-                                </motion.div>
-                            ))}
-                          </div>
-
-                          {data.aiTools && data.aiTools.length > 0 && (
-                            <div className="pt-8 space-y-6">
-                                <div className="flex items-center gap-3 text-zinc-600">
-                                    <Sparkles size={16}/>
-                                    <h3 className="text-[10px] font-display font-bold uppercase tracking-[0.4em]">Integrated Intelligence</h3>
-                                </div>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                    {data.aiTools.map(tool => (
-                                        <motion.div key={tool} initial={{ opacity: 0, scale: 0.95 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true }} className="flex items-center gap-3 p-4 bg-indigo-500/5 border border-indigo-500/10 rounded-2xl hover:bg-indigo-500/10 transition-all">
-                                            <ToolIcon name={tool} className="w-6 h-6" />
-                                            <span className="text-[10px] font-bold text-indigo-300/60 uppercase tracking-widest">{tool}</span>
-                                        </motion.div>
-                                    ))}
-                                </div>
-                            </div>
-                          )}
-                      </section>
-                  )}
-
-                  <footer className="pt-32 pb-12 text-center">
-                    <div className="h-px w-full bg-gradient-to-r from-transparent via-zinc-900 to-transparent mb-12" />
-                    <p className="text-zinc-700 text-[10px] uppercase tracking-[0.5em] font-medium">{data.name} &copy; {new Date().getFullYear()}</p>
-                    <p className="mt-4 text-zinc-800 text-[9px] uppercase tracking-[0.3em] font-bold">Created with Frames by Varun</p>
-                  </footer>
+          {/* Showreel Section */}
+          {(data.showreelLink || data.showreelThumbnail) && (
+             <div className="mb-32">
+                 <motion.div 
+                    initial={{ opacity: 0, y: 20 }} 
+                    whileInView={{ opacity: 1, y: 0 }} 
+                    viewport={{ once: true }}
+                    className="mb-8 flex items-center gap-4"
+                >
+                    <div className="h-px flex-1 bg-zinc-800"></div>
+                    <h2 className="text-sm font-display font-bold text-zinc-500 tracking-[0.2em] uppercase">Featured Reel</h2>
+                    <div className="h-px flex-1 bg-zinc-800"></div>
+                 </motion.div>
+                 <ShowreelPlayer src={data.showreelLink} thumbnail={data.showreelThumbnail} />
              </div>
-          </main>
+          )}
+          
+          {/* Tools & Skills Grid */}
+          {hasAnyTools && (
+               <div className="mb-32">
+                   <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                        {data.primaryTool && <PrimaryToolCard toolName={data.primaryTool} />}
+                        {secondaryTools.map(tool => (
+                            <motion.div 
+                                key={tool}
+                                initial={{ opacity: 0, scale: 0.9 }} 
+                                whileInView={{ opacity: 1, scale: 1 }} 
+                                viewport={{ once: true }}
+                                className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 flex flex-col items-center justify-center gap-3 hover:bg-zinc-800 transition-colors group aspect-square"
+                            >
+                                <ToolIcon name={tool} className="w-8 h-8 opacity-60 group-hover:opacity-100 transition-opacity" />
+                                <span className="text-xs font-medium text-zinc-400 group-hover:text-white">{tool}</span>
+                            </motion.div>
+                        ))}
+                        {(data.aiTools || []).map(tool => (
+                             <motion.div 
+                                key={tool}
+                                initial={{ opacity: 0, scale: 0.9 }} 
+                                whileInView={{ opacity: 1, scale: 1 }} 
+                                viewport={{ once: true }}
+                                className="bg-indigo-900/10 border border-indigo-500/20 rounded-2xl p-4 flex flex-col items-center justify-center gap-3 hover:bg-indigo-900/20 transition-colors group aspect-square"
+                            >
+                                <div className="absolute top-2 right-2"><Sparkles size={10} className="text-indigo-400" /></div>
+                                <ToolIcon name={tool} className="w-8 h-8 opacity-80 group-hover:opacity-100 transition-opacity" />
+                                <span className="text-xs font-medium text-indigo-200">{tool}</span>
+                            </motion.div>
+                        ))}
+                   </div>
+               </div>
+          )}
+
+          {/* Projects Grid */}
+          {data.projects && data.projects.length > 0 && (
+              <div className="space-y-16">
+                   <motion.div 
+                        initial={{ opacity: 0 }} 
+                        whileInView={{ opacity: 1 }} 
+                        viewport={{ once: true }}
+                        className="flex justify-between items-end border-b border-zinc-800 pb-4"
+                    >
+                        <h2 className="text-4xl md:text-6xl font-display font-black text-white uppercase tracking-tighter">Selected Works</h2>
+                        <span className="text-zinc-500 font-display font-bold text-sm tracking-widest hidden md:block">
+                            {String(data.projects.length).padStart(2, '0')} PROJECTS
+                        </span>
+                   </motion.div>
+
+                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 auto-rows-[minmax(300px,auto)]">
+                       {data.projects.map(project => (
+                           <AmbientProjectCard 
+                                key={project.id} 
+                                project={project} 
+                                onClick={() => setSelectedProject(project)} 
+                           />
+                       ))}
+                   </div>
+              </div>
+          )}
+          
+          {/* Footer */}
+          <footer className="mt-32 pt-16 border-t border-zinc-900 text-center space-y-8">
+               <h2 className="text-2xl font-display font-bold text-zinc-700 uppercase tracking-widest">Thanks for watching</h2>
+               <div className="flex justify-center gap-6">
+                    {Object.entries(data.socials).map(([key, val]) => {
+                        if (!val) return null;
+                         const Icon = { instagram: Instagram, twitter: Twitter, youtube: Youtube, linkedin: Linkedin, email: Mail }[key] || Globe;
+                        return (
+                            <a 
+                                key={key} 
+                                href={key === 'email' ? `mailto:${val}` : getSocialUrl(key, val as string)} 
+                                className="text-zinc-500 hover:text-white transition-colors"
+                            >
+                                <Icon size={20} />
+                            </a>
+                        )
+                    })}
+               </div>
+               <div className="pb-8 text-zinc-800 text-[10px] font-bold uppercase tracking-widest">
+                   © {new Date().getFullYear()} {data.name}. All rights reserved.
+               </div>
+          </footer>
       </div>
 
       <AnimatePresence>
-        {selectedProject && (
-            <Lightbox 
-                src={selectedProject.driveLink || selectedProject.link || selectedProject.thumbnail} 
-                type={selectedProject.type} 
-                title={selectedProject.title} 
-                aspectRatio={selectedProject.aspectRatio} 
-                onClose={() => setSelectedProject(null)}
-            />
-        )}
+          {selectedProject && <Lightbox project={selectedProject} onClose={() => setSelectedProject(null)} />}
       </AnimatePresence>
     </div>
   );

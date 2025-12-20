@@ -5,10 +5,11 @@ import { PortfolioData, Project, Testimonial } from '../../types';
 import { Input, TextArea } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { ToolSelector } from '../../components/ToolSelector';
-import { Plus, Trash2, Video, Wand2, Image as ImageIcon, ChevronDown, Upload, X, LayoutDashboard, Copy, ExternalLink, User, MessageSquare, Loader2, CheckCircle2, Globe, Crop, Settings, LogOut, AlertCircle, Sparkles, Wrench, ZoomIn, ZoomOut, QrCode, Download, AlertTriangle, Eye, Monitor, Smartphone, HelpCircle, Info, BarChart3, MousePointerClick, Save, UploadCloud, Link, Youtube, HardDrive, Database, RotateCcw } from 'lucide-react';
+import { Plus, Trash2, Video, Wand2, Image as ImageIcon, ChevronDown, Upload, X, LayoutDashboard, Copy, ExternalLink, User, MessageSquare, Loader2, CheckCircle2, Globe, Crop, Settings, LogOut, AlertCircle, Sparkles, Wrench, ZoomIn, ZoomOut, QrCode, Download, AlertTriangle, Eye, Monitor, Smartphone, HelpCircle, Info, BarChart3, MousePointerClick, Save, UploadCloud, Link, Youtube, HardDrive, Database, RotateCcw, PenSquare, XCircle, Check } from 'lucide-react';
 import Cropper from 'react-easy-crop';
-import { getCroppedImg, generateThumbnailFromVideo, uploadFileToStorage, hasCloudStorage, generateAiBio, generateAiDescription, downloadQrCode, getVideoMetadata, getDriveThumbnail, generateAiThumbnail, getPortfolioStats, cleanupUnusedMedia, saveDraft } from '../../lib/utils';
+import { getCroppedImg, generateThumbnailFromVideo, uploadFileToStorage, hasCloudStorage, generateAiBio, generateAiDescription, downloadQrCode, getVideoMetadata, getDriveThumbnail, generateAiThumbnail, getPortfolioStats, cleanupUnusedMedia, saveDraft, PROJECT_CONTENT_TYPES, PROJECT_SUBJECT_MATTERS, EDITING_TOOLS_LIST } from '../../lib/utils';
 
+// ... (Existing Imports and Interfaces)
 interface EditorPanelProps {
   data: PortfolioData;
   onChange: (newData: PortfolioData) => void;
@@ -21,7 +22,8 @@ interface EditorPanelProps {
   onPreview?: () => void;
 }
 
-// --- Animated Publish Button Component ---
+// ... (Existing Components: PublishButton, Tooltip, getLinkIndicator)
+
 const PublishButton = ({ onPublish, hasUnsavedChanges }: { onPublish: () => Promise<void>, hasUnsavedChanges: boolean }) => {
     const [status, setStatus] = useState<'idle' | 'loading' | 'success'>('idle');
 
@@ -117,10 +119,241 @@ const getLinkIndicator = (url: string) => {
     return { icon: Link, color: 'text-emerald-500', label: 'Web', border: '!border-emerald-500/50 focus:!border-emerald-500 focus:!ring-emerald-500/20' };
 };
 
+// --- Project Editor Component ---
+const ProjectCardEditor = ({ 
+    project, 
+    onChange, 
+    onDelete, 
+    onUploadVideo, 
+    onUploadImage,
+    uploadStatus
+}: { 
+    project: Project, 
+    onChange: (p: Partial<Project>) => void, 
+    onDelete: () => void, 
+    onUploadVideo: (file: File) => void, 
+    onUploadImage: (file: File) => void,
+    uploadStatus: any 
+}) => {
+    const [isExpanded, setIsExpanded] = useState(false);
+    const linkStatus = getLinkIndicator(project.link);
+    const [localLinkInput, setLocalLinkInput] = useState(project.link);
+    const [isValidating, setIsValidating] = useState(false);
+
+    const handleLinkChange = (val: string) => {
+        setLocalLinkInput(val);
+        onChange({ link: val });
+        
+        if (val.length > 10) {
+            setIsValidating(true);
+            // Debounce the metadata fetch
+            const timeout = setTimeout(async () => {
+                const metadata = await getVideoMetadata(val);
+                if (metadata.thumbnail) {
+                    onChange({ 
+                        thumbnail: metadata.thumbnail, 
+                        aspectRatio: metadata.aspectRatio // Auto-persist aspect ratio from link
+                    });
+                } else if (metadata.aspectRatio) {
+                     onChange({ aspectRatio: metadata.aspectRatio });
+                }
+                setIsValidating(false);
+            }, 800);
+            return () => clearTimeout(timeout);
+        } else {
+            setIsValidating(false);
+        }
+    };
+
+    const toggleSoftware = (toolName: string) => {
+        const current = project.softwareUsed || [];
+        if (current.includes(toolName)) {
+            onChange({ softwareUsed: current.filter(t => t !== toolName) });
+        } else {
+            onChange({ softwareUsed: [...current, toolName] });
+        }
+    }
+
+    return (
+        <div className={`bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden transition-all duration-300 ${isExpanded ? 'ring-1 ring-zinc-700' : ''}`}>
+             {/* Header / Condensed View */}
+             <div className="p-4 flex gap-4 items-start">
+                 <div className="w-24 h-24 bg-black rounded-lg overflow-hidden shrink-0 border border-zinc-800 relative group cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
+                    <img src={project.thumbnail || "https://picsum.photos/400/225"} className="w-full h-full object-cover" />
+                    {project.aspectRatio && (
+                        <div className="absolute bottom-1 right-1 bg-black/70 text-[8px] px-1 rounded text-zinc-300 backdrop-blur-sm">
+                            {project.aspectRatio}
+                        </div>
+                    )}
+                    {uploadStatus && (
+                        <div className="absolute inset-0 bg-black/80 z-20 flex items-center justify-center backdrop-blur-sm">
+                            <div className="w-full px-2">
+                                <div className="h-1 bg-zinc-800 rounded-full overflow-hidden mb-1">
+                                    <motion.div className="h-full bg-indigo-500" initial={{ width: 0 }} animate={{ width: `${uploadStatus.progress}%` }} />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                <div className="flex-1 space-y-3">
+                    <div className="flex justify-between items-start gap-2">
+                        <input 
+                            className="bg-transparent border-none p-0 text-white font-bold text-sm w-full focus:ring-0 placeholder:text-zinc-600" 
+                            value={project.title} 
+                            onChange={e => onChange({ title: e.target.value })} 
+                            placeholder="Project Title"
+                        />
+                        <div className="flex items-center gap-1">
+                            <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => setIsExpanded(!isExpanded)}>
+                                {isExpanded ? <ChevronDown className="rotate-180 transition-transform" size={14} /> : <ChevronDown className="transition-transform" size={14} />}
+                            </Button>
+                            <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-red-500 hover:text-red-400" onClick={onDelete}>
+                                <Trash2 size={12}/>
+                            </Button>
+                        </div>
+                    </div>
+
+                    <div className="flex gap-2 items-center">
+                         {/* Link Input */}
+                         <div className="relative flex-1 group/input">
+                            <Input 
+                                value={project.link} 
+                                onChange={e => handleLinkChange(e.target.value)} 
+                                placeholder={project.type === 'video' ? "Drive / YouTube / Vimeo Link" : "Image URL"}
+                                className={`h-8 text-[10px] py-1 pr-7 bg-black/30 ${linkStatus ? linkStatus.border : ''}`}
+                            />
+                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none">
+                                <AnimatePresence mode="wait">
+                                    {isValidating ? (
+                                        <motion.div key="loader" initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.5 }}>
+                                            <Loader2 className="animate-spin text-zinc-600" size={12} />
+                                        </motion.div>
+                                    ) : linkStatus ? (
+                                        <motion.div key="icon" initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.5 }} className={linkStatus.color} title={linkStatus.label}>
+                                            <linkStatus.icon size={12} />
+                                        </motion.div>
+                                    ) : null}
+                                </AnimatePresence>
+                            </div>
+                        </div>
+                        
+                        <Button size="sm" variant="outline" className="h-8 w-8 p-0" title="Upload Media" onClick={() => {
+                             const input = document.createElement('input');
+                             input.type = 'file';
+                             input.accept = project.type === 'video' ? 'video/*' : 'image/*';
+                             input.onchange = (e: any) => project.type === 'video' ? onUploadVideo(e.target.files[0]) : onUploadImage(e.target.files[0]);
+                             input.click();
+                        }}>
+                            <Upload size={12} />
+                        </Button>
+                    </div>
+                </div>
+             </div>
+
+             {/* Expanded Metadata Panel */}
+             <AnimatePresence>
+                 {isExpanded && (
+                     <motion.div 
+                        initial={{ height: 0, opacity: 0 }} 
+                        animate={{ height: 'auto', opacity: 1 }} 
+                        exit={{ height: 0, opacity: 0 }} 
+                        className="border-t border-zinc-800 bg-black/20"
+                     >
+                         <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                             <div className="space-y-4">
+                                 <div>
+                                    <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider mb-1 block">Description</label>
+                                    <TextArea 
+                                        value={project.description} 
+                                        onChange={e => onChange({ description: e.target.value })} 
+                                        placeholder="Short summary of the project..." 
+                                        rows={3}
+                                        className="bg-black/30 text-xs"
+                                    />
+                                 </div>
+                                 <div className="grid grid-cols-2 gap-2">
+                                     <div>
+                                        <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider mb-1 block">Content Type</label>
+                                        <select 
+                                            value={project.contentType || ''} 
+                                            onChange={e => onChange({ contentType: e.target.value })}
+                                            className="w-full bg-black/30 border border-zinc-800 rounded-lg px-2 py-2 text-zinc-300 text-xs focus:outline-none focus:border-zinc-600"
+                                        >
+                                            <option value="">Select Type...</option>
+                                            {PROJECT_CONTENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                                        </select>
+                                     </div>
+                                     <div>
+                                        <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider mb-1 block">Subject Matter</label>
+                                        <select 
+                                            value={project.subjectMatter || ''} 
+                                            onChange={e => onChange({ subjectMatter: e.target.value })}
+                                            className="w-full bg-black/30 border border-zinc-800 rounded-lg px-2 py-2 text-zinc-300 text-xs focus:outline-none focus:border-zinc-600"
+                                        >
+                                            <option value="">Select Subject...</option>
+                                            {PROJECT_SUBJECT_MATTERS.map(t => <option key={t} value={t}>{t}</option>)}
+                                        </select>
+                                     </div>
+                                 </div>
+                             </div>
+
+                             <div className="space-y-4">
+                                <div>
+                                    <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider mb-2 block">Editing Software</label>
+                                    <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto custom-scrollbar p-1">
+                                        {EDITING_TOOLS_LIST.map(tool => {
+                                            const isActive = (project.softwareUsed || []).includes(tool.name);
+                                            return (
+                                                <button 
+                                                    key={tool.name}
+                                                    onClick={() => toggleSoftware(tool.name)}
+                                                    className={`text-[9px] px-2 py-1 rounded border transition-colors ${isActive ? 'bg-indigo-500/20 border-indigo-500/40 text-indigo-300' : 'bg-black/40 border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}
+                                                >
+                                                    {tool.name}
+                                                </button>
+                                            )
+                                        })}
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2">
+                                     <div>
+                                        <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider mb-1 block">Aspect Ratio</label>
+                                        <select 
+                                            value={project.aspectRatio || '16:9'} 
+                                            onChange={e => onChange({ aspectRatio: e.target.value as any })}
+                                            className="w-full bg-black/30 border border-zinc-800 rounded-lg px-2 py-2 text-zinc-300 text-xs focus:outline-none focus:border-zinc-600"
+                                        >
+                                            <option value="16:9">16:9 (Landscape)</option>
+                                            <option value="9:16">9:16 (Portrait)</option>
+                                            <option value="4:3">4:3 (Classic)</option>
+                                            <option value="1:1">1:1 (Square)</option>
+                                        </select>
+                                     </div>
+                                     <div>
+                                        <label className="text-[9px] font-bold text-zinc-500 uppercase tracking-wider mb-1 block">Media Type</label>
+                                        <select 
+                                            value={project.type} 
+                                            onChange={e => onChange({ type: e.target.value as any })}
+                                            className="w-full bg-black/30 border border-zinc-800 rounded-lg px-2 py-2 text-zinc-300 text-xs focus:outline-none focus:border-zinc-600"
+                                        >
+                                            <option value="video">Video</option>
+                                            <option value="image">Image</option>
+                                        </select>
+                                     </div>
+                                </div>
+                             </div>
+                         </div>
+                     </motion.div>
+                 )}
+             </AnimatePresence>
+        </div>
+    )
+}
+
 export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave, onPublish, isSaving, hasUnsavedChanges, onLogout, onDeleteAccount, onPreview }) => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'profile' | 'content' | 'testimonials' | 'tools' | 'settings'>('dashboard');
   const [uploadStatus, setUploadStatus] = useState<{ id: string; progress: number, step?: string } | null>(null);
-  const [linkValidation, setLinkValidation] = useState<string | null>(null);
   
   // Deletion States
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -204,6 +437,16 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
     } finally { 
         setTimeout(() => setUploadStatus(null), 1000); 
     }
+  };
+  
+  const handleProjectImage = async (projectId: string, file: File) => {
+     const url = URL.createObjectURL(file);
+     // Optimistic update
+     updateProject(projectId, { link: url, thumbnail: url, type: 'image' }); 
+     
+     uploadFileToStorage(file, `users/${data.uid}/projects/${projectId}_img_${Date.now()}`).then(url => {
+        updateProject(projectId, { link: url, thumbnail: url });
+     });
   };
 
   const handleShowreel = async (file: File) => {
@@ -293,28 +536,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
       return `https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data=${encodeURIComponent(getShareLink())}&format=png`;
   }
 
-  const handleLinkInput = (id: string, val: string) => {
-      const updatedProjects = data.projects.map(p => p.id === id ? { ...p, link: val } : p);
-      onChange({ ...data, projects: updatedProjects });
-      
-      setLinkValidation(id);
-      
-      if (val.length > 10) {
-          setTimeout(async () => {
-              const metadata = await getVideoMetadata(val);
-              if (metadata.thumbnail) {
-                   const withThumb = data.projects.map(p => 
-                       p.id === id ? { ...p, link: val, thumbnail: metadata.thumbnail, aspectRatio: metadata.aspectRatio } : p
-                   );
-                   onChange({ ...data, projects: withThumb });
-              }
-              setLinkValidation(null);
-          }, 800);
-      } else {
-          setLinkValidation(null);
-      }
-  };
-
   const handleShowreelLinkInput = (val: string) => {
       updateField('showreelLink', val);
       if (val.length > 10) {
@@ -379,7 +600,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
 
             <main className="flex-1 overflow-y-auto p-8 md:p-12 custom-scrollbar bg-[radial-gradient(circle_at_50%_0%,rgba(99,102,241,0.05),transparent)]">
                 <div className="max-w-3xl mx-auto space-y-12">
-                    {/* ... Dashboard and Profile Sections (Identical to previous, just omitted for brevity unless changes needed) ... */}
                     {activeTab === 'dashboard' && (
                         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
                             <div className="bg-indigo-500/10 border border-indigo-500/20 p-8 rounded-3xl space-y-4">
@@ -460,6 +680,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
 
                     {activeTab === 'content' && (
                         <div className="space-y-12 animate-in fade-in">
+                            {/* Showreel Section */}
                             <div className="space-y-4">
                                 <div className="flex justify-between items-center">
                                     <h3 className="text-sm font-bold uppercase tracking-widest text-zinc-500">Showreel</h3>
@@ -496,6 +717,8 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                                     </div>
                                 </div>
                             </div>
+                            
+                            {/* Projects Section */}
                             <div className="space-y-6">
                                 <div className="flex justify-between items-center">
                                     <h3 className="text-sm font-bold uppercase tracking-widest text-zinc-500">Projects</h3>
@@ -505,7 +728,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                                             const newProject: Project = { 
                                                 id: Date.now().toString(), 
                                                 title: "New Project", 
-                                                description: "Edit summary", 
+                                                description: "Short edit summary", 
                                                 thumbnail: "", 
                                                 link: "", 
                                                 category: "Work", 
@@ -519,101 +742,17 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                                     </div>
                                 </div>
                                 <div className="space-y-4">
-                                    {data.projects.map(p => {
-                                        const linkStatus = getLinkIndicator(p.link);
-                                        return (
-                                            <div key={p.id} className="bg-zinc-900/50 border border-zinc-800 p-4 rounded-2xl flex gap-4 relative overflow-hidden group/card">
-                                                {uploadStatus?.id === p.id && (
-                                                    <div className="absolute inset-0 bg-black/80 z-20 flex items-center justify-center backdrop-blur-sm">
-                                                        <div className="w-full max-w-[50%]">
-                                                            <div className="h-1 bg-zinc-800 rounded-full overflow-hidden mb-2">
-                                                                <motion.div 
-                                                                    className="h-full bg-indigo-500" 
-                                                                    initial={{ width: 0 }} 
-                                                                    animate={{ width: `${uploadStatus.progress}%` }} 
-                                                                />
-                                                            </div>
-                                                            <p className="text-center text-[10px] font-bold">{uploadStatus.step}</p>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                                <div className="w-24 h-24 bg-black rounded-lg overflow-hidden shrink-0 border border-zinc-800 relative">
-                                                    <img src={p.thumbnail} className="w-full h-full object-cover"/>
-                                                    {p.aspectRatio && (
-                                                        <div className="absolute bottom-1 right-1 bg-black/70 text-[8px] px-1 rounded text-zinc-300">
-                                                            {p.aspectRatio}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <div className="flex-1 space-y-2">
-                                                    <input className="bg-transparent border-none p-0 text-white font-bold w-full focus:ring-0" value={p.title} onChange={e => updateProject(p.id, { title: e.target.value })} />
-                                                    <div className="flex gap-2">
-                                                        <select 
-                                                            value={p.type} 
-                                                            onChange={e => updateProject(p.id, { type: e.target.value as 'video'|'image' })}
-                                                            className="bg-black text-[10px] text-zinc-400 border border-zinc-800 rounded px-1"
-                                                        >
-                                                            <option value="video">Video</option>
-                                                            <option value="image">Image</option>
-                                                        </select>
-                                                        <input className="bg-transparent border-none p-0 text-zinc-500 text-xs w-full focus:ring-0" value={p.category} onChange={e => updateProject(p.id, { category: e.target.value })} placeholder="Category" />
-                                                    </div>
-                                                    
-                                                    <div className="flex gap-2 pt-1 items-center">
-                                                        {p.type === 'video' ? (
-                                                            <>
-                                                                <Button size="sm" variant="outline" className="h-8 text-[10px]" onClick={() => {
-                                                                    const input = document.createElement('input');
-                                                                    input.type = 'file';
-                                                                    input.accept = 'video/*';
-                                                                    input.onchange = (e: any) => handleProjectVideo(p.id, e.target.files[0]);
-                                                                    input.click();
-                                                                }}>Upload</Button>
-                                                                <div className="relative flex-1 group/input">
-                                                                    <Input 
-                                                                        value={p.link} 
-                                                                        onChange={e => handleLinkInput(p.id, e.target.value)} 
-                                                                        placeholder="Drive/YouTube Link"
-                                                                        className={`h-8 text-[10px] py-1 pr-7 ${linkStatus ? linkStatus.border : ''}`}
-                                                                    />
-                                                                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none">
-                                                                        <AnimatePresence mode="wait">
-                                                                            {linkValidation === p.id ? (
-                                                                                <motion.div key="loader" initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.5 }}>
-                                                                                    <Loader2 className="animate-spin text-zinc-600" size={12} />
-                                                                                </motion.div>
-                                                                            ) : linkStatus ? (
-                                                                                <motion.div key="icon" initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.5 }} className={linkStatus.color} title={linkStatus.label}>
-                                                                                    <linkStatus.icon size={12} />
-                                                                                </motion.div>
-                                                                            ) : null}
-                                                                        </AnimatePresence>
-                                                                    </div>
-                                                                </div>
-                                                            </>
-                                                        ) : (
-                                                            <Button size="sm" variant="outline" className="h-8 text-[10px]" onClick={() => {
-                                                                const input = document.createElement('input');
-                                                                input.type = 'file';
-                                                                input.accept = 'image/*';
-                                                                input.onchange = (e: any) => {
-                                                                    const file = e.target.files[0];
-                                                                    const url = URL.createObjectURL(file);
-                                                                    updateProject(p.id, { link: url, thumbnail: url }); 
-                                                                    uploadFileToStorage(file, `users/${data.uid}/projects/${p.id}_img_${Date.now()}`).then(url => {
-                                                                        updateProject(p.id, { link: url, thumbnail: url });
-                                                                    });
-                                                                };
-                                                                input.click();
-                                                            }}>Upload Image</Button>
-                                                        )}
-                                                        
-                                                        <Button size="sm" variant="ghost" className="h-8 text-[10px] text-red-500 hover:text-red-400 hover:bg-red-500/10" onClick={() => setProjectToDelete(p)}><Trash2 size={12}/></Button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
+                                    {data.projects.map(p => (
+                                        <ProjectCardEditor 
+                                            key={p.id}
+                                            project={p}
+                                            onChange={(updates) => updateProject(p.id, updates)}
+                                            onDelete={() => setProjectToDelete(p)}
+                                            onUploadVideo={(file) => handleProjectVideo(p.id, file)}
+                                            onUploadImage={(file) => handleProjectImage(p.id, file)}
+                                            uploadStatus={uploadStatus?.id === p.id ? uploadStatus : null}
+                                        />
+                                    ))}
                                 </div>
                             </div>
                         </div>
