@@ -138,17 +138,13 @@ const VideoPlayer: React.FC<{
             // Browsers often block unmuted autoplay without prior interaction.
             const forceMute = (auto && muted) ? 1 : mute;
 
-            return `https://www.youtube.com/embed/${ytId}?autoplay=${auto}&mute=${forceMute}&controls=${controls ? 1 : 0}&loop=1&playlist=${ytId}&playsinline=1&rel=0&modestbranding=1&showinfo=0&origin=${origin}`;
+            return `https://www.youtube.com/embed/${ytId}?autoplay=${auto}&mute=${forceMute}&controls=${controls ? 1 : 0}&loop=1&playlist=${ytId}&playsinline=1&rel=0&modestbranding=1&showinfo=0&enablejsapi=1&origin=${origin}`;
         }
         if (type === 'vimeo') {
             const match = src.match(/vimeo\.com\/(?:channels\/(?:\w+\/)?|groups\/(?:[^\/]*)\/videos\/|album\/(?:\d+)\/video\/|video\/|)(\d+)(?:$|\/|\?)/);
             const vId = match?.[1];
             if (!vId) return src;
             
-            // Vimeo Specifics:
-            // 'background=1' enables: autoplay, loop, muted, no controls.
-            // If we want audio (muted=false), we MUST set background=0, otherwise audio is impossible.
-            // If we have controls=false, we generally want background mode, but if audio is on, we have to sacrifice "no UI" for "audio enabled".
             const isBackground = !controls && muted; 
             
             return `https://player.vimeo.com/video/${vId}?autoplay=${auto}&muted=${mute}&loop=1&background=${isBackground ? 1 : 0}&playsinline=1`;
@@ -592,12 +588,11 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                     {/* 1. Showreel Section */}
                     {safeData.showreelLink && (
                         <section className="p-6 md:p-12 xl:p-16 border-b border-zinc-900/50">
-                            <div className="flex items-center gap-3 mb-8">
-                                <h2 className="text-3xl font-display font-bold text-white tracking-tight">Showreels</h2>
-                                <span className="px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 text-[10px] font-bold uppercase tracking-widest border border-indigo-500/20">Latest</span>
+                            <div className="flex items-center gap-3 mb-6 max-w-5xl mx-auto">
+                                <h2 className="text-3xl font-display font-bold text-white tracking-tight">Showreel</h2>
                             </div>
                             
-                            <div className="w-full aspect-video md:aspect-[21/9] lg:aspect-[16/8] rounded-2xl overflow-hidden ring-1 ring-zinc-800 shadow-2xl relative group">
+                            <div className="max-w-5xl mx-auto w-full aspect-video md:aspect-[2.35/1] rounded-2xl overflow-hidden ring-1 ring-zinc-800 shadow-2xl relative group bg-black">
                                 <VideoPlayer 
                                     src={safeData.showreelLink} 
                                     thumbnail={safeData.showreelThumbnail} 
