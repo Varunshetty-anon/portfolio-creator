@@ -175,7 +175,7 @@ const ProjectCardEditor = ({
     }
 
     return (
-        <div className={`bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden transition-all duration-300 ${isExpanded ? 'ring-1 ring-zinc-700' : ''}`}>
+        <div className={`bg-zinc-900/50 border border-zinc-800 rounded-2xl overflow-hidden transition-all duration-300 ${isExpanded ? 'ring-1 ring-zinc-700 bg-zinc-900' : ''}`}>
              {/* Header / Condensed View */}
              <div className="p-4 flex gap-4 items-start">
                  <div className="w-24 h-24 bg-black rounded-lg overflow-hidden shrink-0 border border-zinc-800 relative group cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
@@ -204,12 +204,12 @@ const ProjectCardEditor = ({
                             onChange={e => onChange({ title: e.target.value })} 
                             placeholder="Project Title"
                         />
-                        <div className="flex items-center gap-1">
-                            <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => setIsExpanded(!isExpanded)}>
+                        <div className="flex items-center gap-2">
+                            <Button size="sm" variant="ghost" className="h-7 px-2 bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700" onClick={() => setIsExpanded(!isExpanded)}>
                                 {isExpanded ? <ChevronDown className="rotate-180 transition-transform" size={14} /> : <ChevronDown className="transition-transform" size={14} />}
                             </Button>
-                            <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-red-500 hover:text-red-400" onClick={onDelete}>
-                                <Trash2 size={12}/>
+                            <Button size="sm" className="h-7 px-2 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white border border-red-500/20" onClick={onDelete}>
+                                <Trash2 size={14}/>
                             </Button>
                         </div>
                     </div>

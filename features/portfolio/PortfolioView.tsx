@@ -534,7 +534,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview })
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [showIntro, setShowIntro] = useState(!isPreview); 
   const containerRef = useRef<HTMLDivElement>(null);
-  const { scrollY } = useScroll();
+  const { scrollY } = useScroll(); // Use window scroll
   const headerOpacity = useTransform(scrollY, [200, 350], [0, 1]);
   const headerY = useTransform(scrollY, [200, 350], [-80, 0]);
   
@@ -553,7 +553,9 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview })
   const hasAnyTools = data.primaryTool || secondaryTools.length > 0 || (data.aiTools && data.aiTools.length > 0);
 
   return (
-    <div className="min-h-screen bg-[#020202] text-zinc-100 font-sans selection:bg-indigo-500/30 lg:overflow-hidden relative">
+    // CRITICAL: Removed lg:overflow-hidden to allow scrolling on all devices.
+    // Added overflow-y-auto and h-screen so it scrolls within its container if nested, or page if not.
+    <div className="h-screen w-full bg-[#020202] text-zinc-100 font-sans selection:bg-indigo-500/30 overflow-y-auto overflow-x-hidden relative custom-scrollbar">
       <AnimatePresence>
         {showIntro && <IntroOverlay name={data.name} onComplete={() => setShowIntro(false)} />}
       </AnimatePresence>

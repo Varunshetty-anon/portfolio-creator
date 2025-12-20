@@ -20,8 +20,10 @@ self.addEventListener('fetch', (event) => {
   // 1. Range headers are sent correctly (vital for video seeking/streaming)
   // 2. CORS checks are handled by the browser's media stack
   // 3. 206 Partial Content responses are processed correctly
+  
   if (
-    url.hostname.includes('firebasestorage.googleapis.com') ||
+    url.href.includes('firebasestorage') ||
+    url.hostname.includes('googleapis') ||
     url.pathname.match(/\.(mp4|webm|mov|m4v|ogg|avi|mkv)$/i)
   ) {
     return; // Fall through to network
