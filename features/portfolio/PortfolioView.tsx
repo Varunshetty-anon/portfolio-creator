@@ -29,13 +29,28 @@ const ensureUrl = (url: string, key?: string): string => {
     // 3. Platform specific logic
     if (key) {
         const k = key.toLowerCase();
+        // Remove @ if present
         const cleanHandle = processed.startsWith('@') ? processed.substring(1) : processed;
+        // Remove protocol for cleaner parsing inside platform blocks
+        const noProtocol = processed.replace(/^https?:\/\//, '');
 
         if (k === 'instagram' && !processed.includes('instagram.com')) return `https://instagram.com/${cleanHandle}`;
         if (k === 'twitter' && !processed.includes('twitter.com') && !processed.includes('x.com')) return `https://twitter.com/${cleanHandle}`;
         if (k === 'linkedin' && !processed.includes('linkedin.com')) return `https://linkedin.com/in/${cleanHandle}`;
         if (k === 'youtube' && !processed.includes('youtube.com') && !processed.includes('youtu.be')) return `https://youtube.com/${cleanHandle}`;
-        if (k === 'discord' && !processed.includes('discord.com') && !processed.includes('discord.gg')) return `https://discord.gg/${cleanHandle}`;
+        
+        if (k === 'discord') {
+             // If it's already a link
+             if (processed.includes('discord.com') || processed.includes('discord.gg')) {
+                 return `https://${noProtocol}`;
+             }
+             // If it's a numeric ID (User ID) -> Link to profile
+             if (/^\d+$/.test(cleanHandle)) {
+                 return `https://discord.com/users/${cleanHandle}`;
+             }
+             // Otherwise assume it's an invite code
+             return `https://discord.gg/${cleanHandle}`;
+        }
     }
 
     // 4. Generic fallback for domains
@@ -478,12 +493,14 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                 className="flex flex-col lg:flex-row min-h-screen"
             >
                 {/* --- SIDEBAR --- */}
+                {/* Fixed: Allow independent scrolling on sidebar if content overflows height, but keep it sticky to viewport top */}
                 <aside className="
                     w-full lg:w-[35%] xl:w-[32%] 
-                    lg:h-screen lg:sticky lg:top-0 lg:overflow-hidden
+                    lg:h-screen lg:sticky lg:top-0 
+                    lg:overflow-y-auto custom-scrollbar
                     bg-[#050505] border-b lg:border-b-0 lg:border-r border-zinc-900 
                     p-8 md:p-12 xl:p-16 
-                    flex flex-col lg:justify-between gap-12 lg:gap-0
+                    flex flex-col lg:justify-between gap-12 lg:gap-8
                     z-10
                 ">
                     <div className="space-y-10 lg:space-y-12">
@@ -535,7 +552,8 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                         </p>
 
                         {/* Socials Dock */}
-                        <div className="flex flex-wrap gap-3">
+                        {/* Fixed: Use wrap to prevent cutting off if width is constrained, and padding to avoid clipping */}
+                        <div className="flex flex-wrap gap-3 pb-2">
                             {safeData.socials && Object.entries(safeData.socials).map(([key, val]) => {
                                 if (!val) return null;
                                 const Icon = { instagram: Instagram, twitter: Twitter, youtube: Youtube, linkedin: Linkedin, email: Mail, discord: Globe }[key.toLowerCase()] || Globe;
@@ -556,7 +574,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                     </div>
 
                     {/* Footer / CTA */}
-                    <div className="hidden lg:block space-y-4">
+                    <div className="hidden lg:block space-y-4 pt-4">
                          <div className="w-full h-px bg-zinc-900" />
                          <div className="flex justify-between items-end">
                             <a href={`mailto:${safeData.contactEmail}`} className="group flex items-center gap-2 text-zinc-500 hover:text-white transition-colors">

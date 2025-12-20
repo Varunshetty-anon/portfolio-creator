@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence, LayoutGroup, Reorder } from 'framer-motion';
 import { PortfolioData, Project, Album } from '../../types';
 import { Input, TextArea } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { ToolSelector } from '../../components/ToolSelector';
+import { ImageCropper } from '../../components/ImageCropper';
 import { Plus, Trash2, Video, Upload, ChevronDown, Loader2, CheckCircle2, AlertTriangle, Eye, Settings, LogOut, Wrench, LayoutDashboard, User, X, Link, Youtube, HardDrive, Database, Globe, ExternalLink, QrCode, Download, Copy, Link2, Check, Play, GripVertical, FolderPlus, Folder } from 'lucide-react';
 import { uploadFileToStorage, getVideoMetadata, getPortfolioStats, PROJECT_CONTENT_TYPES, EDITING_TOOLS_LIST, downloadQrCode } from '../../lib/utils';
 
@@ -45,29 +46,62 @@ const Toggle = ({ label, checked, onChange }: { label: string; checked: boolean;
     </div>
 );
 
-const ProjectCardEditor: React.FC<{ project: Project; albums: Album[]; onChange: (p: Partial<Project>) => void; onDelete: () => void }> = ({ project, albums, onChange, onDelete }) => {
+const ProjectCardEditor: React.FC<{ project: Project; albums: Album[]; onChange: (p: Partial<Project>) => void; onDelete: () => void; onAutoSave: () => void }> = ({ project, albums, onChange, onDelete, onAutoSave }) => {
     const [isExpanded, setIsExpanded] = useState(false);
-    const [loading, setLoading] = useState(false);
+    const [linkStatus, setLinkStatus] = useState<'idle' | 'validating' | 'valid' | 'invalid'>('idle');
 
-    const handleLink = async (val: string) => {
+    // Link Validation & Auto-Save Logic
+    const handleLinkChange = async (val: string) => {
+        // Immediate update to UI
         onChange({ link: val });
-        if (val.length > 10) {
-            setLoading(true);
-            const m = await getVideoMetadata(val);
-            if (m.thumbnail) onChange({ thumbnail: m.thumbnail, aspectRatio: m.aspectRatio });
-            setLoading(false);
+        
+        // Reset status if empty
+        if (!val) {
+            setLinkStatus('idle');
+            return;
         }
+
+        // Basic length check before validating
+        if (val.length < 8) {
+             setLinkStatus('invalid');
+             return;
+        }
+
+        setLinkStatus('validating');
+
+        // Debounce the metadata fetch slightly to avoid slamming API while typing
+        const timer = setTimeout(async () => {
+            try {
+                const m = await getVideoMetadata(val);
+                if (m.thumbnail) {
+                    // Success!
+                    onChange({ link: val, thumbnail: m.thumbnail, aspectRatio: m.aspectRatio });
+                    setLinkStatus('valid');
+                    // TRIGGER AUTO SAVE
+                    onAutoSave();
+                } else {
+                    setLinkStatus('invalid');
+                }
+            } catch (e) {
+                setLinkStatus('invalid');
+            }
+        }, 1000);
+
+        return () => clearTimeout(timer);
     };
 
     return (
-        <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl overflow-visible transition-colors hover:border-zinc-700">
+        <div className={`bg-zinc-900/50 border rounded-xl overflow-visible transition-all duration-300 ${isExpanded ? 'border-zinc-700 bg-zinc-900' : 'border-zinc-800 hover:border-zinc-700'}`}>
              <div className="p-4 flex gap-4 items-start cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
-                 <div className="w-24 aspect-video bg-black rounded-lg border border-zinc-800 overflow-hidden shrink-0 flex items-center justify-center relative">
+                 <div className="w-24 aspect-video bg-black rounded-lg border border-zinc-800 overflow-hidden shrink-0 flex items-center justify-center relative group">
                     {project.thumbnail ? <img src={project.thumbnail} className="w-full h-full object-cover"/> : <Video size={16} className="text-zinc-700"/>}
-                    {loading && <div className="absolute inset-0 bg-black/50 flex items-center justify-center"><Loader2 size={12} className="animate-spin text-white"/></div>}
+                    {linkStatus === 'validating' && <div className="absolute inset-0 bg-black/50 flex items-center justify-center"><Loader2 size={12} className="animate-spin text-white"/></div>}
                 </div>
                 <div className="flex-1 min-w-0">
-                    <h4 className="text-sm font-bold text-white truncate">{project.title || "Untitled Project"}</h4>
+                    <div className="flex items-center gap-2">
+                        <h4 className="text-sm font-bold text-white truncate">{project.title || "Untitled Project"}</h4>
+                        {linkStatus === 'valid' && <CheckCircle2 size={12} className="text-green-500" />}
+                    </div>
                     <p className="text-xs text-zinc-500 mt-1 truncate">{project.contentType || "Video"} • {project.link ? "Linked" : "No Link"}</p>
                     {project.albumId && (
                         <span className="inline-block mt-2 px-2 py-0.5 rounded bg-zinc-800 text-[10px] text-zinc-400 border border-zinc-700">
@@ -83,7 +117,23 @@ const ProjectCardEditor: React.FC<{ project: Project; albums: Album[]; onChange:
                      <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="border-t border-zinc-800 bg-zinc-900/30 overflow-hidden">
                          <div className="p-5 space-y-4">
                              <Input label="Title" value={project.title} onChange={e => onChange({ title: e.target.value })} />
-                             <Input label="Video Link" value={project.link} onChange={e => handleLink(e.target.value)} placeholder="YouTube, Vimeo, Drive..." />
+                             
+                             <div className="relative">
+                                <Input 
+                                    label="Video Link" 
+                                    value={project.link} 
+                                    onChange={e => handleLinkChange(e.target.value)} 
+                                    placeholder="YouTube, Vimeo, Drive..." 
+                                    className={`pr-10 transition-colors ${linkStatus === 'invalid' ? 'border-red-500 focus:border-red-500' : linkStatus === 'valid' ? 'border-green-500/50 focus:border-green-500' : ''}`}
+                                />
+                                <div className="absolute right-3 top-[34px] pointer-events-none">
+                                    {linkStatus === 'validating' && <Loader2 size={14} className="animate-spin text-zinc-500" />}
+                                    {linkStatus === 'valid' && <CheckCircle2 size={14} className="text-green-500" />}
+                                    {linkStatus === 'invalid' && <AlertTriangle size={14} className="text-red-500" />}
+                                </div>
+                             </div>
+                             {linkStatus === 'valid' && <p className="text-[10px] text-green-500 flex items-center gap-1"><Check size={10}/> Link verified & saved</p>}
+
                              <TextArea label="Description" value={project.description} onChange={e => onChange({ description: e.target.value })} rows={3} />
                              
                              {/* Album Selection */}
@@ -141,6 +191,10 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
   // Albums State
   const [newAlbumTitle, setNewAlbumTitle] = useState('');
 
+  // Cropper State
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
+  const [isCropping, setIsCropping] = useState(false);
+
   useEffect(() => { if (data.uid && activeTab === 'dashboard') getPortfolioStats(data.uid).then(setStats); }, [activeTab, data.uid]);
 
   // Debounced Showreel Validation
@@ -166,7 +220,11 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
             const meta = await getVideoMetadata(data.showreelLink);
             if (meta.thumbnail) {
                 if (meta.thumbnail !== data.showreelThumbnail) {
-                    onChange({ ...data, showreelThumbnail: meta.thumbnail });
+                    // Update state AND auto-save
+                    const updated = { ...data, showreelThumbnail: meta.thumbnail };
+                    onChange(updated);
+                    // Trigger auto-save via explicit call if possible, or just let the user save. 
+                    // Visual feedback is key.
                 }
                 setShowreelError(null);
             } else {
@@ -191,21 +249,31 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
   }
 
   const publicUrl = `${window.location.origin}/#${data.username}`;
-  // Use a reliable QR API that supports CORS better or just accept the image source
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(publicUrl)}&bgcolor=000000&color=ffffff&margin=10`;
 
   const handleShortenLink = async () => {
     setIsShortening(true);
+    setShortUrl('');
     try {
-        const response = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(publicUrl)}`);
+        // Use a proxy to bypass potential CORS on some shortener APIs, or just try tinyurl directly.
+        // TinyURL API (simple) usually works, but can be strict.
+        // Using a public CORS proxy is a common workaround for client-side only apps.
+        const apiUrl = `https://tinyurl.com/api-create.php?url=${encodeURIComponent(publicUrl)}`;
+        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`;
+        
+        const response = await fetch(proxyUrl);
         if (!response.ok) throw new Error("Failed to shorten");
+        
         const short = await response.text();
-        if (short.startsWith('Error')) throw new Error(short);
-        setShortUrl(short);
+        if (short.trim().startsWith('http')) {
+             setShortUrl(short);
+        } else {
+             throw new Error("Invalid response");
+        }
     } catch (e) {
         console.error("Shortening failed", e);
-        // Fallback for user
-        setShortUrl("Error generating link. Try again later.");
+        // Fallback: Just let them know
+        setShortUrl("Could not generate. Copy the main link instead.");
     } finally {
         setIsShortening(false);
     }
@@ -226,12 +294,51 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
 
   const removeAlbum = (id: string) => {
       updateField('albums', (data.albums || []).filter(a => a.id !== id));
-      // Optionally reset project albumIds? keeping it for now in case of accidental delete
+  };
+
+  // --- Image Crop Handlers ---
+  const onFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+        const file = e.target.files[0];
+        const reader = new FileReader();
+        reader.addEventListener('load', () => setCropImageSrc(reader.result?.toString() || ''));
+        reader.readAsDataURL(file);
+        setIsCropping(true);
+        // Reset the input value so selecting the same file works again
+        e.target.value = '';
+    }
+  };
+
+  const onCropComplete = async (croppedBlob: Blob) => {
+      // Create a File object from the Blob to reuse existing upload logic if needed, 
+      // or just upload the blob directly. `uploadFileToStorage` expects File but works with Blob mostly if type is set.
+      const file = new File([croppedBlob], `avatar_${Date.now()}.jpg`, { type: 'image/jpeg' });
+      
+      try {
+          const url = await uploadFileToStorage(file, `users/${data.uid}/avatar_${Date.now()}`);
+          
+          // 1. Update State
+          const newData = { ...data, profileImage: url };
+          onChange(newData);
+          
+          // 2. Close Modal
+          setIsCropping(false);
+          setCropImageSrc(null);
+
+          // 3. AUTO SAVE
+          // We trigger save immediately after state update.
+          setTimeout(() => onSave(), 100); 
+
+      } catch (e) {
+          console.error("Upload failed", e);
+          alert("Failed to upload image.");
+      }
   };
 
   if (!data) return <div className="h-screen bg-black flex items-center justify-center"><Loader2 className="animate-spin text-zinc-500"/></div>;
 
   return (
+    <>
     <div className="h-screen flex bg-[#050505] text-white font-sans overflow-hidden">
         {/* Sidebar */}
         <aside className="w-20 lg:w-64 border-r border-zinc-900 flex flex-col bg-zinc-950/50 shrink-0">
@@ -391,8 +498,17 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                              <div className="flex items-center gap-6">
                                 <div className="w-24 h-24 rounded-full bg-zinc-900 border border-zinc-800 relative group overflow-hidden">
                                     <img src={data.profileImage} className="w-full h-full object-cover"/>
-                                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer" onClick={() => { const i = document.createElement('input'); i.type='file'; i.onchange=(e:any)=>uploadFileToStorage(e.target.files[0], `users/${data.uid}/avatar_${Date.now()}`).then(u=>updateField('profileImage', u)); i.click(); }}>
-                                        <Upload size={20} className="text-white"/>
+                                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                                        <label htmlFor="profile-upload" className="cursor-pointer w-full h-full flex items-center justify-center">
+                                            <Upload size={20} className="text-white"/>
+                                            <input 
+                                                id="profile-upload"
+                                                type="file" 
+                                                accept="image/*"
+                                                className="hidden"
+                                                onChange={onFileSelect}
+                                            />
+                                        </label>
                                     </div>
                                 </div>
                                 <div>
@@ -443,7 +559,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                                     <Input label="Twitter / X" placeholder="https://twitter.com/..." value={data.socials?.twitter || ''} onChange={e => updateSocial('twitter', e.target.value)} />
                                     <Input label="LinkedIn" placeholder="https://linkedin.com/in/..." value={data.socials?.linkedin || ''} onChange={e => updateSocial('linkedin', e.target.value)} />
                                     <Input label="YouTube" placeholder="https://youtube.com/..." value={data.socials?.youtube || ''} onChange={e => updateSocial('youtube', e.target.value)} />
-                                    <Input label="Discord" placeholder="Server Invite or Handle" value={data.socials?.discord || ''} onChange={e => updateSocial('discord', e.target.value)} />
+                                    <Input label="Discord" placeholder="Server Invite (e.g. discord.gg/abc) or User ID" value={data.socials?.discord || ''} onChange={e => updateSocial('discord', e.target.value)} />
                                 </div>
                              </div>
                         </div>
@@ -553,6 +669,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                                             albums={data.albums || []}
                                             onChange={u => updateField('projects', data.projects.map(pr => pr.id === p.id ? { ...pr, ...u } : pr))} 
                                             onDelete={() => updateField('projects', data.projects.filter(pr => pr.id !== p.id))} 
+                                            onAutoSave={onSave}
                                         />
                                     ))}
                                 </div>
@@ -621,6 +738,15 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
             )}
         </AnimatePresence>
 
+        {/* Image Cropper Modal */}
+        {isCropping && cropImageSrc && (
+            <ImageCropper 
+                imageSrc={cropImageSrc}
+                onCancel={() => { setIsCropping(false); setCropImageSrc(null); }}
+                onCropComplete={onCropComplete}
+            />
+        )}
+
         {showDeleteModal && createPortal(
             <div className="fixed inset-0 z-[1000] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
                 <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 max-w-md w-full text-center space-y-6">
@@ -635,5 +761,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
             </div>, document.body
         )}
     </div>
+    </>
   );
 };
