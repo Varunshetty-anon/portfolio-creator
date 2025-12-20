@@ -202,7 +202,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
     const [selectedProject, setSelectedProject] = useState<Project | null>(null);
     const { scrollY } = useScroll();
     
-    // Use synchronous check for initial render if possible, otherwise default to Desktop to ensure full content load
+    // Responsive Detection
     const isMobileInitial = typeof window !== 'undefined' ? window.innerWidth < 1024 : false;
     const [isMobile, setIsMobile] = useState(isMobileInitial);
 
@@ -219,120 +219,161 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
         return () => { document.body.style.overflow = 'auto'; }
     }, [safeData.uid, isPreview, selectedProject]);
 
-    const SCROLL_THRESHOLD = isMobile ? 300 : 500;
+    // --- SCROLL ANIMATION CONFIG ---
+    // The range of pixels over which the "Intro to Sidebar/Header" transition happens
+    const TRANSITION_RANGE = [0, 500];
 
-    // --- Transforms ---
-    // Header background fade
-    const headerBg = useTransform(scrollY, [SCROLL_THRESHOLD - 100, SCROLL_THRESHOLD], ["rgba(5,5,5,0)", "rgba(5,5,5,0.95)"]);
-    const headerBlur = useTransform(scrollY, [SCROLL_THRESHOLD - 100, SCROLL_THRESHOLD], ["blur(0px)", "blur(16px)"]);
-    const headerBorder = useTransform(scrollY, [SCROLL_THRESHOLD - 50, SCROLL_THRESHOLD], ["1px solid transparent", "1px solid #1a1a1e"]);
-
-    // Desktop: Sidebar shrinks to top left
-    const dWidth = useTransform(scrollY, [0, SCROLL_THRESHOLD], ["100%", "30%"]);
-    const dAvatarSize = useTransform(scrollY, [0, SCROLL_THRESHOLD], [240, 80]);
-    const dNameSize = useTransform(scrollY, [0, SCROLL_THRESHOLD], ["6rem", "2rem"]);
+    // -- DESKTOP TRANSFORMS --
+    // Header starts full width (Hero), shrinks to 25% (Sidebar)
+    const dWidth = useTransform(scrollY, TRANSITION_RANGE, ["100%", "28%"]); 
+    const dLogoSize = useTransform(scrollY, TRANSITION_RANGE, [200, 80]);
+    const dNameSize = useTransform(scrollY, TRANSITION_RANGE, ["5rem", "1.8rem"]);
+    const dContainerGap = useTransform(scrollY, TRANSITION_RANGE, ["2.5rem", "1rem"]);
+    // Background becomes slightly transparent on scroll if desired, but solid looks better for sidebar
+    const dBg = useTransform(scrollY, TRANSITION_RANGE, ["rgba(5,5,5,1)", "rgba(5,5,5,1)"]); 
     
-    // Mobile: Header shrinks from full screen to top bar
-    const mHeight = useTransform(scrollY, [0, SCROLL_THRESHOLD], ["90vh", "80px"]); 
-    const mAvatarSize = useTransform(scrollY, [0, SCROLL_THRESHOLD], [120, 40]);
-    const mNameSize = useTransform(scrollY, [0, SCROLL_THRESHOLD], ["2.5rem", "1.1rem"]);
-    const mDetailsOpacity = useTransform(scrollY, [0, SCROLL_THRESHOLD / 2], [1, 0]);
+    // -- MOBILE TRANSFORMS --
+    // Header starts full height (Hero), shrinks to 80px (Top Bar)
+    const mHeight = useTransform(scrollY, TRANSITION_RANGE, ["100dvh", "80px"]);
+    const mLogoSize = useTransform(scrollY, TRANSITION_RANGE, [140, 40]);
+    const mNameSize = useTransform(scrollY, TRANSITION_RANGE, ["2.5rem", "1rem"]);
+    const mContainerGap = useTransform(scrollY, TRANSITION_RANGE, ["1.5rem", "0.5rem"]);
+    const mOpacity = useTransform(scrollY, [0, 200], [1, 0]); // Fade out details quickly
 
     const displayName = safeData.name || "CREATOR";
+    const displayRole = safeData.role || "Visual Artist";
 
     return (
-        <div className="bg-[#050505] min-h-[200vh] w-full relative text-zinc-100 font-sans selection:bg-indigo-500/40 overflow-x-hidden">
+        <div className="bg-[#050505] min-h-screen w-full relative text-zinc-100 font-sans selection:bg-indigo-500/40">
             <AnimatePresence>
                 {selectedProject && <ProjectLightbox project={selectedProject} onClose={() => setSelectedProject(null)} />}
             </AnimatePresence>
 
-            {/* FIXED HEADER / HERO SECTION */}
-            <motion.div 
-                className="fixed top-0 left-0 z-[50] flex flex-col overflow-hidden"
+            {/* --- FIXED HEADER / SIDEBAR --- */}
+            {/* This container animates from Full Screen Hero to Sidebar (Desktop) or Top Bar (Mobile) */}
+            <motion.header
+                className="fixed top-0 left-0 z-40 flex flex-col items-center overflow-hidden border-b lg:border-b-0 lg:border-r border-zinc-900 shadow-2xl"
                 style={{
-                    width: isMobile ? '100%' : dWidth,
+                    backgroundColor: dBg,
+                    // Mobile Styles
                     height: isMobile ? mHeight : '100dvh',
-                    backgroundColor: headerBg,
-                    backdropFilter: headerBlur,
-                    borderBottom: isMobile ? headerBorder : 'none',
-                    borderRight: !isMobile ? headerBorder : 'none',
-                    padding: isMobile ? (scrollY.get() > SCROLL_THRESHOLD ? '1rem' : '2rem') : (scrollY.get() > SCROLL_THRESHOLD ? '3rem' : '0rem'),
-                    alignItems: isMobile ? 'center' : (scrollY.get() > SCROLL_THRESHOLD ? 'flex-start' : 'center'),
-                    justifyContent: isMobile ? (scrollY.get() > SCROLL_THRESHOLD ? 'flex-start' : 'center') : 'center',
-                    flexDirection: isMobile && scrollY.get() > SCROLL_THRESHOLD ? 'row' : 'col'
+                    width: isMobile ? '100%' : dWidth,
+                    minWidth: isMobile ? 'auto' : '320px', // Prevent sidebar getting too squished
+                    // Desktop Alignment: Center initially, then stays centered in the sidebar width
+                    // Mobile Alignment: Center initially, then centers in the top bar
+                    justifyContent: 'center', 
                 }}
             >
+                {/* Content Wrapper */}
                 <motion.div 
-                    className={`flex ${isMobile && scrollY.get() > SCROLL_THRESHOLD ? 'flex-row items-center gap-3 w-full' : 'flex-col items-center md:items-start gap-6 md:gap-10'} max-w-2xl transition-all duration-300`}
+                    className="flex flex-col items-center text-center p-6 w-full max-w-xl mx-auto"
+                    style={{ gap: isMobile ? mContainerGap : dContainerGap }}
                 >
+                    {/* Profile Image */}
                     <motion.div 
-                        style={{ width: isMobile ? mAvatarSize : dAvatarSize, height: isMobile ? mAvatarSize : dAvatarSize }} 
+                        style={{ 
+                            width: isMobile ? mLogoSize : dLogoSize, 
+                            height: isMobile ? mLogoSize : dLogoSize 
+                        }} 
                         className="rounded-full overflow-hidden border border-zinc-800 bg-zinc-950 shrink-0 shadow-2xl relative z-10"
                     >
-                        <img src={safeData.profileImage || INITIAL_DATA.profileImage} className="w-full h-full object-cover" alt={displayName} />
+                        <img 
+                            src={safeData.profileImage || INITIAL_DATA.profileImage} 
+                            className="w-full h-full object-cover" 
+                            alt={displayName} 
+                        />
                     </motion.div>
 
-                    <div className={`flex flex-col relative z-10 ${isMobile && scrollY.get() > SCROLL_THRESHOLD ? 'items-start' : 'items-center md:items-start'}`}>
+                    {/* Identity Info */}
+                    <div className="flex flex-col items-center">
                         <motion.h1 
                             style={{ fontSize: isMobile ? mNameSize : dNameSize }} 
-                            className="font-display font-black tracking-tighter uppercase leading-[0.85] text-white whitespace-nowrap"
+                            className="font-display font-black tracking-tighter uppercase leading-[0.9] text-white whitespace-nowrap"
                         >
                             {displayName}
                         </motion.h1>
-
-                        <motion.div 
+                        
+                        {/* Role - Scales slightly but always visible on Desktop, hides on mobile scroll end */}
+                        <motion.p 
+                            className="text-zinc-500 font-bold tracking-widest uppercase mt-2"
                             style={{ 
-                                opacity: isMobile ? mDetailsOpacity : 1,
-                                height: isMobile && scrollY.get() > SCROLL_THRESHOLD ? 0 : 'auto',
+                                fontSize: isMobile ? '0.7rem' : '0.8rem',
+                                opacity: isMobile ? mOpacity : 1,
+                                height: isMobile && scrollY.get() > 400 ? 0 : 'auto',
                                 overflow: 'hidden'
                             }}
-                            className={`${isMobile && scrollY.get() > SCROLL_THRESHOLD ? 'hidden' : 'block'} mt-4 md:mt-6 text-center md:text-left`}
                         >
-                            <p className="text-lg md:text-2xl text-zinc-500 font-bold tracking-tight mb-4">{safeData.role || "Video Editor"}</p>
-                            {!isMobile && (
-                                <>
-                                    <p className="text-zinc-400 text-base leading-relaxed font-light max-w-sm mb-6">{safeData.bio}</p>
-                                    <div className="flex gap-4 justify-center md:justify-start">
-                                        {safeData.socials && Object.entries(safeData.socials).map(([key, val]) => {
-                                            if (!val) return null;
-                                            const Icon = { instagram: Instagram, twitter: Twitter, youtube: Youtube, linkedin: Linkedin, email: Mail }[key] || Globe;
-                                            return (
-                                                <a key={key} href={val as string} target="_blank" rel="noreferrer" className="w-10 h-10 rounded-xl bg-zinc-900/50 hover:bg-white hover:text-black flex items-center justify-center text-zinc-500 transition-all border border-zinc-800">
-                                                    <Icon size={18} />
-                                                </a>
-                                            )
-                                        })}
-                                    </div>
-                                </>
-                            )}
-                             {isMobile && safeData.socials && (
-                                 <div className="flex gap-6 justify-center mt-6">
-                                     {Object.entries(safeData.socials).map(([key, val]) => {
-                                        if (!val) return null;
-                                        const Icon = { instagram: Instagram, twitter: Twitter, youtube: Youtube, linkedin: Linkedin, email: Mail }[key] || Globe;
-                                        return <a key={key} href={val as string} className="text-zinc-500"><Icon size={24}/></a>
-                                     })}
-                                 </div>
-                            )}
-                        </motion.div>
+                            {displayRole}
+                        </motion.p>
                     </div>
+
+                    {/* Extended Bio & Socials - Hidden on Mobile Scroll, Visible on Desktop Sidebar */}
+                    <motion.div 
+                        style={{ 
+                            opacity: isMobile ? mOpacity : 1,
+                            display: isMobile && scrollY.get() > 400 ? 'none' : 'block' // Performance optimization
+                        }}
+                        className="flex flex-col items-center gap-6 md:gap-8 w-full"
+                    >
+                        <div className="h-px w-12 bg-zinc-800" />
+                        
+                        {/* Location */}
+                        <div className="flex items-center gap-2 text-zinc-500 text-xs uppercase tracking-wider font-medium">
+                            <Globe size={14} /> {safeData.location || "Earth"}
+                        </div>
+
+                        {/* Bio */}
+                        <p className="text-zinc-400 text-sm md:text-base leading-relaxed font-light max-w-sm">
+                            {safeData.bio}
+                        </p>
+
+                        {/* Social Links */}
+                        <div className="flex gap-4 justify-center flex-wrap">
+                            {safeData.socials && Object.entries(safeData.socials).map(([key, val]) => {
+                                if (!val) return null;
+                                const Icon = { instagram: Instagram, twitter: Twitter, youtube: Youtube, linkedin: Linkedin, email: Mail }[key] || Globe;
+                                return (
+                                    <a 
+                                        key={key} 
+                                        href={val as string} 
+                                        target="_blank" 
+                                        rel="noreferrer" 
+                                        className="w-10 h-10 rounded-full bg-zinc-900/50 hover:bg-white hover:text-black flex items-center justify-center text-zinc-500 transition-all border border-zinc-800"
+                                    >
+                                        <Icon size={16} />
+                                    </a>
+                                )
+                            })}
+                        </div>
+                        
+                        <a href={`mailto:${safeData.contactEmail}`} className="px-8 py-3 rounded-full border border-zinc-800 text-xs font-bold uppercase tracking-widest hover:bg-white hover:text-black transition-all">
+                            Contact Me
+                        </a>
+                    </motion.div>
                 </motion.div>
 
-                 <motion.div 
+                {/* Scroll Indicator - Fades out immediately on scroll */}
+                <motion.div 
                     style={{ opacity: useTransform(scrollY, [0, 100], [1, 0]) }}
-                    className="absolute bottom-12 left-0 w-full flex flex-col items-center gap-2 pointer-events-none"
+                    className="absolute bottom-8 left-0 w-full flex flex-col items-center gap-2 pointer-events-none"
                 >
                     <span className="text-[9px] font-black tracking-[0.6em] text-zinc-700 uppercase">Scroll</span>
                     <motion.div animate={{ y: [0, 5, 0] }} transition={{ repeat: Infinity, duration: 2 }} className="text-zinc-800"><ArrowDown size={16}/></motion.div>
                 </motion.div>
-            </motion.div>
+            </motion.header>
 
-            {/* SPACER to push content below the scroll threshold */}
-            <div style={{ height: SCROLL_THRESHOLD + (isMobile ? 0 : 0) }} className="w-full pointer-events-none" />
+            {/* --- SCROLL SPACER --- */}
+            {/* This invisible div forces the page to be scrollable initially, driving the animation from Hero -> Sidebar */}
+            <div style={{ height: '100vh' }} className="w-full pointer-events-none" />
 
-            {/* MAIN CONTENT */}
+            {/* --- MAIN CONTENT FLOW --- */}
+            {/* Content naturally flows after the spacer. Layout shifts based on sidebar presence */}
             <main 
-                className={`container mx-auto px-6 md:px-12 pb-48 relative z-10 ${isMobile ? 'pt-12' : 'lg:ml-[30%] lg:w-[70%]'}`}
+                className={`relative z-10 pb-48 px-6 md:px-12 pt-24 md:pt-32 transition-all duration-300 ease-out`}
+                style={{
+                    marginLeft: isMobile ? '0' : '28%', // Matches the final desktop sidebar width
+                    width: isMobile ? '100%' : '72%',    // Takes up the remaining space
+                }}
             >
                 {/* 1. SHOWREEL */}
                 {safeData.showreelLink && (
@@ -358,11 +399,11 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                             <div className="h-px w-full bg-zinc-900" />
                         </div>
                         
-                        <div className="columns-1 md:columns-2 gap-6 space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                             {safeData.projects.map((project) => (
                                 <div 
                                     key={project.id}
-                                    className="break-inside-avoid relative group cursor-pointer rounded-2xl overflow-hidden border border-zinc-900 bg-zinc-950 shadow-lg hover:border-zinc-700 transition-colors"
+                                    className="group cursor-pointer rounded-2xl overflow-hidden border border-zinc-900 bg-zinc-950 shadow-lg hover:border-zinc-700 transition-colors"
                                     onClick={() => setSelectedProject(project)}
                                 >
                                     <div className="relative w-full">
@@ -419,7 +460,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                         {/* Other Tools */}
                         <div>
                             <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-4">Production Stack</h4>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                                 {safeData.tools?.filter(t => t !== safeData.primaryTool).map((tool) => (
                                     <div key={tool} className="bg-zinc-950 border border-zinc-900 p-4 rounded-xl flex flex-col items-center gap-3 hover:bg-zinc-900 transition-colors">
                                         <ToolIcon name={tool} className="w-8 h-8" />
@@ -433,7 +474,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                         {safeData.aiTools && safeData.aiTools.length > 0 && (
                              <div>
                                 <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-4 flex items-center gap-2"><Sparkles size={12} className="text-yellow-500"/> AI Extensions</h4>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                                     {safeData.aiTools.map((tool) => (
                                         <div key={tool} className="bg-zinc-950/50 border border-yellow-900/20 p-4 rounded-xl flex flex-col items-center gap-3">
                                             <ToolIcon name={tool} className="w-8 h-8" />
@@ -469,7 +510,6 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                         </div>
                     </div>
                 </section>
-
             </main>
         </div>
     );
