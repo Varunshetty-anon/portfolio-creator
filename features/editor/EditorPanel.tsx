@@ -120,7 +120,6 @@ const ProjectCardEditor: React.FC<ProjectCardEditorProps> = ({
         else onChange({ softwareUsed: [...current, toolName] });
     }
 
-    // IMPORTANT: removed overflow-hidden from the main container to prevent cutting off shadows/dropdowns
     return (
         <motion.div 
             layout
@@ -128,9 +127,10 @@ const ProjectCardEditor: React.FC<ProjectCardEditorProps> = ({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95 }}
             className={`bg-zinc-900 border border-zinc-800 rounded-2xl transition-all duration-300 ${isExpanded ? 'ring-1 ring-zinc-700' : 'hover:border-zinc-700'} relative`}
+            // Removed overflow-hidden from root to allow dropdowns to pop out if needed
         >
              <div className="p-4 flex flex-col sm:flex-row gap-4 items-start relative z-10">
-                 {/* Thumbnail Section */}
+                 {/* Thumbnail Section - Keeps overflow hidden for the image */}
                  <div className="w-full sm:w-32 aspect-video bg-black rounded-lg overflow-hidden shrink-0 border border-zinc-800 relative group cursor-pointer" onClick={() => {
                      // Trigger file upload via label
                  }}>
@@ -223,7 +223,7 @@ const ProjectCardEditor: React.FC<ProjectCardEditorProps> = ({
                         initial={{ height: 0, opacity: 0 }} 
                         animate={{ height: 'auto', opacity: 1 }} 
                         exit={{ height: 0, opacity: 0 }} 
-                        className="border-t border-zinc-800 bg-black/20"
+                        className="border-t border-zinc-800 bg-black/20 overflow-hidden" // Keep internal animation smooth
                      >
                          <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
                              <div className="space-y-4">
