@@ -1,4 +1,9 @@
 
+export interface Album {
+  id: string;
+  title: string;
+}
+
 export interface Project {
   id: string;
   title: string;
@@ -14,6 +19,9 @@ export interface Project {
   contentType?: string;
   subjectMatter?: string;
   softwareUsed?: string[]; // List of tool names
+  
+  // Organization
+  albumId?: string; 
 }
 
 export interface Testimonial {
@@ -51,6 +59,7 @@ export interface PortfolioContent {
   tools: string[];
   aiTools: string[];
   projects: Project[];
+  albums: Album[];
   availability: {
     status: boolean;
     link?: string;
@@ -118,6 +127,7 @@ export const INITIAL_CONTENT: PortfolioContent = {
   tools: [],
   aiTools: [],
   projects: [],
+  albums: [],
 };
 
 export const INITIAL_DATA: PortfolioData = {

@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
-import { PortfolioData, Project } from '../../types';
+import { motion, AnimatePresence, LayoutGroup, Reorder } from 'framer-motion';
+import { PortfolioData, Project, Album } from '../../types';
 import { Input, TextArea } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { ToolSelector } from '../../components/ToolSelector';
-import { Plus, Trash2, Video, Upload, ChevronDown, Loader2, CheckCircle2, AlertTriangle, Eye, Settings, LogOut, Wrench, LayoutDashboard, User, X, Link, Youtube, HardDrive, Database, Globe, ExternalLink, QrCode, Download, Copy, Link2, Check, Play } from 'lucide-react';
+import { Plus, Trash2, Video, Upload, ChevronDown, Loader2, CheckCircle2, AlertTriangle, Eye, Settings, LogOut, Wrench, LayoutDashboard, User, X, Link, Youtube, HardDrive, Database, Globe, ExternalLink, QrCode, Download, Copy, Link2, Check, Play, GripVertical, FolderPlus, Folder } from 'lucide-react';
 import { uploadFileToStorage, getVideoMetadata, getPortfolioStats, PROJECT_CONTENT_TYPES, EDITING_TOOLS_LIST, downloadQrCode } from '../../lib/utils';
 
 interface EditorPanelProps {
@@ -45,7 +45,7 @@ const Toggle = ({ label, checked, onChange }: { label: string; checked: boolean;
     </div>
 );
 
-const ProjectCardEditor: React.FC<{ project: Project; onChange: (p: Partial<Project>) => void; onDelete: () => void }> = ({ project, onChange, onDelete }) => {
+const ProjectCardEditor: React.FC<{ project: Project; albums: Album[]; onChange: (p: Partial<Project>) => void; onDelete: () => void }> = ({ project, albums, onChange, onDelete }) => {
     const [isExpanded, setIsExpanded] = useState(false);
     const [loading, setLoading] = useState(false);
 
@@ -69,6 +69,11 @@ const ProjectCardEditor: React.FC<{ project: Project; onChange: (p: Partial<Proj
                 <div className="flex-1 min-w-0">
                     <h4 className="text-sm font-bold text-white truncate">{project.title || "Untitled Project"}</h4>
                     <p className="text-xs text-zinc-500 mt-1 truncate">{project.contentType || "Video"} • {project.link ? "Linked" : "No Link"}</p>
+                    {project.albumId && (
+                        <span className="inline-block mt-2 px-2 py-0.5 rounded bg-zinc-800 text-[10px] text-zinc-400 border border-zinc-700">
+                            {albums.find(a => a.id === project.albumId)?.title || 'Unknown Album'}
+                        </span>
+                    )}
                 </div>
                 <button onClick={(e) => {e.stopPropagation(); onDelete();}} className="p-2 text-zinc-600 hover:text-red-500"><Trash2 size={14}/></button>
              </div>
@@ -80,6 +85,20 @@ const ProjectCardEditor: React.FC<{ project: Project; onChange: (p: Partial<Proj
                              <Input label="Title" value={project.title} onChange={e => onChange({ title: e.target.value })} />
                              <Input label="Video Link" value={project.link} onChange={e => handleLink(e.target.value)} placeholder="YouTube, Vimeo, Drive..." />
                              <TextArea label="Description" value={project.description} onChange={e => onChange({ description: e.target.value })} rows={3} />
+                             
+                             {/* Album Selection */}
+                             <div className="space-y-1.5">
+                                <label className="text-[10px] uppercase font-bold text-zinc-500">Album / Category</label>
+                                <select 
+                                    value={project.albumId || ''} 
+                                    onChange={e => onChange({ albumId: e.target.value })} 
+                                    className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-300 outline-none focus:border-zinc-600"
+                                >
+                                    <option value="">Uncategorized</option>
+                                    {albums.map(a => <option key={a.id} value={a.id}>{a.title}</option>)}
+                                </select>
+                             </div>
+
                              <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
                                     <label className="text-[10px] uppercase font-bold text-zinc-500">Content Type</label>
@@ -111,35 +130,59 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
   
   // Showreel Validation State
   const [isVerifyingShowreel, setIsVerifyingShowreel] = useState(false);
+  const [showreelError, setShowreelError] = useState<string | null>(null);
   
   // Dashboard Link State
   const [shortUrl, setShortUrl] = useState('');
   const [isShortening, setIsShortening] = useState(false);
   const [copiedType, setCopiedType] = useState<'main' | 'short' | null>(null);
+  const [isQrExpanded, setIsQrExpanded] = useState(false);
+
+  // Albums State
+  const [newAlbumTitle, setNewAlbumTitle] = useState('');
 
   useEffect(() => { if (data.uid && activeTab === 'dashboard') getPortfolioStats(data.uid).then(setStats); }, [activeTab, data.uid]);
 
   // Debounced Showreel Validation
   useEffect(() => {
     const checkShowreel = async () => {
-        if (!data.showreelLink || data.showreelLink.length < 5) return;
+        setShowreelError(null);
+        if (!data.showreelLink) return;
+
+        // Valid Check
+        const isYoutube = data.showreelLink.match(/(youtube\.com|youtu\.?be)/i);
+        const isVimeo = data.showreelLink.match(/vimeo\.com/i);
+        const isDrive = data.showreelLink.match(/drive\.google\.com/i);
+        
+        if (!isYoutube && !isVimeo && !isDrive && data.showreelLink.length > 8) {
+            setShowreelError("Use a YouTube, Vimeo, or Drive link.");
+            return;
+        }
+
+        if (data.showreelLink.length < 10) return;
         
         setIsVerifyingShowreel(true);
         try {
             const meta = await getVideoMetadata(data.showreelLink);
-            if (meta.thumbnail && meta.thumbnail !== data.showreelThumbnail) {
-                onChange({ ...data, showreelThumbnail: meta.thumbnail });
+            if (meta.thumbnail) {
+                if (meta.thumbnail !== data.showreelThumbnail) {
+                    onChange({ ...data, showreelThumbnail: meta.thumbnail });
+                }
+                setShowreelError(null);
+            } else {
+                setShowreelError("Could not verify video. Check permissions.");
             }
         } catch (error) {
             console.error("Showreel validation error", error);
+            setShowreelError("Validation failed.");
         } finally {
             setIsVerifyingShowreel(false);
         }
     };
 
-    const timeoutId = setTimeout(checkShowreel, 1000);
+    const timeoutId = setTimeout(checkShowreel, 800);
     return () => clearTimeout(timeoutId);
-  }, [data.showreelLink]); // Note: We reference 'data.showreelLink' which is a primitive string, so this won't loop.
+  }, [data.showreelLink]);
 
   const updateField = (f: keyof PortfolioData, v: any) => onChange({ ...data, [f]: v });
   
@@ -148,6 +191,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
   }
 
   const publicUrl = `${window.location.origin}/#${data.username}`;
+  // Use a reliable QR API that supports CORS better or just accept the image source
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(publicUrl)}&bgcolor=000000&color=ffffff&margin=10`;
 
   const handleShortenLink = async () => {
@@ -156,10 +200,12 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
         const response = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(publicUrl)}`);
         if (!response.ok) throw new Error("Failed to shorten");
         const short = await response.text();
+        if (short.startsWith('Error')) throw new Error(short);
         setShortUrl(short);
     } catch (e) {
         console.error("Shortening failed", e);
-        setShortUrl('');
+        // Fallback for user
+        setShortUrl("Error generating link. Try again later.");
     } finally {
         setIsShortening(false);
     }
@@ -169,6 +215,18 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
       navigator.clipboard.writeText(text);
       setCopiedType(type);
       setTimeout(() => setCopiedType(null), 2000);
+  };
+
+  const addAlbum = () => {
+      if (!newAlbumTitle.trim()) return;
+      const newAlbum: Album = { id: Date.now().toString(), title: newAlbumTitle.trim() };
+      updateField('albums', [...(data.albums || []), newAlbum]);
+      setNewAlbumTitle('');
+  };
+
+  const removeAlbum = (id: string) => {
+      updateField('albums', (data.albums || []).filter(a => a.id !== id));
+      // Optionally reset project albumIds? keeping it for now in case of accidental delete
   };
 
   if (!data) return <div className="h-screen bg-black flex items-center justify-center"><Loader2 className="animate-spin text-zinc-500"/></div>;
@@ -292,21 +350,34 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                                         </div>
 
                                         {/* QR Code */}
-                                        <div className="flex-1 bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 flex gap-4 items-center">
-                                            <div className="w-20 h-20 bg-white p-1 rounded-lg shrink-0">
+                                        <div className="flex-1 bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 flex gap-4 items-center relative">
+                                            <div 
+                                                className="w-20 h-20 bg-white p-1 rounded-lg shrink-0 cursor-pointer hover:scale-105 transition-transform"
+                                                onClick={() => setIsQrExpanded(true)}
+                                            >
                                                 <img src={qrCodeUrl} alt="Portfolio QR" className="w-full h-full object-contain" />
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <h4 className="text-xs font-bold text-zinc-400 uppercase mb-1">QR Code</h4>
                                                 <p className="text-[10px] text-zinc-600 mb-2 truncate">Scan to view portfolio</p>
-                                                <Button 
-                                                    size="sm" 
-                                                    variant="outline" 
-                                                    className="w-full h-7 text-[10px]"
-                                                    onClick={() => downloadQrCode(qrCodeUrl, 'frames-portfolio-qr.png')}
-                                                >
-                                                    <Download size={10} className="mr-1.5"/> Download
-                                                </Button>
+                                                <div className="flex gap-2">
+                                                    <Button 
+                                                        size="sm" 
+                                                        variant="outline" 
+                                                        className="h-7 text-[10px] px-2"
+                                                        onClick={() => downloadQrCode(qrCodeUrl, 'frames-portfolio-qr.png')}
+                                                    >
+                                                        <Download size={10} className="mr-1.5"/> DL
+                                                    </Button>
+                                                    <Button 
+                                                        size="sm" 
+                                                        variant="ghost" 
+                                                        className="h-7 text-[10px] px-2"
+                                                        onClick={() => setIsQrExpanded(true)}
+                                                    >
+                                                        <Eye size={10} className="mr-1.5"/> View
+                                                    </Button>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -390,11 +461,13 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                                                 value={data.showreelLink} 
                                                 onChange={e => updateField('showreelLink', e.target.value)} 
                                                 placeholder="YouTube, Vimeo, Google Drive..." 
-                                                className="pr-10" 
+                                                className={`pr-10 ${showreelError ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
                                             />
                                             <div className="absolute right-3 top-[34px] text-zinc-500">
                                                 {isVerifyingShowreel ? (
                                                     <Loader2 size={16} className="animate-spin" />
+                                                ) : showreelError ? (
+                                                    <AlertTriangle size={16} className="text-red-500" />
                                                 ) : data.showreelLink && data.showreelThumbnail ? (
                                                     <CheckCircle2 size={16} className="text-green-500" />
                                                 ) : data.showreelLink ? (
@@ -402,8 +475,13 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                                                 ) : null}
                                             </div>
                                         </div>
+                                        {showreelError && (
+                                            <p className="text-xs text-red-500 flex items-center gap-1.5 mt-1">
+                                                <AlertTriangle size={10} /> {showreelError}
+                                            </p>
+                                        )}
                                         
-                                        {data.showreelLink && (
+                                        {data.showreelLink && !showreelError && (
                                             <div className="mt-4 bg-black rounded-lg overflow-hidden border border-zinc-800 relative aspect-video">
                                                 {data.showreelThumbnail ? (
                                                     <>
@@ -428,14 +506,54 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                                     </div>
                                 </div>
                             </div>
+
+                            {/* Album Management */}
+                            <div>
+                                <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-500 mb-4">Albums / Categories</h3>
+                                <div className="p-6 bg-zinc-900/30 border border-zinc-800 rounded-2xl mb-8">
+                                    <div className="flex gap-2 mb-4">
+                                        <Input 
+                                            placeholder="New Album Title (e.g., Commercials)" 
+                                            value={newAlbumTitle} 
+                                            onChange={e => setNewAlbumTitle(e.target.value)} 
+                                            className="bg-black/50"
+                                        />
+                                        <Button onClick={addAlbum} className="bg-white text-black"><FolderPlus size={18} /></Button>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Reorder.Group axis="y" values={data.albums || []} onReorder={(newOrder) => updateField('albums', newOrder)} className="space-y-2">
+                                            {(data.albums || []).map(album => (
+                                                <Reorder.Item key={album.id} value={album}>
+                                                    <div className="flex items-center gap-3 p-3 bg-zinc-900 border border-zinc-800 rounded-lg group hover:border-zinc-700">
+                                                        <GripVertical size={16} className="text-zinc-600 cursor-grab active:cursor-grabbing" />
+                                                        <Folder size={16} className="text-zinc-500" />
+                                                        <span className="flex-1 text-sm font-medium">{album.title}</span>
+                                                        <button onClick={() => removeAlbum(album.id)} className="p-1.5 text-zinc-600 hover:text-red-500 rounded"><Trash2 size={14} /></button>
+                                                    </div>
+                                                </Reorder.Item>
+                                            ))}
+                                        </Reorder.Group>
+                                        {(!data.albums || data.albums.length === 0) && (
+                                            <p className="text-xs text-zinc-600 italic">No albums created. Projects will be uncategorized.</p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
                             <div>
                                 <div className="flex justify-between items-center mb-4">
                                     <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-500">Projects</h3>
-                                    <Button size="sm" onClick={() => updateField('projects', [{ id: Date.now().toString(), title: "New Project", description: "", thumbnail: "", link: "", category: "Work", type: "video", aspectRatio: '16:9' }, ...data.projects])} className="bg-white text-black text-xs font-bold rounded-full px-4"><Plus size={14} className="mr-1"/> Add Project</Button>
+                                    <Button size="sm" onClick={() => updateField('projects', [{ id: Date.now().toString(), title: "New Project", description: "", thumbnail: "", link: "", category: "Work", type: "video", aspectRatio: '16:9', albumId: "" }, ...data.projects])} className="bg-white text-black text-xs font-bold rounded-full px-4"><Plus size={14} className="mr-1"/> Add Project</Button>
                                 </div>
                                 <div className="space-y-4">
                                     {(data.projects || []).map(p => (
-                                        <ProjectCardEditor key={p.id} project={p} onChange={u => updateField('projects', data.projects.map(pr => pr.id === p.id ? { ...pr, ...u } : pr))} onDelete={() => updateField('projects', data.projects.filter(pr => pr.id !== p.id))} />
+                                        <ProjectCardEditor 
+                                            key={p.id} 
+                                            project={p} 
+                                            albums={data.albums || []}
+                                            onChange={u => updateField('projects', data.projects.map(pr => pr.id === p.id ? { ...pr, ...u } : pr))} 
+                                            onDelete={() => updateField('projects', data.projects.filter(pr => pr.id !== p.id))} 
+                                        />
                                     ))}
                                 </div>
                             </div>
@@ -469,6 +587,39 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                 </div>
             </main>
         </div>
+
+        {/* QR Expansion Modal */}
+        <AnimatePresence>
+            {isQrExpanded && (
+                <motion.div 
+                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                    className="fixed inset-0 z-[150] bg-black/80 backdrop-blur-sm flex items-center justify-center p-8"
+                    onClick={() => setIsQrExpanded(false)}
+                >
+                    <motion.div 
+                        initial={{ scale: 0.9 }} animate={{ scale: 1 }}
+                        className="bg-white p-6 rounded-2xl max-w-sm w-full relative"
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <button onClick={() => setIsQrExpanded(false)} className="absolute top-4 right-4 text-black/50 hover:text-black"><X size={24}/></button>
+                        <div className="aspect-square bg-white rounded-xl overflow-hidden mb-4">
+                            <img src={qrCodeUrl} className="w-full h-full object-contain" alt="Large QR" />
+                        </div>
+                        <div className="text-center">
+                            <h3 className="text-black font-bold text-lg mb-1">Scan to View</h3>
+                            <p className="text-black/50 text-xs mb-4">{publicUrl}</p>
+                             <Button 
+                                size="md" 
+                                className="w-full bg-black text-white hover:bg-zinc-800"
+                                onClick={() => downloadQrCode(qrCodeUrl, 'frames-portfolio-qr.png')}
+                            >
+                                <Download size={16} className="mr-2"/> Download Image
+                            </Button>
+                        </div>
+                    </motion.div>
+                </motion.div>
+            )}
+        </AnimatePresence>
 
         {showDeleteModal && createPortal(
             <div className="fixed inset-0 z-[1000] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">

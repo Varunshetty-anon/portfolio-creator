@@ -118,15 +118,25 @@ const VideoPlayer: React.FC<{
             const match = src.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/);
             const ytId = match?.[2];
             if (!ytId) return src;
-            // Force mute if autoplay is on to satisfy browser policies
+            
+            // Critical for Autoplay: If autoplaying, default to muted (1) unless specifically unmuted (0).
+            // Browsers often block unmuted autoplay without prior interaction.
             const forceMute = (auto && muted) ? 1 : mute;
+
             return `https://www.youtube.com/embed/${ytId}?autoplay=${auto}&mute=${forceMute}&controls=${controls ? 1 : 0}&loop=1&playlist=${ytId}&playsinline=1&rel=0&modestbranding=1&showinfo=0&origin=${origin}`;
         }
         if (type === 'vimeo') {
             const match = src.match(/vimeo\.com\/(?:channels\/(?:\w+\/)?|groups\/(?:[^\/]*)\/videos\/|album\/(?:\d+)\/video\/|video\/|)(\d+)(?:$|\/|\?)/);
             const vId = match?.[1];
             if (!vId) return src;
-            return `https://player.vimeo.com/video/${vId}?autoplay=${auto}&muted=${mute}&loop=1&background=${controls ? 0 : 1}&playsinline=1`;
+            
+            // Vimeo Specifics:
+            // 'background=1' enables: autoplay, loop, muted, no controls.
+            // If we want audio (muted=false), we MUST set background=0, otherwise audio is impossible.
+            // If we have controls=false, we generally want background mode, but if audio is on, we have to sacrifice "no UI" for "audio enabled".
+            const isBackground = !controls && muted; 
+            
+            return `https://player.vimeo.com/video/${vId}?autoplay=${auto}&muted=${mute}&loop=1&background=${isBackground ? 1 : 0}&playsinline=1`;
         }
         if (type === 'drive') return `https://drive.google.com/file/d/${getDriveId(src)}/preview`;
         return src;
@@ -330,23 +340,6 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
     const [selectedProject, setSelectedProject] = useState<Project | null>(null);
     const [isShowreelMuted, setIsShowreelMuted] = useState(true);
     
-    // Responsive Columns State
-    const [numColumns, setNumColumns] = useState(2);
-
-    useEffect(() => {
-        const handleResize = () => {
-            // Switch to 3 columns on larger screens (2xl breakpoint approx 1536px)
-            if (window.innerWidth >= 1536) setNumColumns(3);
-            else setNumColumns(2);
-        };
-        
-        // Initial check
-        handleResize();
-        
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
-    }, []);
-
     // Preload Profile Image for Seamless Intro
     useEffect(() => {
         if (safeData.profileImage) {
@@ -359,38 +352,47 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
         }
     }, [safeData.profileImage]);
 
-    // Intelligent Masonry Layout Calculation
-    const projectColumns = useMemo(() => {
+    // Categorized Data Logic
+    const categorizedProjects = useMemo(() => {
         const projects = safeData.projects || [];
-        // Create buckets based on current numColumns
-        const cols: Project[][] = Array.from({ length: numColumns }, () => []);
-        const heights: number[] = new Array(numColumns).fill(0);
-
-        projects.forEach(p => {
-            // Calculate a "weight" representing visual height.
-            // 9:16 is normally 1.77, but since we clamp it to 3:4 visually, we use 1.33 weight
-            let weight = 1; 
-            if (p.aspectRatio === '9:16') weight = 1.33;
-            else if (p.aspectRatio === '16:9') weight = 0.56;
-            else if (p.aspectRatio === '4:3') weight = 0.75;
-            
-            // Find the shortest column
-            let shortestColIndex = 0;
-            let minHeight = heights[0];
-            
-            for (let i = 1; i < numColumns; i++) {
-                if (heights[i] < minHeight) {
-                    minHeight = heights[i];
-                    shortestColIndex = i;
-                }
-            }
-            
-            cols[shortestColIndex].push(p);
-            heights[shortestColIndex] += weight;
-        });
+        const albums = safeData.albums || [];
         
-        return cols;
-    }, [safeData.projects, numColumns]);
+        // Map of Album ID -> Projects
+        const mapping = new Map<string, Project[]>();
+        const uncategorized: Project[] = [];
+
+        // Initialize mapping with order from albums array
+        albums.forEach(a => mapping.set(a.id, []));
+
+        // Distribute projects
+        projects.forEach(p => {
+            if (p.albumId && mapping.has(p.albumId)) {
+                mapping.get(p.albumId)?.push(p);
+            } else {
+                uncategorized.push(p);
+            }
+        });
+
+        // Build result array
+        const result: { title: string; projects: Project[] }[] = [];
+        
+        albums.forEach(a => {
+            const projs = mapping.get(a.id);
+            if (projs && projs.length > 0) {
+                result.push({ title: a.title, projects: projs });
+            }
+        });
+
+        if (uncategorized.length > 0) {
+            // If no albums exist at all, don't show "Uncategorized" header, just show the projects.
+            // If albums DO exist, show "General" or "Other Work".
+            const title = albums.length > 0 ? "Other Work" : "My Work";
+            result.push({ title, projects: uncategorized });
+        }
+        
+        return result;
+
+    }, [safeData.projects, safeData.albums]);
 
     useEffect(() => {
         if (!isPreview && safeData.uid) trackPortfolioView(safeData.uid);
@@ -590,33 +592,18 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                         </section>
                     )}
 
-                    {/* 2. Work Grid (Masonry Layout) */}
-                    <div className="p-5 md:p-10 xl:p-14">
-                        {safeData.projects && safeData.projects.length > 0 && (
-                            <section className="mb-16">
-                                <div className="flex items-end justify-between mb-8">
-                                    <h2 className="text-4xl md:text-5xl font-display font-black text-white tracking-tight">MY WORK</h2>
-                                    <div className="h-px flex-1 bg-zinc-900 ml-8 relative top-[-10px] hidden md:block" />
+                    {/* 2. Work Sections (Iterate Categories) */}
+                    <div className="p-5 md:p-10 xl:p-14 pb-24">
+                        {categorizedProjects.length > 0 && categorizedProjects.map((section, idx) => (
+                            <section key={idx} className="mb-16 last:mb-0">
+                                <div className="flex items-end justify-between mb-6">
+                                    <h2 className="text-2xl md:text-4xl font-display font-bold text-white tracking-tight uppercase">{section.title}</h2>
+                                    <div className="h-px flex-1 bg-zinc-900 ml-6 relative top-[-8px] hidden md:block" />
                                 </div>
 
-                                {/* Desktop: Dynamic Balanced Columns with Compact Spacing */}
-                                <div className="hidden md:flex gap-3 items-start">
-                                    {projectColumns.map((col, idx) => (
-                                        <div key={idx} className={`space-y-3 ${numColumns === 3 ? 'w-1/3' : 'w-1/2'}`}>
-                                            {col.map(project => (
-                                                <ProjectCard 
-                                                    key={project.id} 
-                                                    project={project} 
-                                                    onClick={() => setSelectedProject(project)} 
-                                                />
-                                            ))}
-                                        </div>
-                                    ))}
-                                </div>
-
-                                {/* Mobile: Single Stack with Compact Spacing */}
-                                <div className="md:hidden space-y-3">
-                                    {safeData.projects.map(project => (
+                                {/* Updated Grid: Denser for smaller thumbnails (2 cols on mobile, 3 on md, 4 on lg) */}
+                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                                    {section.projects.map(project => (
                                         <ProjectCard 
                                             key={project.id} 
                                             project={project} 
@@ -625,10 +612,17 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                                     ))}
                                 </div>
                             </section>
+                        ))}
+                        
+                        {/* Fallback if no projects */}
+                        {categorizedProjects.length === 0 && (
+                            <div className="p-12 text-center text-zinc-600 border border-zinc-900 border-dashed rounded-xl">
+                                No projects to display.
+                            </div>
                         )}
 
                         {/* 3. Dedicated Skills Section */}
-                        <section className="space-y-12 border-t border-zinc-900 pt-16">
+                        <section className="space-y-12 border-t border-zinc-900 pt-16 mt-16">
                              <div className="flex items-end gap-6 mb-8">
                                 <h2 className="text-4xl font-display font-black text-white tracking-tight uppercase">Skills & Tools</h2>
                              </div>

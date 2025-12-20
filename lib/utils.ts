@@ -331,6 +331,10 @@ export const loadEditorState = async (uid: string): Promise<PortfolioData | null
   if (draftSnap.exists()) {
     content = { ...content, ...(draftSnap.data() as PortfolioContent) };
   }
+  
+  // Ensure albums exist even if old data format
+  if (!content.albums) content.albums = [];
+
   return {
     ...content,
     uid,
@@ -592,12 +596,21 @@ export const getBrandColor = (name: string): string => {
 };
 
 export const downloadQrCode = async (url: string, filename: string) => {
-  const res = await fetch(url);
-  const blob = await res.blob();
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = filename;
-  link.click();
+  try {
+    // Attempt to fetch via proxy or direct
+    const res = await fetch(url, { mode: 'cors' });
+    if (!res.ok) throw new Error("Network error");
+    const blob = await res.blob();
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  } catch (e) {
+    // Fallback: Open in new tab if programmatic download fails due to CORS
+    window.open(url, '_blank');
+  }
 };
 
 export const loginWithEmail = (e: string, p: string) => signInWithEmailAndPassword(auth!, e, p);
