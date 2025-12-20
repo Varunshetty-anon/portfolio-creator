@@ -378,9 +378,22 @@ export const uploadFileToStorage = (file: File, path: string, onProgress?: (prog
     if (!storage) return reject(new Error("Storage not configured"));
     
     const storageRef = ref(storage, path);
+    
+    // Determine content type:
+    // 1. Check file extension (most reliable for our naming convention)
+    // 2. Fallback to file.type
+    // 3. Fallback to generic
+    let contentType = file.type || 'application/octet-stream';
+    const lowerPath = path.toLowerCase();
+    
+    if (lowerPath.endsWith('.mp4')) contentType = 'video/mp4';
+    else if (lowerPath.endsWith('.webm')) contentType = 'video/webm';
+    else if (lowerPath.endsWith('.jpg') || lowerPath.endsWith('.jpeg')) contentType = 'image/jpeg';
+    else if (lowerPath.endsWith('.png')) contentType = 'image/png';
+
     // CRITICAL: Explicitly set content type and cache control for video streaming
     const metadata = {
-        contentType: file.type || 'video/mp4',
+        contentType: contentType,
         cacheControl: 'public, max-age=31536000'
     };
 

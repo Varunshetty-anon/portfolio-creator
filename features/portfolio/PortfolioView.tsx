@@ -296,7 +296,6 @@ const PrimaryToolCard: React.FC<{ toolName: string }> = React.memo(({ toolName }
 const ShowreelPlayer: React.FC<{ src: string; thumbnail: string }> = React.memo(({ src, thumbnail }) => {
     const [isVideoReady, setIsVideoReady] = useState(false);
     const [isMuted, setIsMuted] = useState(true);
-    const [hasInteraction, setHasInteraction] = useState(false);
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const isInView = useInView(containerRef, { amount: 0.4 });
@@ -314,9 +313,7 @@ const ShowreelPlayer: React.FC<{ src: string; thumbnail: string }> = React.memo(
             if (isInView) {
                 const playPromise = videoRef.current.play();
                 if (playPromise !== undefined) {
-                    playPromise.catch(() => {
-                        // Autoplay blocked
-                    });
+                    playPromise.catch(() => {});
                 }
             } else {
                 videoRef.current.pause();
@@ -348,7 +345,6 @@ const ShowreelPlayer: React.FC<{ src: string; thumbnail: string }> = React.memo(
             whileInView={{ opacity: 1, scale: 1 }} 
             viewport={{ once: true }}
             onClick={() => {
-                setHasInteraction(true);
                 setIsMuted(!isMuted);
                 if (videoRef.current) videoRef.current.muted = !isMuted;
             }}
@@ -363,17 +359,22 @@ const ShowreelPlayer: React.FC<{ src: string; thumbnail: string }> = React.memo(
             {type === 'direct' ? (
                 <video 
                     ref={videoRef}
+                    key={src} // FORCE RE-RENDER IF SRC CHANGES
                     src={src}
                     className="w-full h-full object-cover"
                     loop
                     muted={isMuted}
                     playsInline
                     preload="metadata"
-                    // Removing crossOrigin="anonymous" to reduce CORS friction and avoid SW interception failures on opaque responses
+                    crossOrigin={undefined} // EXPLICITLY UNDEFINED TO PREVENT CORS
                     onCanPlay={() => setIsVideoReady(true)}
                     onWaiting={() => setIsVideoReady(false)} 
                     onPlaying={() => setIsVideoReady(true)}
                     controls={false}
+                    onError={(e) => {
+                        console.error("Video Error:", e.currentTarget.error);
+                        setIsVideoReady(false);
+                    }}
                 />
             ) : (
                 <iframe 
@@ -460,7 +461,8 @@ const Lightbox: React.FC<{ src: string; type: 'video' | 'image'; title: string; 
                                 preload="metadata" 
                                 className="w-full h-full object-contain" 
                                 playsInline 
-                                // Removing crossOrigin="anonymous" to reduce CORS friction and allow opaque responses
+                                crossOrigin={undefined} // EXPLICITLY UNDEFINED
+                                onError={(e) => console.error("Lightbox Video Error:", e.currentTarget.error)}
                             />
                         )
                     ) : (
