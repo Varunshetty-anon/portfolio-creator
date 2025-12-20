@@ -76,16 +76,19 @@ const VideoPlayer: React.FC<{
     aspectRatio?: string;
     className?: string;
     onToggleMute?: () => void;
-}> = ({ src, thumbnail, autoplay = false, muted = true, controls = false, aspectRatio = '16:9', className = '', onToggleMute }) => {
+    ambience?: boolean;
+}> = ({ src, thumbnail, autoplay = false, muted = true, controls = false, aspectRatio = '16:9', className = '', onToggleMute, ambience = false }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
-    const containerRef = useRef<HTMLDivElement>(null);
+    const ambienceRef = useRef<HTMLVideoElement>(null);
     const [isLoaded, setIsLoaded] = useState(false);
     const [detectedRatio, setDetectedRatio] = useState<string | null>(null);
+    const [hasError, setHasError] = useState(false);
     
     // Reset detection when src changes
     useEffect(() => {
         setDetectedRatio(null);
         setIsLoaded(false);
+        setHasError(false);
     }, [src]);
 
     const effectiveAspectRatio = detectedRatio || aspectRatio || '16:9';
@@ -93,7 +96,7 @@ const VideoPlayer: React.FC<{
     
     const isVertical = useMemo(() => {
         try {
-            const [w, h] = cssAspectRatio.split('/').map(Number);
+            const [w, h] = cssAspectRatio.split('/').map(n => Number(n));
             return w < h;
         } catch { return false; }
     }, [cssAspectRatio]);
@@ -104,11 +107,40 @@ const VideoPlayer: React.FC<{
         if (lower.includes('youtube.com') || lower.includes('youtu.be')) return 'youtube';
         if (lower.includes('vimeo.com')) return 'vimeo';
         if (lower.includes('dropbox.com')) return 'dropbox';
-        // Treat everything else as direct/mp4 for now, especially firebase storage links
         return 'direct';
     }, [src]);
 
-    // IntersectionObserver for Efficient Autoplay (Direct Videos)
+    // --- Ambience Sync Logic (Dual Video Strategy) ---
+    // We use a second video element for the glow to avoid Canvas/JS frame extraction overhead 
+    // and strictly follow the "no canvas extraction" rule while maintaining dynamic color.
+    useEffect(() => {
+        if (!ambience || type !== 'direct' || !videoRef.current || !ambienceRef.current) return;
+
+        const main = videoRef.current;
+        const amb = ambienceRef.current;
+
+        const syncPlay = () => amb.play().catch(() => {});
+        const syncPause = () => amb.pause();
+        const syncSeek = () => { amb.currentTime = main.currentTime; };
+        
+        main.addEventListener('play', syncPlay);
+        main.addEventListener('pause', syncPause);
+        main.addEventListener('seeking', syncSeek);
+        main.addEventListener('seeked', syncSeek);
+        main.addEventListener('waiting', syncPause);
+        main.addEventListener('playing', syncPlay);
+
+        return () => {
+            main.removeEventListener('play', syncPlay);
+            main.removeEventListener('pause', syncPause);
+            main.removeEventListener('seeking', syncSeek);
+            main.removeEventListener('seeked', syncSeek);
+            main.removeEventListener('waiting', syncPause);
+            main.removeEventListener('playing', syncPlay);
+        };
+    }, [ambience, type, isLoaded]);
+
+    // --- Intersection Observer for Autoplay ---
     useEffect(() => {
         const video = videoRef.current;
         if (!video || !autoplay || (type !== 'direct' && type !== 'dropbox')) return;
@@ -116,22 +148,21 @@ const VideoPlayer: React.FC<{
         const observer = new IntersectionObserver(
             (entries) => {
                 entries.forEach((entry) => {
-                    if (entry.isIntersecting) {
-                        const playPromise = video.play();
-                        if (playPromise !== undefined) {
-                            playPromise.catch(() => { /* Silent fail */ });
-                        }
+                    if (entry.isIntersecting && !hasError) {
+                        // Ensure muted is set before play attempt
+                        video.muted = muted;
+                        video.play().catch(() => { /* Silent fail */ });
                     } else {
                         video.pause();
                     }
                 });
             },
-            { threshold: 0.5 } // Play when 50% visible
+            { threshold: 0.5 }
         );
 
         observer.observe(video);
         return () => observer.disconnect();
-    }, [autoplay, type, src]);
+    }, [autoplay, type, src, muted, hasError]);
 
     const getEmbedSrc = () => {
         const auto = autoplay ? 1 : 0;
@@ -168,37 +199,58 @@ const VideoPlayer: React.FC<{
         setIsLoaded(true);
     };
 
+    const handleError = () => {
+        setHasError(true);
+        setIsLoaded(true); // Stop loading spinner
+    };
+
     // Direct Video Render Logic
     if (type === 'direct' || type === 'dropbox') {
         const videoSrc = type === 'dropbox' ? (getDropboxDirectLink(src) || src) : src;
 
         return (
              <div 
-                ref={containerRef}
-                className={`relative bg-[#050505] overflow-hidden ${isVertical ? 'w-full h-auto lg:w-auto lg:h-full' : 'w-full h-full'} ${className}`} 
+                className={`relative bg-[#050505] ${isVertical ? 'w-full h-auto lg:w-auto lg:h-full' : 'w-full h-full'} ${className}`} 
                 style={{ aspectRatio: cssAspectRatio }}
             >
+                {/* Ambience Glow - Dual Video Strategy */}
+                {ambience && !hasError && (
+                    <video
+                        ref={ambienceRef}
+                        src={videoSrc}
+                        className="absolute inset-0 w-full h-full object-cover blur-[50px] opacity-60 scale-110 pointer-events-none transition-opacity duration-1000 -z-10"
+                        muted
+                        loop
+                        playsInline
+                        aria-hidden="true"
+                    />
+                )}
+
                 <AnimatePresence>
-                    {!isLoaded && (
-                        <motion.div initial={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.8 }} className="absolute inset-0 z-10 bg-[#09090b] flex items-center justify-center">
+                    {!isLoaded && !hasError && (
+                        <motion.div initial={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.8 }} className="absolute inset-0 z-10 bg-[#09090b] flex items-center justify-center rounded-2xl overflow-hidden">
                             {thumbnail && <img src={thumbnail} className="absolute inset-0 w-full h-full object-cover opacity-60 blur-lg scale-110" alt="Thumbnail" />}
                         </motion.div>
                     )}
                 </AnimatePresence>
 
+                {/* Main Video */}
                 <video 
                     key={videoSrc}
                     ref={videoRef}
                     src={videoSrc}
-                    className="w-full h-full object-cover"
+                    className="relative w-full h-full object-cover z-10 rounded-2xl bg-black" 
                     loop 
                     muted={muted} 
                     playsInline 
                     preload="auto"
-                    onLoadedMetadata={handleLoadedMetadata}
                     controls={controls}
+                    onLoadedMetadata={handleLoadedMetadata}
+                    onError={handleError}
                 />
-                 {onToggleMute && (
+                
+                 {/* Mute Toggle */}
+                 {onToggleMute && !hasError && (
                     <motion.button 
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
@@ -208,15 +260,24 @@ const VideoPlayer: React.FC<{
                         {muted ? <VolumeX size={18}/> : <Volume2 size={18}/>}
                     </motion.button>
                 )}
+
+                {/* Fallback for Errors */}
+                {hasError && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center z-20 bg-zinc-900 rounded-2xl">
+                        {thumbnail && <img src={thumbnail} className="absolute inset-0 w-full h-full object-cover opacity-30" alt="Fallback" />}
+                        <Play size={48} className="text-white/50 mb-2 relative z-10" />
+                        <span className="text-xs text-zinc-500 relative z-10">Playback Unavailable</span>
+                    </div>
+                )}
             </div>
         )
     }
 
-    // Iframe Render Logic (Youtube, Vimeo)
+    // Iframe Render Logic
     return (
         <div 
             className={`
-                relative bg-[#050505] overflow-hidden 
+                relative bg-[#050505] overflow-hidden rounded-2xl
                 ${isVertical ? 'w-full h-auto lg:w-auto lg:h-full' : 'w-full h-full'} 
                 ${className}
             `} 
@@ -472,18 +533,18 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: introComplete ? 1 : 0 }}
                 transition={{ duration: 0.8 }}
-                className="flex flex-col lg:flex-row min-h-screen"
+                className="flex flex-col lg:block min-h-screen"
             >
                 {/* --- SIDEBAR --- */}
-                {/* Sticky sidebar that enables split-screen independent scrolling logic */}
+                {/* Fixed sidebar on desktop for strictly static behavior */}
                 <aside className="
                     w-full lg:w-[35%] xl:w-[32%] 
-                    lg:h-screen lg:sticky lg:top-0 
+                    lg:fixed lg:top-0 lg:left-0 lg:bottom-0 
                     lg:overflow-y-auto custom-scrollbar
                     bg-[#050505] border-b lg:border-b-0 lg:border-r border-zinc-900 
                     p-8 md:p-12 xl:p-16 
                     flex flex-col lg:justify-between gap-12 lg:gap-8
-                    z-10
+                    z-20
                 ">
                     <div className="space-y-10 lg:space-y-12">
                         <div className="relative inline-block">
@@ -545,29 +606,31 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                                 <span className="text-sm font-medium">Get in touch</span>
                                 <ArrowUpRight size={14} className="group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform"/>
                             </a>
-                            <span className="text-[10px] text-zinc-700 uppercase tracking-widest font-bold">© {new Date().getFullYear()}</span>
+                            <span className="text-left text-[10px] text-zinc-700 uppercase tracking-widest font-bold">© {new Date().getFullYear()}</span>
                          </div>
                     </div>
                 </aside>
 
                 {/* --- CONTENT AREA --- */}
-                <main className="flex-1 min-w-0 bg-[#050505] relative z-0">
+                {/* Margin offset to clear fixed sidebar on desktop */}
+                <main className="w-full lg:ml-[35%] xl:ml-[32%] lg:w-auto relative z-10 bg-[#050505]">
                     
                     {/* 1. Showreel Section */}
                     {safeData.showreelLink && (
                         <section className="p-6 md:p-12 xl:p-16 border-b border-zinc-900/50">
-                            <div className="flex items-center gap-3 mb-6 max-w-3xl mx-auto">
+                            <div className="flex items-center gap-3 mb-6 max-w-2xl mx-auto">
                                 <h2 className="text-3xl font-display font-bold text-white tracking-tight">Showreel</h2>
                             </div>
                             
-                            {/* Decreased width to max-w-3xl as requested */}
-                            <div className="max-w-3xl mx-auto w-full aspect-video md:aspect-[2.35/1] rounded-2xl overflow-hidden ring-1 ring-zinc-800 shadow-2xl relative group bg-black">
+                            {/* Decreased width to max-w-2xl and allow overflow for ambience */}
+                            <div className="max-w-2xl mx-auto w-full aspect-video md:aspect-[2.35/1] relative group overflow-visible">
                                 <VideoPlayer 
                                     src={safeData.showreelLink} 
                                     thumbnail={safeData.showreelThumbnail} 
                                     autoplay={true} 
                                     muted={isShowreelMuted}
                                     onToggleMute={() => setIsShowreelMuted(!isShowreelMuted)}
+                                    ambience={true}
                                     className="scale-[1.01] group-hover:scale-100 transition-transform duration-1000"
                                 />
                             </div>

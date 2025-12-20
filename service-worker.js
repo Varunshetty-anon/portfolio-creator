@@ -22,13 +22,14 @@ self.addEventListener('fetch', (event) => {
   // 3. 206 Partial Content responses are processed correctly
   
   if (
-    url.href.includes('firebasestorage') ||
+    url.hostname.includes('firebasestorage') ||
     url.hostname.includes('googleapis') ||
+    url.hostname.includes('firebaseio') ||
     url.pathname.match(/\.(mp4|webm|mov|m4v|ogg|avi|mkv)$/i)
   ) {
     return; // Fall through to network
   }
 
   // For other requests, we currently fall through to network as well.
-  // This acts as a pass-through Service Worker.
+  // This acts as a pass-through Service Worker for now.
 });
