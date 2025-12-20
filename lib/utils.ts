@@ -167,17 +167,38 @@ export const getVideoMetadata = async (url: string): Promise<{ thumbnail: string
         if (url.includes('youtube.com') || url.includes('youtu.be')) {
             thumbnail = getYouTubeThumbnail(url);
             try {
+                // Attempt to fetch oembed metadata for accurate aspect ratio
                 const res = await fetch(`https://www.youtube.com/oembed?url=${url}&format=json`);
-                const data = await res.json();
-                if (data.width && data.height) {
-                    aspectRatio = getAspectRatioFromDims(data.width, data.height);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.width && data.height) {
+                        aspectRatio = getAspectRatioFromDims(data.width, data.height);
+                    }
                 }
-            } catch (e) {}
+            } catch (e) {
+                // Fallback: 16:9 is standard for YouTube
+                aspectRatio = '16:9';
+            }
         } 
+        else if (url.includes('vimeo.com')) {
+            try {
+                const res = await fetch(`https://vimeo.com/api/oembed.json?url=${url}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.thumbnail_url) thumbnail = data.thumbnail_url;
+                    if (data.width && data.height) {
+                        aspectRatio = getAspectRatioFromDims(data.width, data.height);
+                    }
+                }
+            } catch (e) {
+                aspectRatio = '16:9';
+            }
+        }
         else if (url.includes('drive.google.com')) {
             thumbnail = getDriveThumbnail(url);
             if (thumbnail) {
                 try {
+                    // For Drive, the thumbnail usually preserves the aspect ratio of the source video
                     const dims = await probeImageDimensions(thumbnail);
                     aspectRatio = getAspectRatioFromDims(dims.width, dims.height);
                 } catch (e) {
@@ -185,7 +206,11 @@ export const getVideoMetadata = async (url: string): Promise<{ thumbnail: string
                 }
             }
         }
-        // Dropbox metadata probing is restricted without auth, so we default or rely on user override.
+        else if (url.includes('dropbox.com')) {
+             // Dropbox metadata is harder to get without auth.
+             // We default to 16:9 but user can override.
+             aspectRatio = '16:9';
+        }
     } catch (e) {
         console.error("Metadata fetch failed", e);
     }
@@ -424,6 +449,8 @@ export const uploadFileToStorage = (file: File, path: string, onProgress?: (prog
     if (lowerPath.endsWith('.jpg') || lowerPath.endsWith('.jpeg')) contentType = 'image/jpeg';
     else if (lowerPath.endsWith('.png')) contentType = 'image/png';
     else if (lowerPath.endsWith('.webp')) contentType = 'image/webp';
+    else if (lowerPath.endsWith('.mp4')) contentType = 'video/mp4';
+    else if (lowerPath.endsWith('.mov')) contentType = 'video/quicktime';
 
     const metadata = {
         contentType: contentType,
@@ -454,11 +481,12 @@ export const generateThumbnailFromVideo = (file: File): Promise<{ url: string; b
     video.muted = true;
     video.src = URL.createObjectURL(file);
     
-    const timeout = setTimeout(() => reject(new Error("Video load timeout")), 8000);
+    // Increased timeout for larger files
+    const timeout = setTimeout(() => reject(new Error("Video load timeout")), 15000);
 
     video.onloadedmetadata = () => {
-        // Seek to random point to avoid black frame, or 1s
-        let seekTime = Math.min(1, video.duration * 0.25);
+        // Seek to 10% or 1s, whichever is shorter, to avoid black frame
+        let seekTime = Math.min(1, video.duration * 0.1);
         if (!isFinite(seekTime)) seekTime = 0;
         video.currentTime = seekTime;
     };

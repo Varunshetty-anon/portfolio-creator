@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence, useScroll, useTransform, useSpring, useInView } from 'framer-motion';
+import { motion, AnimatePresence, useScroll, useTransform, useInView, Variants } from 'framer-motion';
 import { Mail, Instagram, Play, Twitter, Linkedin, Youtube, X, Volume2, VolumeX, Globe, Maximize2, Star, Sparkles, MonitorPlay, MapPin, Loader2, Database } from 'lucide-react';
 import { PortfolioData, Project } from '../../types';
 import { getBrandColor, getDriveEmbedUrl, EDITING_TOOLS_LIST, AI_TOOLS_LIST, trackPortfolioView, trackPortfolioClick, getDriveId, getDropboxDirectLink } from '../../lib/utils';
@@ -25,7 +25,6 @@ const ToolIcon = React.memo(({ name, className = "w-6 h-6" }: { name: string; cl
 
     const handleError = () => {
         if (!tool) { setHasError(true); return; }
-        // Fallback or retry logic if needed, currently just shows initial char
         setHasError(true);
     };
 
@@ -108,7 +107,7 @@ const ShowreelPlayer: React.FC<{ src: string; thumbnail: string }> = React.memo(
     const [isMuted, setIsMuted] = useState(true);
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
-    const isInView = useInView(containerRef, { amount: 0.4 });
+    const isInView = useInView(containerRef, { amount: 0.2 });
 
     const type = React.useMemo(() => {
         if (!src) return 'none';
@@ -123,10 +122,9 @@ const ShowreelPlayer: React.FC<{ src: string; thumbnail: string }> = React.memo(
 
     useEffect(() => {
         if ((type === 'direct' || type === 'dropbox') && videoRef.current) {
-            videoRef.current.muted = true;
+            videoRef.current.muted = true; // Always start muted
             if (isInView) {
-                const playPromise = videoRef.current.play();
-                if (playPromise !== undefined) playPromise.catch(() => {});
+                videoRef.current.play().catch(() => {});
             } else {
                 videoRef.current.pause();
             }
@@ -157,15 +155,17 @@ const ShowreelPlayer: React.FC<{ src: string; thumbnail: string }> = React.memo(
             whileInView={{ opacity: 1, scale: 1 }} 
             viewport={{ once: true }}
         >
+            {/* Ambient Glow */}
             <div className="absolute -inset-1 sm:-inset-4 opacity-0 group-hover:opacity-100 transition-opacity duration-1000 z-0">
                 <img src={thumbnail} className="w-full h-full object-cover blur-3xl scale-105 opacity-60 rounded-[3rem]" aria-hidden="true" />
             </div>
 
             <div className="relative w-full h-full rounded-2xl sm:rounded-3xl overflow-hidden bg-black border border-zinc-800 shadow-2xl z-10">
+                {/* Loading State */}
                 <div className={`absolute inset-0 z-20 pointer-events-none transition-opacity duration-700 ease-in-out ${isVideoReady ? 'opacity-0' : 'opacity-100'}`}>
                     <img src={thumbnail || "https://picsum.photos/800/450"} className="w-full h-full object-cover" alt="Loading" />
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                        <Loader2 className="w-10 h-10 text-white/50 animate-spin" />
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                        <Loader2 className="w-10 h-10 text-white/70 animate-spin" />
                     </div>
                 </div>
 
@@ -255,6 +255,7 @@ const Lightbox: React.FC<{ project: Project; onClose: () => void }> = ({ project
     const driveEmbed = getDriveEmbedUrl(project.link);
     const dropboxDirect = getDropboxDirectLink(project.link);
     
+    // Dynamic aspect ratio calculation
     const getAspectRatioStyle = () => {
         switch(project.aspectRatio) {
             case '9:16': return { aspectRatio: '9/16' };
@@ -347,19 +348,24 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
     const [selectedProject, setSelectedProject] = useState<Project | null>(null);
     const { scrollY } = useScroll();
     
-    // --- Desktop Hero Transformations ---
-    const heroX = useTransform(scrollY, [0, 400], ["0%", "-33%"]); // Center to Left (Left col is approx 33% width)
-    const heroY = useTransform(scrollY, [0, 400], ["0%", "-10%"]); // Subtle lift
-    const heroScale = useTransform(scrollY, [0, 400], [1, 0.9]); // Slight shrink
-    const heroLeft = useTransform(scrollY, [0, 400], ["50%", "16.66%"]); // 50% (Center) to ~16% (Center of 1/3 col)
+    // --- Desktop Animations ---
+    // Moves profile from center (50%) to left column center (16.66%)
+    const dLeft = useTransform(scrollY, [0, 500], ["50%", "16.66%"]);
+    const dScale = useTransform(scrollY, [0, 500], [1, 1]); // Kept constant for cleaner look
     
-    // --- Mobile Hero Transformations ---
-    const mobileHeaderHeight = useTransform(scrollY, [0, 300], ["85vh", "90px"]);
-    const mobileAvatarOpacity = useTransform(scrollY, [0, 200], [1, 0]);
-    const mobileAvatarScale = useTransform(scrollY, [0, 200], [1, 0.5]);
-    const mobileBioOpacity = useTransform(scrollY, [0, 150], [1, 0]);
-    const mobileNameScale = useTransform(scrollY, [0, 300], [1, 0.6]);
-    const mobileNameY = useTransform(scrollY, [0, 300], [0, 0]); // Keep centered in flex container
+    // --- Mobile Animations ---
+    // Moves profile from center to top header
+    const mTop = useTransform(scrollY, [0, 300], ["40%", "0%"]);
+    const mY = useTransform(scrollY, [0, 300], ["-50%", "0%"]);
+    const mScale = useTransform(scrollY, [0, 300], [1, 0.8]);
+    const mBg = useTransform(scrollY, [200, 300], ["rgba(5,5,5,0)", "rgba(9,9,11,0.95)"]);
+    const mBackdrop = useTransform(scrollY, [200, 300], ["blur(0px)", "blur(16px)"]);
+    const mBorder = useTransform(scrollY, [200, 300], ["rgba(39,39,42,0)", "rgba(39,39,42,1)"]);
+    
+    // Element Specifics (Mobile)
+    const mBioOpacity = useTransform(scrollY, [0, 150], [1, 0]);
+    const mBioHeight = useTransform(scrollY, [0, 150], ["auto", "0px"]);
+    const mAvatarSize = useTransform(scrollY, [0, 300], ["128px", "40px"]);
 
     useEffect(() => {
         if (!isPreview && data.uid) {
@@ -385,14 +391,13 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                 {selectedProject && <Lightbox project={selectedProject} onClose={() => setSelectedProject(null)} />}
              </AnimatePresence>
 
-             {/* --- Desktop Hero (Fixed & Transforming) --- */}
+             {/* --- Desktop Hero (Fixed Layer) --- */}
              <motion.div 
-                className="hidden lg:flex fixed top-0 left-0 w-full h-screen pointer-events-none z-20 items-center justify-center"
-                style={{ left: heroLeft, x: "-50%" }} // Centered using left:50% x:-50%, transitions to left:16%
+                className="hidden lg:flex fixed top-0 left-0 w-full h-full pointer-events-none z-20 items-center justify-start"
              >
                  <motion.div 
-                    style={{ y: heroY, scale: heroScale }}
-                    className="pointer-events-auto flex flex-col items-center text-center max-w-md p-8"
+                    style={{ left: dLeft, x: "-50%" }}
+                    className="absolute top-1/2 -translate-y-1/2 pointer-events-auto flex flex-col items-center text-center max-w-md p-8 w-full"
                  >
                      <div className="w-40 h-40 rounded-full overflow-hidden border border-zinc-800 shadow-2xl bg-zinc-900 mb-8 relative group">
                         <img src={data.profileImage} className="w-full h-full object-cover" alt={data.name} />
@@ -423,29 +428,27 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                  </motion.div>
              </motion.div>
 
-             {/* --- Mobile Hero (Sticky & Shrinking) --- */}
+             {/* --- Mobile Hero (Sticky Layer) --- */}
              <motion.div 
-                className="lg:hidden sticky top-0 w-full z-40 bg-[#050505] border-b border-zinc-900/0 overflow-hidden flex flex-col items-center justify-center shadow-2xl"
-                style={{ height: mobileHeaderHeight, borderBottomColor: useTransform(scrollY, [0, 200], ["rgba(24, 24, 27, 0)", "rgba(24, 24, 27, 1)"]) }}
+                className="lg:hidden fixed top-0 w-full z-40 overflow-hidden flex flex-col items-center shadow-2xl"
+                style={{ top: mTop, y: mY, backgroundColor: mBg, backdropFilter: mBackdrop, borderBottom: '1px solid', borderBottomColor: mBorder }}
              >
-                 <motion.div className="flex flex-col items-center text-center px-6 relative z-10 w-full h-full justify-center">
+                 <motion.div className="flex flex-col items-center text-center px-6 py-6 relative z-10 w-full justify-center">
                      <motion.div 
-                        style={{ opacity: mobileAvatarOpacity, scale: mobileAvatarScale, height: useTransform(scrollY, [0, 200], ["auto", "0px"]) }} 
-                        className="mb-6 origin-bottom"
+                        style={{ width: mAvatarSize, height: mAvatarSize }} 
+                        className="mb-4 rounded-full overflow-hidden border border-zinc-800 bg-zinc-900 mx-auto"
                      >
-                         <div className="w-32 h-32 rounded-full overflow-hidden border border-zinc-800 bg-zinc-900 mx-auto">
-                            <img src={data.profileImage} className="w-full h-full object-cover" />
-                         </div>
+                        <img src={data.profileImage} className="w-full h-full object-cover" />
                      </motion.div>
                      
-                     <motion.div style={{ scale: mobileNameScale, y: mobileNameY }} className="origin-center">
-                         <h1 className="text-4xl font-display font-black tracking-tighter uppercase leading-none">{data.name}</h1>
-                         <motion.p style={{ opacity: mobileAvatarOpacity }} className="text-zinc-400 text-sm mt-2">{data.role}</motion.p>
+                     <motion.div style={{ scale: mScale }} className="origin-center">
+                         <h1 className="text-3xl font-display font-black tracking-tighter uppercase leading-none">{data.name}</h1>
+                         <motion.p style={{ opacity: mBioOpacity, height: mBioHeight }} className="text-zinc-400 text-sm mt-2">{data.role}</motion.p>
                      </motion.div>
 
-                     <motion.div style={{ opacity: mobileBioOpacity, height: useTransform(scrollY, [0, 150], ["auto", "0px"]) }} className="mt-6 overflow-hidden">
-                         <p className="text-zinc-500 text-sm max-w-xs mx-auto leading-relaxed">{data.bio}</p>
-                         <div className="mt-6 flex justify-center gap-4">
+                     <motion.div style={{ opacity: mBioOpacity, height: mBioHeight }} className="mt-4 overflow-hidden">
+                         <p className="text-zinc-500 text-xs max-w-xs mx-auto leading-relaxed mb-4">{data.bio}</p>
+                         <div className="flex justify-center gap-4">
                             <a href={`mailto:${data.contactEmail}`} className="px-5 py-2 bg-white/10 border border-white/20 text-white rounded-full text-[10px] font-bold uppercase tracking-widest">Email Me</a>
                          </div>
                      </motion.div>
@@ -454,10 +457,10 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
 
              {/* --- Scrollable Content Column --- */}
              <div className="relative z-0 container mx-auto px-4 md:px-8">
-                 {/* Desktop Spacer: Pushes content below the initial fullscreen hero view */}
-                 <div className="hidden lg:block h-[80vh]" /> 
+                 {/* Spacer to push content below initial hero view */}
+                 <div className="h-[100vh]" /> 
 
-                 <div className="lg:ml-[33.33%] lg:w-[66.66%] lg:pl-12 pb-32 pt-12 lg:pt-0">
+                 <div className="lg:ml-[33.33%] lg:w-[66.66%] lg:pl-16 pb-32">
                      
                      {/* Showreel Section */}
                      {data.showreelLink && (

@@ -7,7 +7,7 @@ import { Button } from '../../components/ui/Button';
 import { ToolSelector } from '../../components/ToolSelector';
 import { Plus, Trash2, Video, Wand2, Image as ImageIcon, ChevronDown, Upload, X, LayoutDashboard, Copy, ExternalLink, User, MessageSquare, Loader2, CheckCircle2, Globe, Crop, Settings, LogOut, AlertCircle, Sparkles, Wrench, ZoomIn, ZoomOut, QrCode, Download, AlertTriangle, Eye, Monitor, Smartphone, HelpCircle, Info, BarChart3, MousePointerClick, Save, UploadCloud, Link, Youtube, HardDrive, Database, RotateCcw, PenSquare, XCircle, Check } from 'lucide-react';
 import Cropper from 'react-easy-crop';
-import { getCroppedImg, generateThumbnailFromVideo, uploadFileToStorage, hasCloudStorage, generateAiBio, generateAiDescription, downloadQrCode, getVideoMetadata, getDriveThumbnail, generateAiThumbnail, getPortfolioStats, cleanupUnusedMedia, saveDraft, PROJECT_CONTENT_TYPES, PROJECT_SUBJECT_MATTERS, EDITING_TOOLS_LIST } from '../../lib/utils';
+import { getCroppedImg, generateThumbnailFromVideo, uploadFileToStorage, hasCloudStorage, generateAiBio, generateAiDescription, downloadQrCode, getVideoMetadata, getDriveThumbnail, generateAiThumbnail, getPortfolioStats, cleanupUnusedMedia, saveDraft, PROJECT_CONTENT_TYPES, PROJECT_SUBJECT_MATTERS, EDITING_TOOLS_LIST, getAspectRatioFromDims, probeImageDimensions } from '../../lib/utils';
 
 interface EditorPanelProps {
   data: PortfolioData;
@@ -133,10 +133,37 @@ const ProjectCardEditor = ({
     return (
         <div className={`bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden transition-all duration-300 ${isExpanded ? 'ring-1 ring-zinc-700' : 'hover:border-zinc-700'}`}>
              <div className="p-4 flex gap-4 items-start">
-                 <div className="w-24 h-24 bg-black rounded-lg overflow-hidden shrink-0 border border-zinc-800 relative group cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
-                    <img src={project.thumbnail || "https://picsum.photos/400/225"} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                 <div className="w-24 h-24 bg-black rounded-lg overflow-hidden shrink-0 border border-zinc-800 relative group cursor-pointer" onClick={() => {
+                     // Click to expand card OR trigger upload if needed. Keeping expansion for now.
+                     // To upload, users can drag/drop or we could add an upload button overlay.
+                     // For now, let's keep the upload logic connected to the image click via ref or explicit button if we want.
+                     // The requirement implies drag/drop or click-to-upload on the image area specifically.
+                     // But here we just toggle expand.
+                     setIsExpanded(!isExpanded)
+                 }}>
+                     <img src={project.thumbnail || "https://picsum.photos/400/225"} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                    
+                    {/* Hidden input for file upload triggered by a button */}
+                    <input 
+                        type="file" 
+                        className="hidden" 
+                        id={`upload-${project.id}`}
+                        accept="image/*,video/*"
+                        onChange={(e) => {
+                            if (e.target.files?.[0]) onUploadImage(e.target.files[0]);
+                        }}
+                    />
+                    
+                    <label 
+                        htmlFor={`upload-${project.id}`}
+                        className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer z-10"
+                        onClick={(e) => e.stopPropagation()} 
+                    >
+                        <Upload size={20} className="text-white"/>
+                    </label>
+
                     {project.aspectRatio && (
-                        <div className="absolute bottom-1 right-1 bg-black/70 text-[8px] px-1 rounded text-zinc-300 backdrop-blur-sm">
+                        <div className="absolute bottom-1 right-1 bg-black/70 text-[8px] px-1 rounded text-zinc-300 backdrop-blur-sm pointer-events-none">
                             {project.aspectRatio}
                         </div>
                     )}
@@ -337,11 +364,66 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
   };
   
   const handleProjectImage = async (projectId: string, file: File) => {
-     const url = URL.createObjectURL(file);
-     updateProject(projectId, { link: url, thumbnail: url, type: 'image' }); 
-     uploadFileToStorage(file, `users/${data.uid}/projects/${projectId}_img_${Date.now()}`).then(url => {
-        updateProject(projectId, { link: url, thumbnail: url });
-     });
+     const isVideo = file.type.startsWith('video/');
+     const isImage = file.type.startsWith('image/');
+     if (!isVideo && !isImage) return; 
+
+     setUploadStatus({ id: projectId, progress: 0 });
+
+     try {
+         if (isVideo) {
+             const { url: thumbUrl, blob: thumbBlob, aspectRatio } = await generateThumbnailFromVideo(file);
+
+             // Optimistic Update
+             const videoUrl = URL.createObjectURL(file);
+             updateProject(projectId, {
+                 link: videoUrl,
+                 thumbnail: thumbUrl,
+                 type: 'video',
+                 aspectRatio: aspectRatio,
+                 contentType: 'Upload' 
+             });
+
+             const videoStoragePath = `users/${data.uid}/projects/${projectId}_vid_${Date.now()}`;
+             const storageVideoUrl = await uploadFileToStorage(file, videoStoragePath, (progress) => {
+                 setUploadStatus({ id: projectId, progress: progress * 0.8 }); 
+             });
+
+             const thumbStoragePath = `users/${data.uid}/projects/${projectId}_thumb_${Date.now()}.jpg`;
+             const thumbFile = new File([thumbBlob], "thumbnail.jpg", { type: "image/jpeg" });
+             const storageThumbUrl = await uploadFileToStorage(thumbFile, thumbStoragePath, (progress) => {
+                 setUploadStatus({ id: projectId, progress: 80 + (progress * 0.2) });
+             });
+
+             updateProject(projectId, {
+                 link: storageVideoUrl,
+                 thumbnail: storageThumbUrl
+             });
+
+         } else {
+             // Image Logic
+             const objectUrl = URL.createObjectURL(file);
+             const { width, height } = await probeImageDimensions(objectUrl);
+             const aspectRatio = getAspectRatioFromDims(width, height);
+
+             updateProject(projectId, {
+                 link: objectUrl,
+                 thumbnail: objectUrl,
+                 type: 'image',
+                 aspectRatio: aspectRatio
+             });
+
+             const storagePath = `users/${data.uid}/projects/${projectId}_img_${Date.now()}`;
+             const url = await uploadFileToStorage(file, storagePath, (p) => setUploadStatus({ id: projectId, progress: p }));
+
+             updateProject(projectId, { link: url, thumbnail: url });
+         }
+     } catch (e) {
+         console.error(e);
+         setToast({ show: true, message: "Upload failed. Please check your connection." });
+     } finally {
+         setUploadStatus(null);
+     }
   };
 
   const handleDeleteAccount = async () => {
