@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useScroll, useTransform, useInView, Variants } from 'framer-motion';
-import { Mail, Instagram, Play, Twitter, Linkedin, Youtube, X, Volume2, VolumeX, Globe, Maximize2, Star, Sparkles, MonitorPlay, MapPin, Loader2, Database } from 'lucide-react';
+import { Mail, Instagram, Play, Twitter, Linkedin, Youtube, X, Volume2, VolumeX, Globe, Maximize2, Star, Sparkles, MonitorPlay, MapPin, Loader2, Database, ArrowDown } from 'lucide-react';
 import { PortfolioData, Project } from '../../types';
 import { getBrandColor, getDriveEmbedUrl, EDITING_TOOLS_LIST, AI_TOOLS_LIST, trackPortfolioView, trackPortfolioClick, getDriveId, getDropboxDirectLink } from '../../lib/utils';
 
@@ -349,12 +349,11 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
     const { scrollY } = useScroll();
     
     // --- Desktop Animations ---
-    // Moves profile from center (50%) to left column center (16.66%)
     const dLeft = useTransform(scrollY, [0, 500], ["50%", "16.66%"]);
-    const dScale = useTransform(scrollY, [0, 500], [1, 1]); // Kept constant for cleaner look
+    const dScale = useTransform(scrollY, [0, 500], [1, 1]); 
+    const dOpacity = useTransform(scrollY, [0, 100], [1, 1]); // Always visible, but moves
     
     // --- Mobile Animations ---
-    // Moves profile from center to top header
     const mTop = useTransform(scrollY, [0, 300], ["40%", "0%"]);
     const mY = useTransform(scrollY, [0, 300], ["-50%", "0%"]);
     const mScale = useTransform(scrollY, [0, 300], [1, 0.8]);
@@ -362,21 +361,33 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
     const mBackdrop = useTransform(scrollY, [200, 300], ["blur(0px)", "blur(16px)"]);
     const mBorder = useTransform(scrollY, [200, 300], ["rgba(39,39,42,0)", "rgba(39,39,42,1)"]);
     
-    // Element Specifics (Mobile)
     const mBioOpacity = useTransform(scrollY, [0, 150], [1, 0]);
     const mBioHeight = useTransform(scrollY, [0, 150], ["auto", "0px"]);
     const mAvatarSize = useTransform(scrollY, [0, 300], ["128px", "40px"]);
 
+    // Fix scroll locking
     useEffect(() => {
         if (!isPreview && data.uid) {
             trackPortfolioView(data.uid);
         }
+        // Force overflow visible on mount to ensure scrolling works
+        document.body.style.overflow = 'auto';
+        document.documentElement.style.overflow = 'auto';
+        
+        return () => {
+             document.body.style.overflow = '';
+             document.documentElement.style.overflow = '';
+        }
     }, [data.uid, isPreview]);
 
     useEffect(() => {
-        if (selectedProject) document.body.style.overflow = 'hidden';
-        else document.body.style.overflow = 'unset';
-        return () => { document.body.style.overflow = 'unset'; }
+        if (selectedProject) {
+            document.body.style.overflow = 'hidden';
+            document.documentElement.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = 'auto';
+            document.documentElement.style.overflow = 'auto';
+        }
     }, [selectedProject]);
 
     if (!data) return <div className="h-screen bg-black flex items-center justify-center text-white"><Loader2 className="animate-spin" /></div>;
@@ -386,7 +397,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
     const secondaryTools = allTools.filter(t => t !== data.primaryTool);
 
     return (
-        <div className="bg-[#050505] min-h-screen text-white font-sans selection:bg-indigo-500/30 selection:text-indigo-200">
+        <div className="bg-[#050505] min-h-screen w-full relative overflow-x-hidden text-white font-sans selection:bg-indigo-500/30 selection:text-indigo-200">
              <AnimatePresence>
                 {selectedProject && <Lightbox project={selectedProject} onClose={() => setSelectedProject(null)} />}
              </AnimatePresence>
@@ -396,7 +407,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                 className="hidden lg:flex fixed top-0 left-0 w-full h-full pointer-events-none z-20 items-center justify-start"
              >
                  <motion.div 
-                    style={{ left: dLeft, x: "-50%" }}
+                    style={{ left: dLeft, x: "-50%", opacity: dOpacity, scale: dScale }}
                     className="absolute top-1/2 -translate-y-1/2 pointer-events-auto flex flex-col items-center text-center max-w-md p-8 w-full"
                  >
                      <div className="w-40 h-40 rounded-full overflow-hidden border border-zinc-800 shadow-2xl bg-zinc-900 mb-8 relative group">
@@ -425,12 +436,21 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                             })}
                         </div>
                      </div>
+                     
+                     {/* Scroll Hint */}
+                     <motion.div 
+                        animate={{ y: [0, 10, 0] }} 
+                        transition={{ duration: 2, repeat: Infinity }}
+                        className="absolute -bottom-32 left-1/2 -translate-x-1/2 text-zinc-700 opacity-50"
+                     >
+                        <ArrowDown size={24} />
+                     </motion.div>
                  </motion.div>
              </motion.div>
 
              {/* --- Mobile Hero (Sticky Layer) --- */}
              <motion.div 
-                className="lg:hidden fixed top-0 w-full z-40 overflow-hidden flex flex-col items-center shadow-2xl"
+                className="lg:hidden fixed top-0 w-full z-40 overflow-hidden flex flex-col items-center shadow-2xl pointer-events-auto"
                 style={{ top: mTop, y: mY, backgroundColor: mBg, backdropFilter: mBackdrop, borderBottom: '1px solid', borderBottomColor: mBorder }}
              >
                  <motion.div className="flex flex-col items-center text-center px-6 py-6 relative z-10 w-full justify-center">
@@ -456,15 +476,15 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
              </motion.div>
 
              {/* --- Scrollable Content Column --- */}
-             <div className="relative z-0 container mx-auto px-4 md:px-8">
-                 {/* Spacer to push content below initial hero view */}
-                 <div className="h-[100vh]" /> 
+             <div className="relative z-0 container mx-auto px-4 md:px-8 pb-32">
+                 {/* Spacer: Height of 100vh ensures the first fold is empty except for the fixed hero */}
+                 <div className="h-[100vh] w-full" /> 
 
-                 <div className="lg:ml-[33.33%] lg:w-[66.66%] lg:pl-16 pb-32">
+                 <div className="lg:ml-[33.33%] lg:w-[66.66%] lg:pl-16">
                      
-                     {/* Showreel Section */}
+                     {/* Showreel Section (Order #2) */}
                      {data.showreelLink && (
-                         <section className="mb-32">
+                         <section className="mb-32 scroll-mt-32" id="showreel">
                              <div className="flex items-center gap-4 mb-8">
                                  <span className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse" />
                                  <span className="text-zinc-500 font-display font-bold text-xs tracking-[0.2em] uppercase">Showreel</span>
@@ -473,9 +493,9 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                          </section>
                      )}
 
-                     {/* Projects Grid */}
+                     {/* Projects Grid (Order #3) */}
                      {data.projects && data.projects.length > 0 && (
-                         <section className="mb-32">
+                         <section className="mb-32 scroll-mt-32" id="projects">
                              <div className="flex items-end justify-between border-b border-zinc-900 pb-6 mb-12">
                                 <h3 className="text-4xl font-display font-black text-white uppercase tracking-tighter">Selected Works</h3>
                                 <span className="text-zinc-600 text-xs font-bold tracking-widest hidden md:block">{data.projects.length} PROJECTS</span>
@@ -493,9 +513,9 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                          </section>
                      )}
                      
-                     {/* Tools & Skills */}
+                     {/* Tools & Skills (Order #4) */}
                      {(data.tools?.length > 0 || data.primaryTool) && (
-                         <section className="mb-32">
+                         <section className="mb-32 scroll-mt-32" id="skills">
                              <h3 className="text-2xl font-display font-bold text-white uppercase tracking-tighter mb-12">Arsenal</h3>
                              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                                  {data.primaryTool && <PrimaryToolCard toolName={data.primaryTool} />}
@@ -516,7 +536,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                          </section>
                      )}
 
-                     {/* Footer */}
+                     {/* Footer (Order #5) */}
                      <footer className="pt-20 border-t border-zinc-900 text-center lg:text-left">
                          <h2 className="text-3xl font-display font-bold uppercase tracking-tighter mb-8">Ready to collaborate?</h2>
                          <a href={`mailto:${data.contactEmail}`} className="inline-block text-xl text-zinc-400 hover:text-white transition-colors border-b border-zinc-800 hover:border-white pb-1 mb-12">

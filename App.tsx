@@ -212,7 +212,7 @@ const App: React.FC = () => {
   if (route === 'editor' && data) {
     if (editorViewMode === 'preview') {
         return (
-            <div className="relative h-screen w-full bg-black overflow-hidden">
+            <div className="relative min-h-screen w-full bg-black">
                 <Button onClick={() => setEditorViewMode('edit')} className="fixed bottom-8 right-8 z-[200] rounded-full shadow-2xl px-6 py-3 bg-zinc-900 text-white border border-zinc-700 hover:bg-white hover:text-black transition-all">
                     <PenTool size={18} className="mr-2" /> Back to Editor
                 </Button>

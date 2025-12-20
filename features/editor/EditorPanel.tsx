@@ -134,11 +134,6 @@ const ProjectCardEditor = ({
         <div className={`bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden transition-all duration-300 ${isExpanded ? 'ring-1 ring-zinc-700' : 'hover:border-zinc-700'}`}>
              <div className="p-4 flex gap-4 items-start">
                  <div className="w-24 h-24 bg-black rounded-lg overflow-hidden shrink-0 border border-zinc-800 relative group cursor-pointer" onClick={() => {
-                     // Click to expand card OR trigger upload if needed. Keeping expansion for now.
-                     // To upload, users can drag/drop or we could add an upload button overlay.
-                     // For now, let's keep the upload logic connected to the image click via ref or explicit button if we want.
-                     // The requirement implies drag/drop or click-to-upload on the image area specifically.
-                     // But here we just toggle expand.
                      setIsExpanded(!isExpanded)
                  }}>
                      <img src={project.thumbnail || "https://picsum.photos/400/225"} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
@@ -344,12 +339,31 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
   const [croppedPixels, setCroppedPixels] = useState<any>(null);
 
   const toastTimerRef = useRef<any>(null);
+  const dataRef = useRef(data);
+
+  // Sync ref with prop updates
+  useEffect(() => { dataRef.current = data; }, [data]);
 
   useEffect(() => {
       if (activeTab === 'dashboard' && data.uid) {
           getPortfolioStats(data.uid).then(setStats);
       }
   }, [activeTab, data.uid]);
+
+  // Debounced effect for Showreel Metadata
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+        const currentLink = dataRef.current.showreelLink;
+        if(currentLink && currentLink.length > 10) {
+            const meta = await getVideoMetadata(currentLink);
+            if (meta.thumbnail && meta.thumbnail !== dataRef.current.showreelThumbnail) {
+                 // Use the ref to ensure we are spreading the latest data, not closing over stale props
+                 onChange({ ...dataRef.current, showreelThumbnail: meta.thumbnail });
+            }
+        }
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [data.showreelLink, onChange]); // Depend on the specific field string
 
   useEffect(() => {
     if (toast?.show) {
@@ -469,16 +483,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
   const getShareLink = () => `${window.location.origin}/#${data.username}`; 
   const getQrUrl = () => `https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data=${encodeURIComponent(getShareLink())}&format=png`;
 
-  const handleShowreelLinkInput = (val: string) => {
-      updateField('showreelLink', val);
-      if (val.length > 10) {
-          setTimeout(async () => {
-              const metadata = await getVideoMetadata(val);
-              if (metadata.thumbnail) updateField('showreelThumbnail', metadata.thumbnail);
-          }, 800);
-      }
-  }
-
   return (
     <div className="h-screen flex flex-col bg-black text-white overflow-hidden font-sans">
         <header className="px-6 py-4 border-b border-zinc-800 bg-[#09090b] flex justify-between items-center z-50">
@@ -542,279 +546,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                         <Button variant="outline" className="flex-1 border-zinc-800" onClick={() => setShowDeleteModal(false)}>Cancel</Button>
                         <Button className="flex-1 bg-red-600 text-white hover:bg-red-700 border-none" onClick={handleDeleteAccount} disabled={isDeleting}>
                             {isDeleting ? <Loader2 className="animate-spin" size={14}/> : 'Delete Forever'}
-                        </Button>
-                    </div>
-                </div>
-            </div>, document.body
-        )}
-
-        <div className="flex-1 flex overflow-hidden">
-            <nav className="w-16 border-r border-zinc-900 flex flex-col gap-6 py-8 items-center bg-[#09090b]">
-                {[
-                    { id: 'dashboard', icon: LayoutDashboard },
-                    { id: 'profile', icon: User },
-                    { id: 'content', icon: Video },
-                    { id: 'tools', icon: Wrench },
-                    { id: 'settings', icon: Settings }
-                ].map(tab => (
-                    <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`p-3 rounded-xl transition-all relative group ${activeTab === tab.id ? 'bg-white text-black shadow-lg shadow-white/10' : 'text-zinc-500 hover:text-white hover:bg-zinc-800'}`}>
-                        <tab.icon size={20} strokeWidth={2} />
-                        {activeTab === tab.id && <motion.div layoutId="activeTab" className="absolute -right-0.5 top-1/2 -translate-y-1/2 w-1 h-8 bg-indigo-500 rounded-l-full" />}
-                    </button>
-                ))}
-            </nav>
-
-            <main className="flex-1 overflow-y-auto p-8 md:p-12 custom-scrollbar bg-black">
-                <div className="max-w-3xl mx-auto space-y-12 pb-20">
-                    {/* Dashboard Tab */}
-                    {activeTab === 'dashboard' && (
-                        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                            <div className="bg-gradient-to-br from-indigo-900/20 to-zinc-900 border border-indigo-500/10 p-8 rounded-3xl space-y-6 relative overflow-hidden">
-                                <div className="absolute top-0 right-0 p-32 bg-indigo-600/5 rounded-full blur-3xl pointer-events-none -translate-y-1/2 translate-x-1/2"/>
-                                <div className="flex justify-between items-start relative z-10">
-                                    <div>
-                                        <h3 className="text-2xl font-bold text-white tracking-tight">Portfolio Status</h3>
-                                        <p className="text-zinc-400 text-sm mt-1">Manage your public presence.</p>
-                                    </div>
-                                    {data.meta?.publish?.isPublished && (
-                                        <span className="px-3 py-1 bg-green-500/10 text-green-400 text-[10px] font-bold uppercase rounded-full border border-green-500/20 flex items-center gap-1.5">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"/> Live
-                                        </span>
-                                    )}
-                                </div>
-                                <div className="flex items-center gap-3 bg-black/40 p-4 rounded-xl border border-zinc-800/50 backdrop-blur-sm">
-                                    <Globe size={16} className="text-zinc-500" />
-                                    <code className="text-xs text-zinc-300 flex-1 truncate font-mono">{getShareLink()}</code>
-                                    <Button size="sm" variant="secondary" className="h-7 text-xs" onClick={() => { navigator.clipboard.writeText(getShareLink()); }}>Copy</Button>
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                     <Button variant="outline" className="w-full py-6 border-zinc-800 hover:bg-zinc-800" onClick={() => window.open(getShareLink(), '_blank')}>Open Live Site <ExternalLink size={14} className="ml-2"/></Button>
-                                     <Button variant="outline" className="w-full py-6 border-zinc-800 hover:bg-zinc-800" onClick={() => setShowQr(true)}>Get QR Code <QrCode size={14} className="ml-2"/></Button>
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-3xl">
-                                     <div className="flex items-center gap-3 text-zinc-500 mb-4">
-                                         <BarChart3 size={18} />
-                                         <span className="text-xs font-bold uppercase tracking-widest">Total Views</span>
-                                     </div>
-                                     <span className="text-5xl font-display font-black text-white tracking-tighter">{stats.views}</span>
-                                </div>
-                                <div className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-3xl">
-                                     <div className="flex items-center gap-3 text-zinc-500 mb-4">
-                                         <MousePointerClick size={18} />
-                                         <span className="text-xs font-bold uppercase tracking-widest">Clicks</span>
-                                     </div>
-                                     <span className="text-5xl font-display font-black text-white tracking-tighter">{stats.clicks}</span>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Profile Tab */}
-                    {activeTab === 'profile' && (
-                        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
-                            <div className="flex items-center gap-8 bg-zinc-900/30 p-6 rounded-3xl border border-zinc-800">
-                                <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-zinc-800 relative group shrink-0 bg-black">
-                                    <img src={data.profileImage} className="w-full h-full object-cover transition-opacity group-hover:opacity-50" />
-                                    {uploadStatus?.id === 'profile' && (
-                                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                                            <Loader2 className="animate-spin text-white" size={24}/>
-                                        </div>
-                                    )}
-                                    <button onClick={() => {
-                                        const input = document.createElement('input');
-                                        input.type = 'file';
-                                        input.onchange = (e: any) => {
-                                            const file = e.target.files[0];
-                                            const reader = new FileReader();
-                                            reader.onload = () => setCropModal({ open: true, src: reader.result as string });
-                                            reader.readAsDataURL(file);
-                                        };
-                                        input.click();
-                                    }} className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><Upload size={24} className="text-white"/></button>
-                                </div>
-                                <div className="flex-1 space-y-4">
-                                    <Input label="Display Name" value={data.name} onChange={e => updateField('name', e.target.value)} />
-                                    <Input label="Professional Role" value={data.role} onChange={e => updateField('role', e.target.value)} placeholder="Senior Video Editor" />
-                                </div>
-                            </div>
-                            <TextArea label="Bio" value={data.bio} onChange={e => updateField('bio', e.target.value)} rows={4} className="text-base" />
-                            <div className="grid grid-cols-2 gap-4">
-                                <Input label="Instagram" value={data.socials.instagram} onChange={e => updateField('socials', { ...data.socials, instagram: e.target.value })} />
-                                <Input label="YouTube" value={data.socials.youtube} onChange={e => updateField('socials', { ...data.socials, youtube: e.target.value })} />
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Content Tab */}
-                    {activeTab === 'content' && (
-                        <div className="space-y-12 animate-in fade-in slide-in-from-bottom-2 duration-500">
-                            <div className="space-y-4">
-                                <div className="flex justify-between items-center px-1">
-                                    <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-500">Featured Showreel</h3>
-                                </div>
-                                <div className="relative bg-zinc-900/50 p-6 rounded-3xl border border-zinc-800">
-                                    <div className="flex gap-4 items-start">
-                                        <div className="flex-1 space-y-2">
-                                            <Input 
-                                                placeholder="Paste YouTube / Vimeo / Drive Link..." 
-                                                value={data.showreelLink} 
-                                                onChange={e => handleShowreelLinkInput(e.target.value)}
-                                                className="bg-black/50 border-zinc-700 focus:border-indigo-500 transition-colors"
-                                            />
-                                            <p className="text-[10px] text-zinc-500 pl-1">Supported: YouTube, Vimeo, Google Drive, Dropbox (Direct Link).</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div className="space-y-6">
-                                <div className="flex justify-between items-center px-1">
-                                    <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-500">Selected Works</h3>
-                                    <Button size="sm" onClick={() => {
-                                        const newProject: Project = { 
-                                            id: Date.now().toString(), title: "New Project", description: "Short edit summary", thumbnail: "", link: "", category: "Work", type: "video", aspectRatio: '16:9'
-                                        };
-                                        updateField('projects', [newProject, ...data.projects]);
-                                    }} className="bg-white text-black hover:bg-zinc-200">
-                                        <Plus size={14}/> Add Project
-                                    </Button>
-                                </div>
-                                <div className="space-y-4">
-                                    {data.projects.map(p => (
-                                        <ProjectCardEditor 
-                                            key={p.id}
-                                            project={p}
-                                            onChange={(updates) => updateProject(p.id, updates)}
-                                            onDelete={() => setProjectToDelete(p)}
-                                            onUploadImage={(file) => handleProjectImage(p.id, file)}
-                                            uploadStatus={uploadStatus?.id === p.id ? uploadStatus : null}
-                                        />
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                    
-                    {/* Tools Tab */}
-                    {activeTab === 'tools' && (
-                        <div className="space-y-12 animate-in fade-in slide-in-from-bottom-2 duration-500">
-                             <div className="space-y-8">
-                                <div>
-                                    <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-4 block px-1">Primary Software</label>
-                                    <ToolSelector 
-                                        type="editing"
-                                        selectedTools={data.tools || []}
-                                        primaryTool={data.primaryTool}
-                                        onSelect={(tools) => updateField('tools', tools)}
-                                        onSetPrimary={(tool) => updateField('primaryTool', tool)}
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-4 block px-1">AI & Plugins</label>
-                                    <ToolSelector 
-                                        type="ai"
-                                        selectedTools={data.aiTools || []}
-                                        onSelect={(tools) => updateField('aiTools', tools)}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Settings Tab */}
-                    {activeTab === 'settings' && (
-                        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
-                            <div className="bg-zinc-900/30 border border-zinc-800 p-8 rounded-3xl space-y-6">
-                                <div className="flex items-center justify-between">
-                                    <div><h4 className="font-bold text-white">Account</h4><p className="text-xs text-zinc-500">Manage your credentials.</p></div>
-                                    <Button variant="ghost" onClick={onLogout} icon={<LogOut size={14}/>} className="text-zinc-400 hover:text-white">Logout</Button>
-                                </div>
-                                <div className="space-y-4">
-                                    <div className="flex items-center gap-2">
-                                        <Input label="Username" value={data.username} onChange={e => updateField('username', e.target.value.toLowerCase().replace(/\s/g, ''))} />
-                                    </div>
-                                    <Input label="Email" value={data.contactEmail} disabled className="opacity-50 cursor-not-allowed" />
-                                </div>
-                            </div>
-                             <div className="bg-zinc-900/30 border border-zinc-800 p-8 rounded-3xl space-y-4">
-                                <div className="flex items-center gap-2 mb-2">
-                                    <Database size={16} className="text-zinc-400" />
-                                    <h4 className="font-bold text-white">Storage</h4>
-                                </div>
-                                <p className="text-xs text-zinc-500 mb-4 max-w-md">
-                                    Remove unused media files to keep your storage clean. This action is irreversible.
-                                </p>
-                                <Button 
-                                    variant="outline" 
-                                    onClick={() => setShowCleanupModal(true)} 
-                                    className="border-zinc-800 hover:bg-zinc-800"
-                                >
-                                    Cleanup Unused Files
-                                </Button>
-                            </div>
-                            <div className="p-8 border border-red-900/20 bg-red-950/10 rounded-3xl">
-                                <h4 className="text-red-500 font-bold mb-2 uppercase text-xs tracking-widest flex items-center gap-2"><AlertTriangle size={14}/> Danger Zone</h4>
-                                <div className="flex items-center justify-between mt-4">
-                                    <p className="text-zinc-500 text-xs">Permanently delete your portfolio and all associated data.</p>
-                                    <Button size="sm" className="bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white border-none transition-colors" onClick={() => setShowDeleteModal(true)}>
-                                        Delete Account
-                                    </Button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </main>
-        </div>
-
-        {/* ... Toasts ... */}
-        <AnimatePresence>
-            {toast && toast.show && (
-                createPortal(
-                    <motion.div 
-                        initial={{ opacity: 0, y: 20, scale: 0.9 }} 
-                        animate={{ opacity: 1, y: 0, scale: 1 }} 
-                        exit={{ opacity: 0, y: 20, scale: 0.9 }}
-                        className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[2000] bg-zinc-900 text-white pl-4 pr-2 py-2 rounded-full shadow-2xl flex items-center gap-4 border border-zinc-800 backdrop-blur-md"
-                    >
-                        <span className="text-xs font-medium text-zinc-200">{toast.message}</span>
-                        {toast.undoData && (
-                            <>
-                                <div className="h-4 w-px bg-zinc-800"></div>
-                                <button onClick={handleUndo} className="text-indigo-400 text-xs font-bold uppercase tracking-wider hover:text-indigo-300 hover:bg-indigo-500/10 px-3 py-1.5 rounded-full transition-colors flex items-center gap-2">
-                                    <RotateCcw size={12}/> Undo
-                                </button>
-                            </>
-                        )}
-                        <button onClick={() => setToast(null)} className="p-1 hover:bg-zinc-800 rounded-full text-zinc-500 hover:text-white transition-colors">
-                            <X size={14}/>
-                        </button>
-                    </motion.div>, document.body
-                )
-            )}
-        </AnimatePresence>
-
-        {/* ... Other portals ... */}
-        {projectToDelete && createPortal(
-            <div className="fixed inset-0 z-[1000] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in" onClick={() => setProjectToDelete(null)}>
-                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 flex flex-col items-center gap-6 max-w-sm w-full text-center shadow-2xl relative overflow-hidden" onClick={e => e.stopPropagation()}>
-                    <div className="absolute inset-0 bg-red-500/5 pointer-events-none" />
-                    <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center text-red-500 mb-2 ring-1 ring-red-500/20 shadow-[0_0_20px_rgba(239,68,68,0.2)]">
-                        <Trash2 size={28} />
-                    </div>
-                    <div className="space-y-2 relative z-10">
-                        <h3 className="text-white font-display font-bold text-2xl tracking-tight">Delete Project?</h3>
-                        <p className="text-zinc-400 text-sm leading-relaxed">
-                            You are about to permanently delete <br/>
-                            <span className="text-white font-bold bg-zinc-800 px-2 py-0.5 rounded border border-zinc-700 mx-1">{projectToDelete.title}</span>
-                        </p>
-                    </div>
-                    <div className="flex gap-3 w-full mt-2 relative z-10">
-                        <Button variant="outline" className="flex-1 border-zinc-700 hover:bg-zinc-800" onClick={() => setProjectToDelete(null)}>Cancel</Button>
-                        <Button className="flex-1 bg-red-600 hover:bg-red-500 text-white border-none shadow-lg shadow-red-900/20" onClick={confirmProjectDeletion}>
-                            Delete
                         </Button>
                     </div>
                 </div>
