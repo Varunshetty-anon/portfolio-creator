@@ -116,35 +116,53 @@ export const getYouTubeThumbnail = (url: string): string | null => {
   return (match && match[2].length === 11) ? `https://img.youtube.com/vi/${match[2]}/maxresdefault.jpg` : null;
 };
 
-export const getDriveId = (url: string): string | null => {
-  if (!url) return null;
-  const patterns = [/\/file\/d\/([a-zA-Z0-9_-]+)/, /id=([a-zA-Z0-9_-]+)/, /\/open\?id=([a-zA-Z0-9_-]+)/];
-  for (const pattern of patterns) {
-    const match = url.match(pattern);
-    if (match && match[1]) return match[1];
+// Convert storage URLs to direct streams
+export const getDirectVideoUrl = (url: string): string => {
+  if (!url) return '';
+  
+  // Dropbox
+  if (url.includes('dropbox.com')) {
+    return url.replace('www.dropbox.com', 'dl.dropboxusercontent.com').replace('?dl=0', '');
   }
-  return null;
+
+  // Google Drive
+  // Convert /file/d/ID/view to /uc?export=download&id=ID
+  if (url.includes('drive.google.com')) {
+    const idMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (idMatch && idMatch[1]) {
+      return `https://drive.google.com/uc?export=download&id=${idMatch[1]}`;
+    }
+  }
+
+  return url;
 };
 
-export const getDriveEmbedUrl = (url: string): string | null => {
-  const id = getDriveId(url);
-  return id ? `https://drive.google.com/file/d/${id}/preview` : null;
+// Check if URL is native streamable
+export const isNativeVideo = (url: string): boolean => {
+  if (!url) return false;
+  const u = url.toLowerCase();
+  return (
+    u.includes('firebasestorage') ||
+    u.includes('dl.dropboxusercontent.com') ||
+    u.includes('drive.google.com/uc') ||
+    u.endsWith('.mp4') ||
+    u.endsWith('.webm') ||
+    u.endsWith('.mov')
+  );
 };
 
 export const getDriveThumbnail = (url: string): string | null => {
-  const id = getDriveId(url);
-  return id ? `https://lh3.googleusercontent.com/d/${id}=w1000` : null;
-};
-
-// Convert Dropbox share links to direct streaming links
-export const getDropboxDirectLink = (url: string): string | null => {
-  if (!url) return null;
-  if (url.includes('dropbox.com')) {
-    // Replace www.dropbox.com with dl.dropboxusercontent.com and strip ?dl=0
-    const base = url.split('?')[0];
-    return base.replace('www.dropbox.com', 'dl.dropboxusercontent.com');
+  // Extract ID
+  const patterns = [/\/file\/d\/([a-zA-Z0-9_-]+)/, /id=([a-zA-Z0-9_-]+)/, /\/open\?id=([a-zA-Z0-9_-]+)/];
+  let id = null;
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match && match[1]) {
+        id = match[1];
+        break;
+    }
   }
-  return null;
+  return id ? `https://lh3.googleusercontent.com/d/${id}=w1000` : null;
 };
 
 export const getStoragePathFromUrl = (url: string): string | null => {
@@ -162,6 +180,7 @@ export const getStoragePathFromUrl = (url: string): string | null => {
 export const getVideoMetadata = async (url: string): Promise<{ thumbnail: string | null, aspectRatio: '16:9' | '9:16' | '4:3' | '1:1' }> => {
     let thumbnail = null;
     let aspectRatio: '16:9' | '9:16' | '4:3' | '1:1' = '16:9';
+    const directUrl = getDirectVideoUrl(url);
 
     try {
         if (url.includes('youtube.com') || url.includes('youtu.be')) {
@@ -203,15 +222,17 @@ export const getVideoMetadata = async (url: string): Promise<{ thumbnail: string
                 }
             }
         }
-        else if (url.includes('dropbox.com')) {
-             aspectRatio = '16:9';
-        }
     } catch (e) {
         console.error("Metadata fetch failed", e);
     }
 
     return { thumbnail, aspectRatio };
 }
+
+// Deprecated: Use getDirectVideoUrl instead
+export const getDropboxDirectLink = (url: string): string | null => {
+    return getDirectVideoUrl(url);
+};
 
 // --- Core Database Logic ---
 

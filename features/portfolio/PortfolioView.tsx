@@ -5,7 +5,7 @@ import {
     Volume2, VolumeX, Play, ArrowUpRight, X, Check, Zap, Layers 
 } from 'lucide-react';
 import { PortfolioData, Project, INITIAL_DATA } from '../../types';
-import { EDITING_TOOLS_LIST, AI_TOOLS_LIST, trackPortfolioView, getDropboxDirectLink } from '../../lib/utils';
+import { EDITING_TOOLS_LIST, AI_TOOLS_LIST, trackPortfolioView, getDirectVideoUrl, isNativeVideo } from '../../lib/utils';
 
 interface PortfolioViewProps {
   data: PortfolioData;
@@ -77,19 +77,28 @@ const VideoPlayer: React.FC<{
     className?: string;
     onToggleMute?: () => void;
     ambience?: boolean;
-}> = ({ src, thumbnail, autoplay = false, muted = true, controls = false, aspectRatio = '16:9', className = '', onToggleMute, ambience = false }) => {
+    isShowreel?: boolean;
+}> = ({ src, thumbnail, autoplay = false, muted = true, controls = false, aspectRatio = '16:9', className = '', onToggleMute, ambience = false, isShowreel = false }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const ambienceRef = useRef<HTMLVideoElement>(null);
     const [isLoaded, setIsLoaded] = useState(false);
     const [detectedRatio, setDetectedRatio] = useState<string | null>(null);
     const [hasError, setHasError] = useState(false);
-    
-    // Reset detection when src changes
+
+    // Normalize URL
+    const normalizedSrc = useMemo(() => getDirectVideoUrl(src), [src]);
+    const isNative = useMemo(() => isNativeVideo(normalizedSrc), [normalizedSrc]);
+
+    // Force failure if it's a showreel but not native (enforce "Local Upload Only" behavior)
     useEffect(() => {
-        setDetectedRatio(null);
+        if (isShowreel && !isNative && src) {
+            setHasError(true);
+        } else {
+            setHasError(false);
+        }
         setIsLoaded(false);
-        setHasError(false);
-    }, [src]);
+        setDetectedRatio(null);
+    }, [src, isShowreel, isNative]);
 
     const effectiveAspectRatio = detectedRatio || aspectRatio || '16:9';
     const cssAspectRatio = useMemo(() => effectiveAspectRatio.replace(':', '/'), [effectiveAspectRatio]);
@@ -101,27 +110,19 @@ const VideoPlayer: React.FC<{
         } catch { return false; }
     }, [cssAspectRatio]);
 
-    const type = useMemo(() => {
-        if (!src) return 'none';
-        const lower = src.toLowerCase();
-        if (lower.includes('youtube.com') || lower.includes('youtu.be')) return 'youtube';
-        if (lower.includes('vimeo.com')) return 'vimeo';
-        if (lower.includes('dropbox.com')) return 'dropbox';
-        return 'direct';
-    }, [src]);
-
     // --- Ambience Sync Logic (Dual Video Strategy) ---
-    // We use a second video element for the glow to avoid Canvas/JS frame extraction overhead 
-    // and strictly follow the "no canvas extraction" rule while maintaining dynamic color.
     useEffect(() => {
-        if (!ambience || type !== 'direct' || !videoRef.current || !ambienceRef.current) return;
+        if (!ambience || !isNative || !videoRef.current || !ambienceRef.current || hasError) return;
 
         const main = videoRef.current;
         const amb = ambienceRef.current;
 
-        const syncPlay = () => amb.play().catch(() => {});
+        const syncPlay = () => {
+            // Attempt playback on ambience. Silent catch if browser blocks unmuted play (ambience is muted though)
+            amb.play().catch(() => {});
+        };
         const syncPause = () => amb.pause();
-        const syncSeek = () => { amb.currentTime = main.currentTime; };
+        const syncSeek = () => { if(amb.readyState > 0) amb.currentTime = main.currentTime; };
         
         main.addEventListener('play', syncPlay);
         main.addEventListener('pause', syncPause);
@@ -138,20 +139,19 @@ const VideoPlayer: React.FC<{
             main.removeEventListener('waiting', syncPause);
             main.removeEventListener('playing', syncPlay);
         };
-    }, [ambience, type, isLoaded]);
+    }, [ambience, isNative, hasError, src]); // Re-bind if src changes
 
     // --- Intersection Observer for Autoplay ---
     useEffect(() => {
         const video = videoRef.current;
-        if (!video || !autoplay || (type !== 'direct' && type !== 'dropbox')) return;
+        if (!video || !autoplay || !isNative || hasError) return;
 
         const observer = new IntersectionObserver(
             (entries) => {
                 entries.forEach((entry) => {
-                    if (entry.isIntersecting && !hasError) {
-                        // Ensure muted is set before play attempt
-                        video.muted = muted;
-                        video.play().catch(() => { /* Silent fail */ });
+                    if (entry.isIntersecting) {
+                        video.muted = muted; // Ensure muted for autoplay policy
+                        video.play().catch(() => { /* Silent fail - user interaction might be needed */ });
                     } else {
                         video.pause();
                     }
@@ -162,28 +162,28 @@ const VideoPlayer: React.FC<{
 
         observer.observe(video);
         return () => observer.disconnect();
-    }, [autoplay, type, src, muted, hasError]);
+    }, [autoplay, isNative, normalizedSrc, muted, hasError]);
 
     const getEmbedSrc = () => {
         const auto = autoplay ? 1 : 0;
         const mute = muted ? 1 : 0;
         const origin = typeof window !== 'undefined' ? window.location.origin : '';
         
-        if (type === 'youtube') {
-            const match = src.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/);
+        if (normalizedSrc.includes('youtube.com') || normalizedSrc.includes('youtu.be')) {
+            const match = normalizedSrc.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/);
             const ytId = match?.[2];
-            if (!ytId) return src;
+            if (!ytId) return normalizedSrc;
             const forceMute = (auto && muted) ? 1 : mute;
             return `https://www.youtube.com/embed/${ytId}?autoplay=${auto}&mute=${forceMute}&controls=${controls ? 1 : 0}&loop=1&playlist=${ytId}&playsinline=1&rel=0&modestbranding=1&showinfo=0&enablejsapi=1&origin=${origin}`;
         }
-        if (type === 'vimeo') {
-            const match = src.match(/vimeo\.com\/(?:channels\/(?:\w+\/)?|groups\/(?:[^\/]*)\/videos\/|album\/(?:\d+)\/video\/|video\/|)(\d+)(?:$|\/|\?)/);
+        if (normalizedSrc.includes('vimeo.com')) {
+            const match = normalizedSrc.match(/vimeo\.com\/(?:channels\/(?:\w+\/)?|groups\/(?:[^\/]*)\/videos\/|album\/(?:\d+)\/video\/|video\/|)(\d+)(?:$|\/|\?)/);
             const vId = match?.[1];
-            if (!vId) return src;
+            if (!vId) return normalizedSrc;
             const isBackground = !controls && muted; 
             return `https://player.vimeo.com/video/${vId}?autoplay=${auto}&muted=${mute}&loop=1&background=${isBackground ? 1 : 0}&playsinline=1`;
         }
-        return src;
+        return normalizedSrc;
     };
 
     const handleLoadedMetadata = (e: React.SyntheticEvent<HTMLVideoElement>) => {
@@ -201,23 +201,22 @@ const VideoPlayer: React.FC<{
 
     const handleError = () => {
         setHasError(true);
-        setIsLoaded(true); // Stop loading spinner
+        setIsLoaded(true); // Stop loading spinner, show fallback
     };
 
-    // Direct Video Render Logic
-    if (type === 'direct' || type === 'dropbox') {
-        const videoSrc = type === 'dropbox' ? (getDropboxDirectLink(src) || src) : src;
-
+    // --- NATIVE VIDEO RENDER ---
+    // Used for Showreels (Strict) and Direct Files (Drive/Dropbox/Uploads)
+    if (isNative) {
         return (
              <div 
                 className={`relative bg-[#050505] ${isVertical ? 'w-full h-auto lg:w-auto lg:h-full' : 'w-full h-full'} ${className}`} 
                 style={{ aspectRatio: cssAspectRatio }}
             >
-                {/* Ambience Glow - Dual Video Strategy */}
+                {/* Ambience Glow (Dual Video) */}
                 {ambience && !hasError && (
                     <video
                         ref={ambienceRef}
-                        src={videoSrc}
+                        src={normalizedSrc}
                         className="absolute inset-0 w-full h-full object-cover blur-[50px] opacity-60 scale-110 pointer-events-none transition-opacity duration-1000 -z-10"
                         muted
                         loop
@@ -226,6 +225,7 @@ const VideoPlayer: React.FC<{
                     />
                 )}
 
+                {/* Loading / Poster State */}
                 <AnimatePresence>
                     {!isLoaded && !hasError && (
                         <motion.div initial={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.8 }} className="absolute inset-0 z-10 bg-[#09090b] flex items-center justify-center rounded-2xl overflow-hidden">
@@ -235,19 +235,21 @@ const VideoPlayer: React.FC<{
                 </AnimatePresence>
 
                 {/* Main Video */}
-                <video 
-                    key={videoSrc}
-                    ref={videoRef}
-                    src={videoSrc}
-                    className="relative w-full h-full object-cover z-10 rounded-2xl bg-black" 
-                    loop 
-                    muted={muted} 
-                    playsInline 
-                    preload="auto"
-                    controls={controls}
-                    onLoadedMetadata={handleLoadedMetadata}
-                    onError={handleError}
-                />
+                {!hasError && (
+                    <video 
+                        key={normalizedSrc}
+                        ref={videoRef}
+                        src={normalizedSrc}
+                        className="relative w-full h-full object-cover z-10 rounded-2xl bg-black" 
+                        loop 
+                        muted={muted} 
+                        playsInline 
+                        preload="auto"
+                        controls={controls}
+                        onLoadedMetadata={handleLoadedMetadata}
+                        onError={handleError}
+                    />
+                )}
                 
                  {/* Mute Toggle */}
                  {onToggleMute && !hasError && (
@@ -261,19 +263,36 @@ const VideoPlayer: React.FC<{
                     </motion.button>
                 )}
 
-                {/* Fallback for Errors */}
+                {/* Fallback for Errors OR Invalid Showreel Links */}
                 {hasError && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center z-20 bg-zinc-900 rounded-2xl">
-                        {thumbnail && <img src={thumbnail} className="absolute inset-0 w-full h-full object-cover opacity-30" alt="Fallback" />}
-                        <Play size={48} className="text-white/50 mb-2 relative z-10" />
-                        <span className="text-xs text-zinc-500 relative z-10">Playback Unavailable</span>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center z-20 bg-zinc-900 rounded-2xl overflow-hidden">
+                        {thumbnail && <img src={thumbnail} className="absolute inset-0 w-full h-full object-cover opacity-50" alt="Fallback" />}
+                        <div className="relative z-10 bg-black/60 p-4 rounded-full backdrop-blur-sm">
+                            <Play size={32} className="text-white fill-white ml-1" />
+                        </div>
                     </div>
                 )}
             </div>
         )
     }
 
-    // Iframe Render Logic
+    // --- IFRAME RENDER ---
+    // Only for Client Works (Not Showreel) using YouTube/Vimeo
+    // Showreel must strictly be native, so if we reach here and isShowreel=true, we render fallback.
+    if (isShowreel) {
+        return (
+             <div 
+                className={`relative bg-[#050505] rounded-2xl overflow-hidden ${className}`} 
+                style={{ aspectRatio: cssAspectRatio }}
+            >
+                <img src={thumbnail} className="w-full h-full object-cover opacity-60" alt="Thumbnail" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-xs text-red-400 bg-red-900/20 border border-red-900/50 px-3 py-1.5 rounded">Invalid Showreel Format</span>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div 
             className={`
@@ -631,6 +650,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                                     muted={isShowreelMuted}
                                     onToggleMute={() => setIsShowreelMuted(!isShowreelMuted)}
                                     ambience={true}
+                                    isShowreel={true}
                                     className="scale-[1.01] group-hover:scale-100 transition-transform duration-1000"
                                 />
                             </div>

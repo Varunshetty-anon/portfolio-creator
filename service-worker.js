@@ -14,7 +14,7 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // CRITICAL: Bypass Firebase Storage and Media Files
+  // CRITICAL: Bypass Firebase Storage, Google Drive, Dropbox, and Media Files
   // We explicitly DO NOT call event.respondWith() for these requests.
   // This allows the browser to handle them natively, ensuring:
   // 1. Range headers are sent correctly (vital for video seeking/streaming)
@@ -25,6 +25,9 @@ self.addEventListener('fetch', (event) => {
     url.hostname.includes('firebasestorage') ||
     url.hostname.includes('googleapis') ||
     url.hostname.includes('firebaseio') ||
+    url.hostname.includes('drive.google.com') ||
+    url.hostname.includes('dropbox.com') ||
+    url.hostname.includes('dropboxusercontent.com') ||
     url.pathname.match(/\.(mp4|webm|mov|m4v|ogg|avi|mkv)$/i)
   ) {
     return; // Fall through to network
