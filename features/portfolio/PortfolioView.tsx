@@ -118,7 +118,9 @@ const VideoPlayer: React.FC<{
             const match = src.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/);
             const ytId = match?.[2];
             if (!ytId) return src;
-            return `https://www.youtube.com/embed/${ytId}?autoplay=${auto}&mute=${mute}&controls=${controls ? 1 : 0}&loop=1&playlist=${ytId}&playsinline=1&rel=0&modestbranding=1&showinfo=0&origin=${origin}`;
+            // Force mute if autoplay is on to satisfy browser policies
+            const forceMute = (auto && muted) ? 1 : mute;
+            return `https://www.youtube.com/embed/${ytId}?autoplay=${auto}&mute=${forceMute}&controls=${controls ? 1 : 0}&loop=1&playlist=${ytId}&playsinline=1&rel=0&modestbranding=1&showinfo=0&origin=${origin}`;
         }
         if (type === 'vimeo') {
             const match = src.match(/vimeo\.com\/(?:channels\/(?:\w+\/)?|groups\/(?:[^\/]*)\/videos\/|album\/(?:\d+)\/video\/|video\/|)(\d+)(?:$|\/|\?)/);
@@ -579,7 +581,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                                 <VideoPlayer 
                                     src={safeData.showreelLink} 
                                     thumbnail={safeData.showreelThumbnail} 
-                                    autoplay={introComplete}
+                                    autoplay={true} // Fixed: Always true so video starts buffering/playing behind intro overlay
                                     muted={isShowreelMuted}
                                     onToggleMute={() => setIsShowreelMuted(!isShowreelMuted)}
                                     className="scale-[1.01] group-hover:scale-100 transition-transform duration-1000"

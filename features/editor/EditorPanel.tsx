@@ -5,7 +5,7 @@ import { PortfolioData, Project } from '../../types';
 import { Input, TextArea } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { ToolSelector } from '../../components/ToolSelector';
-import { Plus, Trash2, Video, Upload, ChevronDown, Loader2, CheckCircle2, AlertTriangle, Eye, Settings, LogOut, Wrench, LayoutDashboard, User, X, Link, Youtube, HardDrive, Database, Globe, ExternalLink, QrCode, Download, Copy, Link2, Check } from 'lucide-react';
+import { Plus, Trash2, Video, Upload, ChevronDown, Loader2, CheckCircle2, AlertTriangle, Eye, Settings, LogOut, Wrench, LayoutDashboard, User, X, Link, Youtube, HardDrive, Database, Globe, ExternalLink, QrCode, Download, Copy, Link2, Check, Play } from 'lucide-react';
 import { uploadFileToStorage, getVideoMetadata, getPortfolioStats, PROJECT_CONTENT_TYPES, EDITING_TOOLS_LIST, downloadQrCode } from '../../lib/utils';
 
 interface EditorPanelProps {
@@ -109,12 +109,37 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
   const [stats, setStats] = useState({ views: 0, clicks: 0 });
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   
+  // Showreel Validation State
+  const [isVerifyingShowreel, setIsVerifyingShowreel] = useState(false);
+  
   // Dashboard Link State
   const [shortUrl, setShortUrl] = useState('');
   const [isShortening, setIsShortening] = useState(false);
   const [copiedType, setCopiedType] = useState<'main' | 'short' | null>(null);
 
   useEffect(() => { if (data.uid && activeTab === 'dashboard') getPortfolioStats(data.uid).then(setStats); }, [activeTab, data.uid]);
+
+  // Debounced Showreel Validation
+  useEffect(() => {
+    const checkShowreel = async () => {
+        if (!data.showreelLink || data.showreelLink.length < 5) return;
+        
+        setIsVerifyingShowreel(true);
+        try {
+            const meta = await getVideoMetadata(data.showreelLink);
+            if (meta.thumbnail && meta.thumbnail !== data.showreelThumbnail) {
+                onChange({ ...data, showreelThumbnail: meta.thumbnail });
+            }
+        } catch (error) {
+            console.error("Showreel validation error", error);
+        } finally {
+            setIsVerifyingShowreel(false);
+        }
+    };
+
+    const timeoutId = setTimeout(checkShowreel, 1000);
+    return () => clearTimeout(timeoutId);
+  }, [data.showreelLink]); // Note: We reference 'data.showreelLink' which is a primitive string, so this won't loop.
 
   const updateField = (f: keyof PortfolioData, v: any) => onChange({ ...data, [f]: v });
   
@@ -128,14 +153,13 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
   const handleShortenLink = async () => {
     setIsShortening(true);
     try {
-        // Using TinyURL API which allows GET requests for creating short links
         const response = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(publicUrl)}`);
         if (!response.ok) throw new Error("Failed to shorten");
         const short = await response.text();
         setShortUrl(short);
     } catch (e) {
         console.error("Shortening failed", e);
-        setShortUrl(''); // Fallback or error state logic could go here
+        setShortUrl('');
     } finally {
         setIsShortening(false);
     }
@@ -359,7 +383,49 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                             <div>
                                 <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-500 mb-4">Showreel</h3>
                                 <div className="p-6 bg-zinc-900/30 border border-zinc-800 rounded-2xl space-y-4">
-                                    <Input label="Showreel Link" value={data.showreelLink} onChange={e => updateField('showreelLink', e.target.value)} placeholder="YouTube, Vimeo, Drive..." />
+                                    <div className="space-y-2">
+                                        <div className="relative">
+                                            <Input 
+                                                label="Showreel Link" 
+                                                value={data.showreelLink} 
+                                                onChange={e => updateField('showreelLink', e.target.value)} 
+                                                placeholder="YouTube, Vimeo, Google Drive..." 
+                                                className="pr-10" 
+                                            />
+                                            <div className="absolute right-3 top-[34px] text-zinc-500">
+                                                {isVerifyingShowreel ? (
+                                                    <Loader2 size={16} className="animate-spin" />
+                                                ) : data.showreelLink && data.showreelThumbnail ? (
+                                                    <CheckCircle2 size={16} className="text-green-500" />
+                                                ) : data.showreelLink ? (
+                                                    <Link size={16} />
+                                                ) : null}
+                                            </div>
+                                        </div>
+                                        
+                                        {data.showreelLink && (
+                                            <div className="mt-4 bg-black rounded-lg overflow-hidden border border-zinc-800 relative aspect-video">
+                                                {data.showreelThumbnail ? (
+                                                    <>
+                                                        <img src={data.showreelThumbnail} alt="Showreel Thumbnail" className="w-full h-full object-cover opacity-60" />
+                                                        <div className="absolute inset-0 flex items-center justify-center">
+                                                             <div className="bg-black/50 p-3 rounded-full backdrop-blur-sm">
+                                                                <Play size={24} className="text-white fill-white" />
+                                                             </div>
+                                                        </div>
+                                                        <div className="absolute bottom-2 right-2 bg-green-500/10 border border-green-500/20 text-green-400 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider flex items-center gap-1">
+                                                            <Check size={10} /> Ready to Autoplay
+                                                        </div>
+                                                    </>
+                                                ) : (
+                                                    <div className="flex flex-col items-center justify-center h-full text-zinc-500 gap-2">
+                                                        <AlertTriangle size={24} className="text-amber-500" />
+                                                        <span className="text-xs">No metadata found. Link might not autoplay.</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                             <div>
