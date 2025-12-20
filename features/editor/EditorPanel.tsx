@@ -95,13 +95,14 @@ const getLinkIndicator = (url: string) => {
     if (lower.includes('youtube.com') || lower.includes('youtu.be')) return { icon: Youtube, color: 'text-red-500', label: 'YouTube', border: '!border-red-500/50' };
     if (lower.includes('drive.google.com')) return { icon: HardDrive, color: 'text-blue-500', label: 'Drive', border: '!border-blue-500/50' };
     if (lower.includes('vimeo.com')) return { icon: Video, color: 'text-sky-500', label: 'Vimeo', border: '!border-sky-500/50' };
+    if (lower.includes('dropbox.com')) return { icon: Database, color: 'text-indigo-400', label: 'Dropbox', border: '!border-indigo-500/50' };
     return { icon: Link, color: 'text-emerald-500', label: 'Web', border: '!border-emerald-500/50' };
 };
 
 const ProjectCardEditor = ({ 
-    project, onChange, onDelete, onUploadVideo, onUploadImage, uploadStatus
+    project, onChange, onDelete, onUploadImage, uploadStatus
 }: { 
-    project: Project, onChange: (p: Partial<Project>) => void, onDelete: () => void, onUploadVideo: (file: File) => void, onUploadImage: (file: File) => void, uploadStatus: any 
+    project: Project, onChange: (p: Partial<Project>) => void, onDelete: () => void, onUploadImage: (file: File) => void, uploadStatus: any 
 }) => {
     const [isExpanded, setIsExpanded] = useState(false);
     const linkStatus = getLinkIndicator(project.link);
@@ -173,7 +174,7 @@ const ProjectCardEditor = ({
                             <Input 
                                 value={project.link} 
                                 onChange={e => handleLinkChange(e.target.value)} 
-                                placeholder={project.type === 'video' ? "Drive / YouTube / Vimeo Link" : "Image URL"}
+                                placeholder="Paste Link (Drive, Dropbox, YouTube...)"
                                 className={`h-8 text-[10px] py-1 pr-7 bg-black/40 ${linkStatus ? linkStatus.border : ''}`}
                             />
                             <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none">
@@ -191,16 +192,6 @@ const ProjectCardEditor = ({
                                 </AnimatePresence>
                             </div>
                         </div>
-                        
-                        <Button size="sm" variant="outline" className="h-8 w-8 p-0 bg-black/40 border-zinc-800 hover:border-zinc-600" title="Upload Media" onClick={() => {
-                             const input = document.createElement('input');
-                             input.type = 'file';
-                             input.accept = project.type === 'video' ? 'video/*' : 'image/*';
-                             input.onchange = (e: any) => project.type === 'video' ? onUploadVideo(e.target.files[0]) : onUploadImage(e.target.files[0]);
-                             input.click();
-                        }}>
-                            <Upload size={12} />
-                        </Button>
                     </div>
                 </div>
              </div>
@@ -340,32 +331,9 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
     }
   }, [toast]);
 
-  const triggerAutoSave = async (newData: PortfolioData) => {
-      onChange(newData);
-      if (newData.uid) await saveDraft(newData.uid, newData);
-  }
-
   const updateField = (f: keyof PortfolioData, v: any) => onChange({ ...data, [f]: v });
   const updateProject = (id: string, updates: Partial<Project>) => {
       onChange({ ...data, projects: data.projects.map(p => p.id === id ? { ...p, ...updates } : p) });
-  };
-
-  const handleProjectVideo = async (projectId: string, file: File) => {
-    setUploadStatus({ id: projectId, progress: 0, step: 'Processing...' });
-    try {
-        const { url: thumbBlobUrl, blob: thumbBlob, aspectRatio } = await generateThumbnailFromVideo(file);
-        setUploadStatus({ id: projectId, progress: 10, step: 'Uploading Video...' });
-        const videoPath = `users/${data.uid}/projects/${projectId}_${Date.now()}.mp4`;
-        const videoUrl = await uploadFileToStorage(file, videoPath, (p) => setUploadStatus({ id: projectId, progress: 10 + (p * 0.7), step: 'Uploading Video...' }));
-
-        setUploadStatus({ id: projectId, progress: 85, step: 'Uploading Thumbnail...' });
-        const thumbPath = `users/${data.uid}/projects/${projectId}_thumb_${Date.now()}.jpg`;
-        const thumbUrl = await uploadFileToStorage(new File([thumbBlob], 'thumb.jpg'), thumbPath);
-
-        const finalProjects = data.projects.map(p => p.id === projectId ? { ...p, link: videoUrl, thumbnail: thumbUrl, aspectRatio: aspectRatio } : p);
-        await triggerAutoSave({ ...data, projects: finalProjects });
-        setUploadStatus({ id: projectId, progress: 100, step: 'Done' });
-    } catch (e) { console.error(e); } finally { setTimeout(() => setUploadStatus(null), 1000); }
   };
   
   const handleProjectImage = async (projectId: string, file: File) => {
@@ -374,19 +342,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
      uploadFileToStorage(file, `users/${data.uid}/projects/${projectId}_img_${Date.now()}`).then(url => {
         updateProject(projectId, { link: url, thumbnail: url });
      });
-  };
-
-  const handleShowreel = async (file: File) => {
-    setUploadStatus({ id: 'showreel', progress: 0, step: 'Processing...' });
-    try {
-        const { blob: thumbBlob } = await generateThumbnailFromVideo(file);
-        setUploadStatus({ id: 'showreel', progress: 10, step: 'Uploading Video...' });
-        const videoUrl = await uploadFileToStorage(file, `users/${data.uid}/showreels/main_${Date.now()}.mp4`, (p) => setUploadStatus({ id: 'showreel', progress: 10 + (p * 0.7), step: 'Uploading Video...' }));
-        setUploadStatus({ id: 'showreel', progress: 85, step: 'Uploading Thumbnail...' });
-        const thumbUrl = await uploadFileToStorage(new File([thumbBlob], 'thumb.jpg'), `users/${data.uid}/showreels/thumb_${Date.now()}.jpg`);
-        await triggerAutoSave({ ...data, showreelLink: videoUrl, showreelThumbnail: thumbUrl });
-        setUploadStatus({ id: 'showreel', progress: 100, step: 'Done' });
-    } catch(e) { console.error(e); } finally { setTimeout(() => setUploadStatus(null), 1000); }
   };
 
   const handleDeleteAccount = async () => {
@@ -463,7 +418,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
             </div>
         </header>
 
-        {/* --- Modals --- */}
+        {/* ... Modals (QR, Cleanup, Delete) same as before ... */}
         {showQr && createPortal(
             <div className="fixed inset-0 z-[1000] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in" onClick={() => setShowQr(false)}>
                 <div className="bg-white rounded-2xl p-8 flex flex-col items-center gap-4 max-w-sm w-full shadow-2xl" onClick={e => e.stopPropagation()}>
@@ -529,6 +484,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
 
             <main className="flex-1 overflow-y-auto p-8 md:p-12 custom-scrollbar bg-black">
                 <div className="max-w-3xl mx-auto space-y-12 pb-20">
+                    {/* Dashboard Tab */}
                     {activeTab === 'dashboard' && (
                         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
                             <div className="bg-gradient-to-br from-indigo-900/20 to-zinc-900 border border-indigo-500/10 p-8 rounded-3xl space-y-6 relative overflow-hidden">
@@ -573,6 +529,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                         </div>
                     )}
 
+                    {/* Profile Tab */}
                     {activeTab === 'profile' && (
                         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
                             <div className="flex items-center gap-8 bg-zinc-900/30 p-6 rounded-3xl border border-zinc-800">
@@ -608,6 +565,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                         </div>
                     )}
 
+                    {/* Content Tab */}
                     {activeTab === 'content' && (
                         <div className="space-y-12 animate-in fade-in slide-in-from-bottom-2 duration-500">
                             <div className="space-y-4">
@@ -615,14 +573,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                                     <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-500">Featured Showreel</h3>
                                 </div>
                                 <div className="relative bg-zinc-900/50 p-6 rounded-3xl border border-zinc-800">
-                                    {uploadStatus?.id === 'showreel' && (
-                                        <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-20 rounded-3xl backdrop-blur-sm">
-                                            <div className="flex flex-col items-center gap-2">
-                                                <Loader2 className="animate-spin text-indigo-500" size={24}/>
-                                                <span className="text-[10px] uppercase font-bold text-white">{uploadStatus.step} {Math.round(uploadStatus.progress)}%</span>
-                                            </div>
-                                        </div>
-                                    )}
                                     <div className="flex gap-4 items-start">
                                         <div className="flex-1 space-y-2">
                                             <Input 
@@ -631,17 +581,8 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                                                 onChange={e => handleShowreelLinkInput(e.target.value)}
                                                 className="bg-black/50 border-zinc-700 focus:border-indigo-500 transition-colors"
                                             />
-                                            <p className="text-[10px] text-zinc-500 pl-1">Supported: YouTube, Vimeo, Google Drive, or Direct Upload.</p>
+                                            <p className="text-[10px] text-zinc-500 pl-1">Supported: YouTube, Vimeo, Google Drive, Dropbox (Direct Link).</p>
                                         </div>
-                                        <Button className="h-10 border-dashed border-zinc-700 hover:border-white hover:bg-zinc-800" variant="outline" onClick={() => {
-                                            const input = document.createElement('input');
-                                            input.type = 'file';
-                                            input.onchange = (e: any) => handleShowreel(e.target.files[0]);
-                                            input.click();
-                                        }}>
-                                            <Upload className="mr-2" size={16}/> 
-                                            Upload
-                                        </Button>
                                     </div>
                                 </div>
                             </div>
@@ -665,7 +606,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                                             project={p}
                                             onChange={(updates) => updateProject(p.id, updates)}
                                             onDelete={() => setProjectToDelete(p)}
-                                            onUploadVideo={(file) => handleProjectVideo(p.id, file)}
                                             onUploadImage={(file) => handleProjectImage(p.id, file)}
                                             uploadStatus={uploadStatus?.id === p.id ? uploadStatus : null}
                                         />
@@ -675,6 +615,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                         </div>
                     )}
                     
+                    {/* Tools Tab */}
                     {activeTab === 'tools' && (
                         <div className="space-y-12 animate-in fade-in slide-in-from-bottom-2 duration-500">
                              <div className="space-y-8">
@@ -700,6 +641,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                         </div>
                     )}
 
+                    {/* Settings Tab */}
                     {activeTab === 'settings' && (
                         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
                             <div className="bg-zinc-900/30 border border-zinc-800 p-8 rounded-3xl space-y-6">
@@ -745,7 +687,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
             </main>
         </div>
 
-        {/* --- Toasts & Modals --- */}
+        {/* ... Toasts ... */}
         <AnimatePresence>
             {toast && toast.show && (
                 createPortal(
@@ -772,6 +714,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
             )}
         </AnimatePresence>
 
+        {/* ... Other portals ... */}
         {projectToDelete && createPortal(
             <div className="fixed inset-0 z-[1000] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in" onClick={() => setProjectToDelete(null)}>
                 <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 flex flex-col items-center gap-6 max-w-sm w-full text-center shadow-2xl relative overflow-hidden" onClick={e => e.stopPropagation()}>

@@ -93,11 +93,10 @@ export const PROJECT_SUBJECT_MATTERS = [
 export const getAspectRatioFromDims = (w: number, h: number): '16:9' | '9:16' | '4:3' | '1:1' => {
   if (!w || !h) return '16:9';
   const ratio = w / h;
-  // Adjusted thresholds for better detection
-  if (ratio >= 1.5) return '16:9'; // 1.5+ (3:2, 16:9, 21:9)
-  if (ratio <= 0.85) return '9:16'; // < 0.85 (9:16, 4:5 vertical)
-  if (ratio > 0.85 && ratio < 1.15) return '1:1'; // ~1 (1:1)
-  return '4:3'; // Everything else falls to 4:3ish
+  if (ratio >= 1.5) return '16:9'; 
+  if (ratio <= 0.85) return '9:16'; 
+  if (ratio > 0.85 && ratio < 1.15) return '1:1'; 
+  return '4:3'; 
 };
 
 export const probeImageDimensions = (url: string): Promise<{ width: number; height: number }> => {
@@ -134,8 +133,18 @@ export const getDriveEmbedUrl = (url: string): string | null => {
 
 export const getDriveThumbnail = (url: string): string | null => {
   const id = getDriveId(url);
-  // Public proxy for thumbnails
   return id ? `https://lh3.googleusercontent.com/d/${id}=w1000` : null;
+};
+
+// Convert Dropbox share links to direct streaming links
+export const getDropboxDirectLink = (url: string): string | null => {
+  if (!url) return null;
+  if (url.includes('dropbox.com')) {
+    // Replace www.dropbox.com with dl.dropboxusercontent.com and strip ?dl=0
+    const base = url.split('?')[0];
+    return base.replace('www.dropbox.com', 'dl.dropboxusercontent.com');
+  }
+  return null;
 };
 
 export const getStoragePathFromUrl = (url: string): string | null => {
@@ -150,7 +159,6 @@ export const getStoragePathFromUrl = (url: string): string | null => {
     }
 }
 
-// Unified Metadata Fetcher for External Links
 export const getVideoMetadata = async (url: string): Promise<{ thumbnail: string | null, aspectRatio: '16:9' | '9:16' | '4:3' | '1:1' }> => {
     let thumbnail = null;
     let aspectRatio: '16:9' | '9:16' | '4:3' | '1:1' = '16:9';
@@ -170,16 +178,14 @@ export const getVideoMetadata = async (url: string): Promise<{ thumbnail: string
             thumbnail = getDriveThumbnail(url);
             if (thumbnail) {
                 try {
-                    // Drive thumbnails usually preserve aspect ratio of the video
-                    // We must fetch this client-side to be sure
                     const dims = await probeImageDimensions(thumbnail);
                     aspectRatio = getAspectRatioFromDims(dims.width, dims.height);
                 } catch (e) {
-                    // Fallback to 16:9 if probe fails, but Drive usually allows w1000 access
                     console.warn("Drive thumbnail probe failed", e);
                 }
             }
         }
+        // Dropbox metadata probing is restricted without auth, so we default or rely on user override.
     } catch (e) {
         console.error("Metadata fetch failed", e);
     }
@@ -412,27 +418,13 @@ export const uploadFileToStorage = (file: File, path: string, onProgress?: (prog
     if (!storage) return reject(new Error("Storage not configured"));
     
     const storageRef = ref(storage, path);
-    
-    // Determine content type with strict overrides for video files to ensure streaming works
     let contentType = file.type || 'application/octet-stream';
     const lowerPath = path.toLowerCase();
     
-    // Force correct MIME types based on extension to avoid "application/octet-stream"
-    // which causes playback/download issues in some browsers
-    if (lowerPath.endsWith('.mp4')) contentType = 'video/mp4';
-    else if (lowerPath.endsWith('.webm')) contentType = 'video/webm';
-    else if (lowerPath.endsWith('.mov')) contentType = 'video/quicktime';
-    else if (lowerPath.endsWith('.m4v')) contentType = 'video/mp4';
-    else if (lowerPath.endsWith('.ogg')) contentType = 'video/ogg';
-    else if (lowerPath.endsWith('.avi')) contentType = 'video/x-msvideo';
-    else if (lowerPath.endsWith('.mkv')) contentType = 'video/x-matroska';
-    else if (lowerPath.endsWith('.jpg') || lowerPath.endsWith('.jpeg')) contentType = 'image/jpeg';
+    if (lowerPath.endsWith('.jpg') || lowerPath.endsWith('.jpeg')) contentType = 'image/jpeg';
     else if (lowerPath.endsWith('.png')) contentType = 'image/png';
     else if (lowerPath.endsWith('.webp')) contentType = 'image/webp';
 
-    // CRITICAL: Explicitly set content type and cache control for video streaming
-    // cacheControl: public, max-age=31536000 (1 year) allows the browser and CDN to cache the video,
-    // reducing partial content requests and improving seeking performance.
     const metadata = {
         contentType: contentType,
         cacheControl: 'public, max-age=31536000'

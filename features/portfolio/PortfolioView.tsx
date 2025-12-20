@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useScroll, useTransform, useInView, Variants } from 'framer-motion';
 import { Mail, Instagram, Play, Twitter, Linkedin, Youtube, X, Volume2, VolumeX, Globe, Maximize2, Star, Sparkles, MonitorPlay, MapPin, Loader2, AlertCircle } from 'lucide-react';
 import { PortfolioData, Project } from '../../types';
-import { getBrandColor, getDriveEmbedUrl, EDITING_TOOLS_LIST, AI_TOOLS_LIST, trackPortfolioView, trackPortfolioClick, getDriveId } from '../../lib/utils';
+import { getBrandColor, getDriveEmbedUrl, EDITING_TOOLS_LIST, AI_TOOLS_LIST, trackPortfolioView, trackPortfolioClick, getDriveId, getDropboxDirectLink } from '../../lib/utils';
 
 interface PortfolioViewProps {
   data: PortfolioData;
@@ -250,11 +250,16 @@ const ShowreelPlayer: React.FC<{ src: string; thumbnail: string }> = React.memo(
         if (src.includes('youtube.com') || src.includes('youtu.be')) return 'youtube';
         if (src.includes('vimeo.com')) return 'vimeo';
         if (src.includes('drive.google.com')) return 'drive';
+        if (src.includes('dropbox.com') || src.includes('dl.dropboxusercontent.com')) return 'dropbox';
         return 'direct';
     }, [src]);
 
+    const directSrc = type === 'dropbox' ? getDropboxDirectLink(src) || src : src;
+
     useEffect(() => {
-        if (type === 'direct' && videoRef.current) {
+        // Autoplay logic for direct video tags
+        if ((type === 'direct' || type === 'dropbox') && videoRef.current) {
+            videoRef.current.muted = true; // Ensure muted for autoplay
             if (isInView) {
                 const playPromise = videoRef.current.play();
                 if (playPromise !== undefined) playPromise.catch(() => {});
@@ -262,12 +267,13 @@ const ShowreelPlayer: React.FC<{ src: string; thumbnail: string }> = React.memo(
                 videoRef.current.pause();
             }
         }
-    }, [isInView, type, src]);
+    }, [isInView, type, directSrc]);
 
     const getEmbedSrc = () => {
         if (type === 'youtube') {
             const ytId = src.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/)?.[2];
-            return `https://www.youtube.com/embed/${ytId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${ytId}&playsinline=1&rel=0&showinfo=0&modestbranding=1`;
+            // Autoplay=1, mute=1 for autoplay policy
+            return `https://www.youtube.com/embed/${ytId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${ytId}&playsinline=1&rel=0&showinfo=0&modestbranding=1&enablejsapi=1`;
         }
         if (type === 'vimeo') {
              const vId = src.match(/vimeo\.com\/(?:channels\/(?:\w+\/)?|groups\/(?:[^\/]*)\/videos\/|album\/(?:\d+)\/video\/|video\/|)(\d+)(?:$|\/|\?)/)?.[1];
@@ -275,6 +281,7 @@ const ShowreelPlayer: React.FC<{ src: string; thumbnail: string }> = React.memo(
         }
         if (type === 'drive') {
              const dId = getDriveId(src);
+             // Drive preview doesn't reliably support autoplay params
              return `https://drive.google.com/file/d/${dId}/preview`;
         }
         return src;
@@ -288,32 +295,36 @@ const ShowreelPlayer: React.FC<{ src: string; thumbnail: string }> = React.memo(
             whileInView={{ opacity: 1, scale: 1 }} 
             viewport={{ once: true }}
         >
-            {/* Ambience Glow */}
-            <div className="absolute -inset-1 sm:-inset-4 bg-zinc-800/50 blur-2xl sm:blur-3xl rounded-[3rem] opacity-0 group-hover:opacity-100 transition-opacity duration-1000 z-0">
-                <img src={thumbnail} className="w-full h-full object-cover opacity-50" aria-hidden="true" />
+            {/* Ambient Glow - Sampled from Thumbnail */}
+            <div className="absolute -inset-1 sm:-inset-4 opacity-0 group-hover:opacity-100 transition-opacity duration-1000 z-0">
+                <img 
+                    src={thumbnail} 
+                    className="w-full h-full object-cover blur-3xl scale-105 opacity-60 rounded-[3rem]" 
+                    aria-hidden="true" 
+                />
             </div>
 
-            <div className="relative w-full h-full rounded-2xl sm:rounded-3xl overflow-hidden bg-black border border-zinc-800 shadow-2xl z-10"
-                onClick={() => {
-                    setIsMuted(!isMuted);
-                    if (videoRef.current) videoRef.current.muted = !isMuted;
-                }}
-            >
+            <div className="relative w-full h-full rounded-2xl sm:rounded-3xl overflow-hidden bg-black border border-zinc-800 shadow-2xl z-10">
+                {/* Loading/Buffering State */}
                 <div className={`absolute inset-0 z-20 pointer-events-none transition-opacity duration-700 ease-in-out ${isVideoReady ? 'opacity-0' : 'opacity-100'}`}>
                     <img src={thumbnail || "https://picsum.photos/800/450"} className="w-full h-full object-cover" alt="Loading" />
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                        <div className="w-12 h-12 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                    </div>
                 </div>
 
-                {type === 'direct' ? (
+                {/* Player */}
+                {type === 'direct' || type === 'dropbox' ? (
                     <video 
                         ref={videoRef}
-                        key={src}
-                        src={src}
+                        key={directSrc}
+                        src={directSrc}
                         className="w-full h-full object-cover"
                         loop
-                        muted={isMuted}
+                        muted={isMuted} // Controlled by state
                         playsInline
                         preload="auto"
-                        crossOrigin={undefined}
+                        crossOrigin="anonymous"
                         onCanPlay={() => setIsVideoReady(true)}
                         onWaiting={() => setIsVideoReady(false)} 
                         onPlaying={() => setIsVideoReady(true)}
@@ -322,19 +333,25 @@ const ShowreelPlayer: React.FC<{ src: string; thumbnail: string }> = React.memo(
                 ) : (
                     <iframe 
                         src={getEmbedSrc()}
-                        className="w-full h-full" 
+                        className="w-full h-full pointer-events-none" // Disable interaction to hide controls overlay
                         allow="autoplay; fullscreen; picture-in-picture"
                         title="Showreel"
-                        onLoad={() => setTimeout(() => setIsVideoReady(true), 1000)}
+                        onLoad={() => setTimeout(() => setIsVideoReady(true), 1500)} // Artificial delay for iframe load
                     />
                 )}
 
-                {type === 'direct' && isVideoReady && (
-                    <div className="absolute bottom-6 right-6 z-30 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                        <button className="w-10 h-10 rounded-full bg-black/60 backdrop-blur-md border border-white/10 flex items-center justify-center text-white hover:bg-white hover:text-black transition-all">
-                            {isMuted ? <VolumeX size={18}/> : <Volume2 size={18}/>}
-                        </button>
-                    </div>
+                {/* Mute Toggle - Only effective for native video or if we had API access. For iframe, visual indicator mostly. */}
+                {(type === 'direct' || type === 'dropbox') && isVideoReady && (
+                    <button 
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setIsMuted(!isMuted);
+                            if (videoRef.current) videoRef.current.muted = !isMuted;
+                        }}
+                        className="absolute bottom-6 right-6 z-30 w-10 h-10 rounded-full bg-black/60 backdrop-blur-md border border-white/10 flex items-center justify-center text-white hover:bg-white hover:text-black transition-all"
+                    >
+                        {isMuted ? <VolumeX size={18}/> : <Volume2 size={18}/>}
+                    </button>
                 )}
             </div>
         </motion.div>
@@ -345,8 +362,7 @@ const AmbientProjectCard: React.FC<{ project: Project; onClick: () => void }> = 
     const isVideo = project.type === 'video';
     const isPortrait = project.aspectRatio === '9:16';
     
-    // Grid spanning logic: Portrait takes 2 rows, landscape takes 1.
-    // We use standard row height in CSS grid to make this work like a masonry layout.
+    // Masonry-like grid sizing
     const spanClass = isPortrait ? 'row-span-2' : 'row-span-1';
     
     return (
@@ -390,8 +406,19 @@ const AmbientProjectCard: React.FC<{ project: Project; onClick: () => void }> = 
 
 const Lightbox: React.FC<{ project: Project; onClose: () => void }> = ({ project, onClose }) => {
     const driveEmbed = getDriveEmbedUrl(project.link);
-    const isPortrait = project.aspectRatio === '9:16';
+    const dropboxDirect = getDropboxDirectLink(project.link);
     
+    // Calculate aspect ratio for inline styles
+    const getAspectRatioStyle = () => {
+        switch(project.aspectRatio) {
+            case '9:16': return { aspectRatio: '9/16' };
+            case '4:3': return { aspectRatio: '4/3' };
+            case '1:1': return { aspectRatio: '1/1' };
+            case '16:9': 
+            default: return { aspectRatio: '16/9' };
+        }
+    };
+
     return (
         <motion.div 
             className="fixed inset-0 z-[2000] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-0 md:p-8" 
@@ -405,19 +432,34 @@ const Lightbox: React.FC<{ project: Project; onClose: () => void }> = ({ project
             </button>
 
             <motion.div 
-                className="w-full h-full md:max-w-6xl md:h-[85vh] bg-[#050505] md:border border-zinc-800 rounded-none md:rounded-3xl overflow-hidden flex flex-col md:flex-row shadow-2xl relative" 
+                className="w-full h-full md:max-w-7xl md:h-[85vh] bg-[#050505] md:border border-zinc-800 rounded-none md:rounded-3xl overflow-hidden flex flex-col md:flex-row shadow-2xl relative" 
                 initial={{ scale: 0.95, opacity: 0, y: 20 }} 
                 animate={{ scale: 1, opacity: 1, y: 0 }} 
                 exit={{ scale: 0.95, opacity: 0, y: 20 }} 
                 transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
                 onClick={e => e.stopPropagation()}
             >
-                {/* Video/Image Section */}
-                <div className={`flex-1 relative bg-black flex items-center justify-center overflow-hidden ${isPortrait ? 'md:border-r border-zinc-800' : 'md:border-r border-zinc-800'}`}>
-                    <div className={`relative w-full h-full flex items-center justify-center ${isPortrait ? 'md:p-8' : ''}`}>
+                {/* Video/Image Section - Dynamic Aspect Ratio Container */}
+                <div className="flex-1 relative bg-black flex items-center justify-center overflow-hidden border-b md:border-b-0 md:border-r border-zinc-800">
+                    <div className="w-full h-full flex items-center justify-center p-0 md:p-4">
                          {project.type === 'video' ? (
-                            <div className={`relative w-full ${isPortrait ? 'aspect-[9/16] h-full max-h-full' : 'aspect-video w-full'}`}>
-                                {driveEmbed ? (
+                            <div 
+                                className="relative w-full max-h-full mx-auto bg-black"
+                                style={{ 
+                                    ...getAspectRatioStyle(),
+                                    maxWidth: project.aspectRatio === '9:16' ? '50vh' : '100%', // Prevent super tall mobile portrait on desktop
+                                }}
+                            >
+                                {dropboxDirect ? (
+                                    <video 
+                                        src={dropboxDirect} 
+                                        controls 
+                                        autoPlay 
+                                        className="w-full h-full object-contain" 
+                                        playsInline 
+                                        crossOrigin="anonymous"
+                                    />
+                                ) : driveEmbed ? (
                                     <iframe src={driveEmbed} className="w-full h-full" allow="autoplay; fullscreen" />
                                 ) : project.link.includes('youtube') || project.link.includes('vimeo') ? (
                                     <iframe src={project.link} className="w-full h-full" allow="autoplay; fullscreen" />
@@ -428,212 +470,232 @@ const Lightbox: React.FC<{ project: Project; onClose: () => void }> = ({ project
                                         autoPlay 
                                         className="w-full h-full object-contain" 
                                         playsInline 
-                                        crossOrigin={undefined}
+                                        crossOrigin="anonymous"
                                     />
                                 )}
                             </div>
-                        ) : (
-                            <img src={project.link || project.thumbnail} className="w-full h-full object-contain" alt={project.title} loading="lazy" />
-                        )}
+                         ) : (
+                            <img src={project.link || project.thumbnail} className="w-full h-full object-contain" alt={project.title} />
+                         )}
                     </div>
                 </div>
 
-                {/* Metadata Sidebar */}
-                <div className="w-full md:w-80 lg:w-96 shrink-0 bg-zinc-900/50 backdrop-blur-xl border-t md:border-t-0 md:border-l border-zinc-800 flex flex-col h-auto md:h-full overflow-y-auto custom-scrollbar">
-                     <div className="p-8 space-y-8">
-                         <div>
-                             <h2 className="text-2xl font-display font-bold text-white tracking-tight leading-tight mb-4">{project.title}</h2>
-                             <p className="text-zinc-400 text-sm leading-relaxed font-light">{project.description || "No description provided."}</p>
-                         </div>
+                {/* Details Section */}
+                <div className="w-full md:w-[400px] bg-zinc-900/50 backdrop-blur-xl border-l border-zinc-800 p-8 flex flex-col gap-6 overflow-y-auto">
+                    <div>
+                         {project.contentType && <span className="text-[10px] font-bold uppercase tracking-widest text-indigo-400 mb-2 block">{project.contentType}</span>}
+                         <h2 className="text-3xl font-display font-bold text-white leading-tight mb-4">{project.title}</h2>
+                         <p className="text-zinc-400 text-sm leading-relaxed">{project.description}</p>
+                    </div>
+
+                    <div className="h-px bg-zinc-800 w-full" />
+
+                    <div className="space-y-4">
+                        {project.softwareUsed && project.softwareUsed.length > 0 && (
+                            <div>
+                                <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Software</h4>
+                                <div className="flex flex-wrap gap-2">
+                                    {project.softwareUsed.map(tool => (
+                                        <div key={tool} className="px-2 py-1 bg-black rounded border border-zinc-800 text-[10px] text-zinc-300 font-medium">
+                                            {tool}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                          
-                         <div className="space-y-6">
-                             {project.contentType && (
-                                 <div>
-                                     <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Content Type</h4>
-                                     <span className="inline-block px-3 py-1 bg-white/5 border border-white/10 rounded-md text-xs font-medium text-white">
-                                         {project.contentType}
-                                     </span>
-                                 </div>
-                             )}
-
-                             {project.subjectMatter && (
-                                 <div>
-                                     <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Subject Matter</h4>
-                                     <span className="inline-block px-3 py-1 bg-white/5 border border-white/10 rounded-md text-xs font-medium text-white">
-                                         {project.subjectMatter}
-                                     </span>
-                                 </div>
-                             )}
-
-                             {project.softwareUsed && project.softwareUsed.length > 0 && (
-                                 <div>
-                                     <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Tools Used</h4>
-                                     <div className="flex flex-wrap gap-2">
-                                         {project.softwareUsed.map(tool => (
-                                             <div key={tool} className="flex items-center gap-2 px-3 py-1.5 bg-white/5 border border-white/10 rounded-md text-xs font-medium text-zinc-300">
-                                                 <ToolIcon name={tool} className="w-3 h-3 opacity-70" />
-                                                 {tool}
-                                             </div>
-                                         ))}
-                                     </div>
-                                 </div>
-                             )}
-                         </div>
-                     </div>
+                        <div className="pt-4">
+                            <a 
+                                href={project.link} 
+                                target="_blank" 
+                                rel="noreferrer" 
+                                className="flex items-center justify-center gap-2 w-full py-3 bg-white text-black rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-zinc-200 transition-colors"
+                            >
+                                Open Original <MonitorPlay size={14} />
+                            </a>
+                        </div>
+                    </div>
                 </div>
             </motion.div>
         </motion.div>
-    )
-}
+    );
+};
 
-export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview }) => {
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
-  const [showIntro, setShowIntro] = useState(!isPreview); 
-  const containerRef = useRef<HTMLDivElement>(null);
-  const { scrollY } = useScroll();
-  const headerOpacity = useTransform(scrollY, [100, 200], [0, 1]);
-  const headerY = useTransform(scrollY, [100, 200], [-20, 0]);
-  
-  useEffect(() => { 
-      if (isPreview) setShowIntro(false); 
-      if (!isPreview && data.uid) trackPortfolioView(data.uid);
-  }, [isPreview, data.uid]);
+export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = false }) => {
+    const [showIntro, setShowIntro] = useState(!isPreview);
+    const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+    
+    // Smooth scroll progress for parallax effects
+    const { scrollYProgress } = useScroll({ target: containerRef, offset: ["start start", "end end"] });
+    const y = useTransform(scrollYProgress, [0, 1], [0, -50]);
 
-  const allTools = [...(data.tools || [])];
-  if (data.primaryTool && !allTools.includes(data.primaryTool)) allTools.unshift(data.primaryTool);
-  const secondaryTools = allTools.filter(t => t !== data.primaryTool);
-  const hasAnyTools = data.primaryTool || secondaryTools.length > 0 || (data.aiTools && data.aiTools.length > 0);
+    useEffect(() => {
+        if (!isPreview && data.uid) {
+            trackPortfolioView(data.uid);
+        }
+    }, [data.uid, isPreview]);
 
-  return (
-    <div className="h-screen w-full bg-[#020202] text-zinc-100 font-sans selection:bg-white/20 overflow-y-auto overflow-x-hidden relative custom-scrollbar">
-      <AnimatePresence>
-        {showIntro && <IntroOverlay name={data.name} onComplete={() => setShowIntro(false)} />}
-      </AnimatePresence>
+    // Disable body scroll when lightbox is open
+    useEffect(() => {
+        if (selectedProject) document.body.style.overflow = 'hidden';
+        else document.body.style.overflow = 'unset';
+        return () => { document.body.style.overflow = 'unset'; }
+    }, [selectedProject]);
 
-      <motion.div 
-        className="fixed top-0 left-0 right-0 h-20 bg-[#020202]/80 backdrop-blur-xl border-b border-white/5 z-[100] flex items-center px-6 md:px-12 justify-between pointer-events-none" 
-        style={{ opacity: headerOpacity, y: headerY }}
-      >
-        <div className="flex items-center gap-3 pointer-events-auto">
-            <div className="w-8 h-8 rounded-full overflow-hidden border border-zinc-800">
-                <img src={data.profileImage} className="w-full h-full object-cover" alt="Profile" />
-            </div>
-            <span className="font-display font-bold text-white text-sm tracking-wide uppercase">{data.name}</span>
-        </div>
-        <a 
-            href={`mailto:${data.contactEmail}`} 
-            className="hidden md:flex items-center gap-2 px-5 py-2 bg-white text-black hover:bg-zinc-200 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all pointer-events-auto"
-        >
-            <Mail size={12} /> Contact
-        </a>
-      </motion.div>
+    const handleIntroComplete = () => {
+        setShowIntro(false);
+    };
 
-      <div className="relative z-10 container mx-auto px-4 md:px-8 pb-32 max-w-7xl">
-          <div className="min-h-[85vh] flex flex-col justify-center py-20">
-              <HeroContent data={data} isMobile={false} />
-          </div>
+    if (!data) return <div className="h-screen bg-black flex items-center justify-center text-white"><Loader2 className="animate-spin" /></div>;
 
-          {(data.showreelLink || data.showreelThumbnail) && (
-             <div className="mb-40">
-                 <motion.div 
-                    initial={{ opacity: 0, y: 20 }} 
-                    whileInView={{ opacity: 1, y: 0 }} 
-                    viewport={{ once: true }}
-                    className="mb-12 flex items-center gap-4 max-w-md"
-                >
-                    <span className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></span>
-                    <h2 className="text-sm font-display font-bold text-zinc-500 tracking-[0.2em] uppercase">Featured Showreel</h2>
-                 </motion.div>
-                 <ShowreelPlayer src={data.showreelLink} thumbnail={data.showreelThumbnail} />
-             </div>
-          )}
-          
-          {hasAnyTools && (
-               <div className="mb-40">
-                   <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                        {data.primaryTool && <PrimaryToolCard toolName={data.primaryTool} />}
-                        {secondaryTools.map(tool => (
-                            <motion.div 
-                                key={tool}
-                                initial={{ opacity: 0, scale: 0.95 }} 
-                                whileInView={{ opacity: 1, scale: 1 }} 
-                                viewport={{ once: true }}
-                                className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 flex flex-col items-center justify-center gap-3 hover:bg-zinc-800 transition-colors group aspect-square"
-                            >
-                                <ToolIcon name={tool} className="w-8 h-8 opacity-40 group-hover:opacity-100 transition-opacity grayscale group-hover:grayscale-0" />
-                                <span className="text-xs font-medium text-zinc-500 group-hover:text-zinc-300">{tool}</span>
-                            </motion.div>
-                        ))}
-                        {(data.aiTools || []).map(tool => (
+    return (
+        <div ref={containerRef} className="bg-[#050505] min-h-screen text-white font-sans selection:bg-indigo-500/30 selection:text-indigo-200 overflow-x-hidden">
+             <AnimatePresence>
+                {showIntro && <IntroOverlay name={data.name} onComplete={handleIntroComplete} />}
+             </AnimatePresence>
+
+             <AnimatePresence>
+                {selectedProject && <Lightbox project={selectedProject} onClose={() => setSelectedProject(null)} />}
+             </AnimatePresence>
+
+             {/* Header / Nav */}
+             <motion.header 
+                className="fixed top-0 left-0 right-0 z-40 px-6 py-6 flex justify-between items-center mix-blend-difference pointer-events-none"
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 2.5, duration: 0.8 }}
+             >
+                 <div className="text-white font-bold text-xl tracking-tighter pointer-events-auto cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth'})}>
+                     {data.name?.split(' ')[0].toUpperCase() || 'PORTFOLIO'}
+                 </div>
+                 {data.availability.status && (
+                     <a href={`mailto:${data.contactEmail}`} className="pointer-events-auto bg-white/10 backdrop-blur-md border border-white/20 text-white px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest hover:bg-white hover:text-black transition-all">
+                         Available for Work
+                     </a>
+                 )}
+             </motion.header>
+
+             <div className="max-w-[1600px] mx-auto px-4 md:px-8 relative z-0">
+                 {/* Hero Section */}
+                 <section className="min-h-screen flex items-center justify-center pt-20">
+                     <HeroContent data={data} isMobile={window.innerWidth < 768} />
+                 </section>
+
+                 {/* Showreel Section */}
+                 {data.showreelLink && (
+                     <section className="py-20 md:py-32">
+                         <div className="max-w-6xl mx-auto space-y-8">
                              <motion.div 
-                                key={tool}
-                                initial={{ opacity: 0, scale: 0.95 }} 
-                                whileInView={{ opacity: 1, scale: 1 }} 
-                                viewport={{ once: true }}
-                                className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-4 flex flex-col items-center justify-center gap-3 hover:bg-zinc-800 transition-colors group aspect-square"
+                                initial={{ opacity: 0, y: 20 }} 
+                                whileInView={{ opacity: 1, y: 0 }} 
+                                viewport={{ once: true }} 
+                                className="flex items-center gap-4 mb-8"
                             >
-                                <div className="absolute top-3 right-3"><Sparkles size={10} className="text-indigo-500/50" /></div>
-                                <ToolIcon name={tool} className="w-8 h-8 opacity-50 group-hover:opacity-100 transition-opacity" />
-                                <span className="text-xs font-medium text-zinc-500 group-hover:text-zinc-300">{tool}</span>
-                            </motion.div>
-                        ))}
-                   </div>
-               </div>
-          )}
+                                 <div className="h-px bg-zinc-800 flex-1" />
+                                 <span className="text-zinc-500 font-display font-bold text-2xl uppercase tracking-widest">Showreel</span>
+                                 <div className="h-px bg-zinc-800 flex-1" />
+                             </motion.div>
+                             <ShowreelPlayer src={data.showreelLink} thumbnail={data.showreelThumbnail} />
+                         </div>
+                     </section>
+                 )}
 
-          {data.projects && data.projects.length > 0 && (
-              <div className="space-y-16">
-                   <motion.div 
-                        initial={{ opacity: 0 }} 
-                        whileInView={{ opacity: 1 }} 
-                        viewport={{ once: true }}
-                        className="flex justify-between items-end border-b border-zinc-800 pb-6"
-                    >
-                        <h2 className="text-4xl md:text-5xl font-display font-black text-white uppercase tracking-tighter">Selected Works</h2>
-                        <span className="text-zinc-500 font-display font-bold text-xs tracking-widest hidden md:block">
-                            {String(data.projects.length).padStart(2, '0')} PROJECTS
-                        </span>
-                   </motion.div>
+                 {/* Projects Grid */}
+                 {data.projects && data.projects.length > 0 && (
+                     <section className="py-20 md:py-32">
+                         <motion.h3 
+                            className="text-[10vw] md:text-[6vw] font-display font-black text-white/5 uppercase leading-none text-center mb-16 select-none"
+                            initial={{ opacity: 0 }}
+                            whileInView={{ opacity: 1 }}
+                            viewport={{ once: true }}
+                         >
+                            Selected Works
+                         </motion.h3>
+                         
+                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 auto-rows-[300px] md:auto-rows-[400px]">
+                             {data.projects.map((project) => (
+                                 <AmbientProjectCard 
+                                    key={project.id} 
+                                    project={project} 
+                                    onClick={() => setSelectedProject(project)} 
+                                 />
+                             ))}
+                         </div>
+                     </section>
+                 )}
+                 
+                 {/* Tools & Skills */}
+                 {(data.tools?.length > 0 || data.primaryTool) && (
+                     <section className="py-20 border-t border-zinc-900">
+                         <div className="max-w-4xl mx-auto text-center space-y-12">
+                             <div className="space-y-4">
+                                 <h3 className="text-3xl font-display font-bold uppercase tracking-tight">Technical Arsenal</h3>
+                                 <p className="text-zinc-500">The tools I use to bring ideas to life.</p>
+                             </div>
+                             
+                             <div className="grid grid-cols-2 md:grid-cols-4 gap-6 justify-center">
+                                 {data.primaryTool && <PrimaryToolCard toolName={data.primaryTool} />}
+                                 {data.tools.filter(t => t !== data.primaryTool).map(tool => (
+                                     <motion.div 
+                                        key={tool}
+                                        initial={{ opacity: 0, scale: 0.9 }}
+                                        whileInView={{ opacity: 1, scale: 1 }}
+                                        viewport={{ once: true }}
+                                        className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 flex flex-col items-center gap-4 hover:bg-zinc-800 transition-colors"
+                                     >
+                                         <ToolIcon name={tool} className="w-8 h-8" />
+                                         <span className="text-sm font-bold text-zinc-300">{tool}</span>
+                                     </motion.div>
+                                 ))}
+                                 {data.aiTools?.map(tool => (
+                                      <motion.div 
+                                        key={tool}
+                                        initial={{ opacity: 0, scale: 0.9 }}
+                                        whileInView={{ opacity: 1, scale: 1 }}
+                                        viewport={{ once: true }}
+                                        className="bg-zinc-900/50 border border-indigo-500/20 rounded-2xl p-6 flex flex-col items-center gap-4 hover:bg-zinc-900 transition-colors relative group"
+                                     >
+                                         <div className="absolute top-2 right-2 text-indigo-500 opacity-50"><Sparkles size={12} /></div>
+                                         <ToolIcon name={tool} className="w-8 h-8" />
+                                         <span className="text-sm font-bold text-zinc-300">{tool}</span>
+                                     </motion.div>
+                                 ))}
+                             </div>
+                         </div>
+                     </section>
+                 )}
 
-                   {/* Collage Grid Layout */}
-                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-[320px] grid-flow-dense">
-                       {data.projects.map(project => (
-                           <AmbientProjectCard 
-                                key={project.id} 
-                                project={project} 
-                                onClick={() => setSelectedProject(project)} 
-                           />
-                       ))}
-                   </div>
-              </div>
-          )}
-          
-          <footer className="mt-40 pt-20 border-t border-zinc-900 text-center space-y-12">
-               <h2 className="text-3xl font-display font-bold text-white uppercase tracking-tight">Thanks for watching</h2>
-               <div className="flex justify-center gap-8">
-                    {Object.entries(data.socials).map(([key, val]) => {
-                        if (!val) return null;
-                         const Icon = { instagram: Instagram, twitter: Twitter, youtube: Youtube, linkedin: Linkedin, email: Mail }[key] || Globe;
-                        return (
-                            <a 
-                                key={key} 
-                                href={key === 'email' ? `mailto:${val}` : getSocialUrl(key, val as string)} 
-                                className="text-zinc-500 hover:text-white transition-colors hover:scale-110 transform"
-                            >
-                                <Icon size={24} />
-                            </a>
-                        )
-                    })}
-               </div>
-               <div className="pb-12 text-zinc-600 text-[10px] font-bold uppercase tracking-widest">
-                   © {new Date().getFullYear()} {data.name}. All rights reserved.
-               </div>
-          </footer>
-      </div>
-
-      <AnimatePresence>
-          {selectedProject && <Lightbox project={selectedProject} onClose={() => setSelectedProject(null)} />}
-      </AnimatePresence>
-    </div>
-  );
+                 {/* Footer */}
+                 <footer className="py-20 border-t border-zinc-900 mt-20">
+                     <div className="flex flex-col items-center gap-8 text-center">
+                         <h2 className="text-4xl md:text-6xl font-display font-black uppercase tracking-tighter">Let's Create</h2>
+                         <a href={`mailto:${data.contactEmail}`} className="text-xl md:text-2xl text-zinc-400 hover:text-white transition-colors border-b border-zinc-700 hover:border-white pb-1">
+                             {data.contactEmail}
+                         </a>
+                         <div className="flex gap-6 mt-8">
+                            {Object.entries(data.socials).map(([key, val]) => {
+                                if (!val) return null;
+                                const Icon = { instagram: Instagram, twitter: Twitter, youtube: Youtube, linkedin: Linkedin, email: Mail }[key] || Globe;
+                                return (
+                                    <a 
+                                        key={key} 
+                                        href={key === 'email' ? `mailto:${val}` : getSocialUrl(key, val as string)} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer" 
+                                        className="text-zinc-500 hover:text-white transition-colors"
+                                    >
+                                        <Icon size={24} />
+                                    </a>
+                                )
+                            })}
+                         </div>
+                         <p className="text-zinc-700 text-xs mt-12 uppercase tracking-widest">
+                             © {new Date().getFullYear()} {data.name}. Built with Frames.
+                         </p>
+                     </div>
+                 </footer>
+             </div>
+        </div>
+    );
 };
