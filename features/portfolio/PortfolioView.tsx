@@ -78,7 +78,8 @@ const VideoPlayer: React.FC<{
     onToggleMute?: () => void;
     ambience?: boolean;
     isShowreel?: boolean;
-}> = ({ src, thumbnail, autoplay = false, muted = true, controls = false, aspectRatio = '16:9', className = '', onToggleMute, ambience = false, isShowreel = false }) => {
+    objectFit?: 'cover' | 'contain';
+}> = ({ src, thumbnail, autoplay = false, muted = true, controls = false, aspectRatio = '16:9', className = '', onToggleMute, ambience = false, isShowreel = false, objectFit = 'cover' }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const ambienceRef = useRef<HTMLVideoElement>(null);
     const [isLoaded, setIsLoaded] = useState(false);
@@ -245,7 +246,7 @@ const VideoPlayer: React.FC<{
                         key={normalizedSrc}
                         ref={videoRef}
                         src={normalizedSrc}
-                        className="relative w-full h-full object-cover z-10 rounded-2xl bg-black" 
+                        className={`relative w-full h-full object-${objectFit} z-10 rounded-2xl bg-black`} 
                         loop 
                         autoPlay={autoplay}
                         muted={muted}
@@ -517,12 +518,13 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                                      <VideoPlayer 
                                         src={selectedProject.link} 
                                         thumbnail={selectedProject.thumbnail} 
-                                        autoplay={true} // FIX: Enable autoplay in modal
+                                        autoplay={true} 
                                         muted={false} 
                                         controls={true}
                                         aspectRatio={selectedProject.aspectRatio}
-                                        // FIX: Use w-full h-full constrained by max height to allow 16:9 to stretch and 9:16 to contain
-                                        className="w-full h-full max-h-[85vh] object-contain mx-auto"
+                                        // FIX: Use contain for modal playback to prevent cropping on vertical videos
+                                        objectFit="contain"
+                                        className="w-full h-full max-h-[85vh] mx-auto"
                                     />
                                 </div>
                             </div>
