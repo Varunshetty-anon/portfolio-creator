@@ -1,6 +1,6 @@
 import { PortfolioData, PortfolioContent, UserProfile, PortfolioMeta, INITIAL_DATA, Project } from '../types';
 import { db, storage, auth, googleProvider, isConfigured } from './firebase';
-import { doc, getDoc, setDoc, collection, query, where, getDocs, deleteDoc, addDoc, serverTimestamp, increment, writeBatch, getDocsFromServer, getDocFromServer } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, where, getDocs, deleteDoc, addDoc, serverTimestamp, increment, writeBatch, getDocsFromServer, getDocFromServer, DocumentSnapshot } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL, listAll, deleteObject } from 'firebase/storage';
 import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, User, deleteUser, setPersistence, browserLocalPersistence } from 'firebase/auth';
 import { GoogleGenAI } from "@google/genai";
@@ -385,7 +385,7 @@ export const ensureUserProfile = async (user: User): Promise<UserProfile> => {
     const userRef = doc(db, USERS_COL, user.uid);
     let profile: UserProfile | null = null;
     try {
-        const snap = await withTimeout(getDoc(userRef), 5000, "Read profile timeout");
+        const snap = await withTimeout(getDoc(userRef), 5000, "Read profile timeout") as DocumentSnapshot;
         if (snap.exists()) profile = snap.data() as UserProfile;
     } catch (e) {}
     if (profile) return profile;

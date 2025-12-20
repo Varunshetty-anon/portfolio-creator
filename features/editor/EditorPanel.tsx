@@ -83,10 +83,16 @@ const getLinkIndicator = (url: string) => {
     return { icon: Link, color: 'text-emerald-500', label: 'Web', border: '!border-emerald-500/50' };
 };
 
-const ProjectCardEditor = ({ 
+interface ProjectCardEditorProps {
+    project: Project;
+    onChange: (p: Partial<Project>) => void;
+    onDelete: () => void;
+    onUploadImage: (file: File) => void;
+    uploadStatus: any;
+}
+
+const ProjectCardEditor: React.FC<ProjectCardEditorProps> = ({ 
     project, onChange, onDelete, onUploadImage, uploadStatus
-}: { 
-    project: Project, onChange: (p: Partial<Project>) => void, onDelete: () => void, onUploadImage: (file: File) => void, uploadStatus: any 
 }) => {
     const [isExpanded, setIsExpanded] = useState(true);
     const linkStatus = getLinkIndicator(project.link);
