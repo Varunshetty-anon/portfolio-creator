@@ -16,6 +16,7 @@ import {
     loginWithEmail, 
     signupWithEmail, 
     loginWithGoogle, 
+    loginWithGoogleRedirect,
     checkUsernameAvailable, 
     deletePortfolioFromDB, 
     deleteUserAuth 
@@ -23,7 +24,7 @@ import {
 import { Loader2, Eye, EyeOff, PenTool } from 'lucide-react';
 import { Button } from './components/ui/Button';
 import { Input } from './components/ui/Input';
-import { onAuthStateChanged, User } from 'firebase/auth';
+import { onAuthStateChanged, User, getRedirectResult } from 'firebase/auth';
 
 const App: React.FC = () => {
   const [route, setRoute] = useState<'home' | 'editor' | 'onboarding' | 'public'>('home');
@@ -74,6 +75,18 @@ const App: React.FC = () => {
         }
 
         if (isConfigured && auth) {
+            // Check for redirect result first
+            try {
+                const redirectResult = await getRedirectResult(auth);
+                if (redirectResult && redirectResult.user) {
+                    console.log("Recovered from redirect login");
+                    // User state will be handled by onAuthStateChanged
+                }
+            } catch (e: any) {
+                console.error("Redirect login error:", e);
+                setAuthError(e.message);
+            }
+
             const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
                 if (user) {
                     try {
@@ -140,14 +153,31 @@ const App: React.FC = () => {
           await loginWithGoogle();
       } catch (e: any) { 
           let msg = e.message;
-          if (msg.includes('popup-closed-by-user')) msg = "Login window closed. Please try again.";
-          else if (msg.includes('network-request-failed')) msg = "Network error. Check your connection.";
-          else if (msg.includes('popup-blocked')) msg = "Popup blocked. Please allow popups for this site.";
-          
-          setAuthError(msg); 
+          if (msg.includes('popup-closed-by-user') || msg.includes('popup-blocked')) {
+             msg = "Popup blocked. Try the Redirect method.";
+             // Automatically try redirect if popup fails? No, let user decide or show error.
+             setAuthError("Popups blocked. Click 'Use Redirect Login' below.");
+          } else if (msg.includes('network-request-failed')) {
+             msg = "Network error. Check your connection.";
+             setAuthError(msg); 
+          } else {
+             setAuthError(msg); 
+          }
           setIsAuthProcessing(false);
       }
   };
+
+  const handleGoogleRedirect = async () => {
+      if (isAuthProcessing) return;
+      setAuthError('');
+      setIsAuthProcessing(true);
+      try {
+          await loginWithGoogleRedirect();
+      } catch (e: any) {
+          setAuthError(e.message);
+          setIsAuthProcessing(false);
+      }
+  }
 
   const handleSaveDraft = async () => {
     if (!dataRef.current || !dataRef.current.uid) return;
@@ -266,7 +296,18 @@ const App: React.FC = () => {
                 <Input label="Password" type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required />
                 <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 bottom-2.5 text-zinc-500 hover:text-white transition-colors">{showPassword ? <EyeOff size={16}/> : <Eye size={16}/>}</button>
               </div>
-              {authError && <p className="text-red-500 text-[10px] uppercase font-bold text-center bg-red-500/10 p-2 rounded-lg border border-red-500/20">{authError}</p>}
+              
+              {authError && (
+                  <div className="text-center bg-red-500/10 p-3 rounded-lg border border-red-500/20">
+                      <p className="text-red-500 text-[10px] uppercase font-bold mb-2">{authError}</p>
+                      {authError.includes('Popups blocked') && (
+                          <Button type="button" size="sm" onClick={handleGoogleRedirect} className="w-full bg-red-900/40 text-red-200 border border-red-800 hover:bg-red-800">
+                             Use Redirect Login
+                          </Button>
+                      )}
+                  </div>
+              )}
+              
               <Button className="w-full py-4 uppercase tracking-widest font-black" disabled={isAuthProcessing}>{isAuthProcessing ? <Loader2 className="animate-spin" /> : 'Enter Studio'}</Button>
               <div className="flex items-center gap-4 py-4"><div className="h-px flex-1 bg-zinc-800"/><span className="text-[10px] text-zinc-600 font-bold">OR</span><div className="h-px flex-1 bg-zinc-800"/></div>
               <Button type="button" variant="secondary" className="w-full py-3" onClick={handleGoogleAuth}>Google Account</Button>

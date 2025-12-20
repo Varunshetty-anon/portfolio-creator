@@ -1,8 +1,9 @@
+
 import { PortfolioData, PortfolioContent, UserProfile, PortfolioMeta, INITIAL_DATA, Project } from '../types';
 import { db, storage, auth, googleProvider, isConfigured } from './firebase';
 import { doc, getDoc, setDoc, collection, query, where, getDocs, deleteDoc, addDoc, serverTimestamp, increment, writeBatch, getDocsFromServer, getDocFromServer, DocumentSnapshot } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL, listAll, deleteObject } from 'firebase/storage';
-import { signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, User, deleteUser, setPersistence, browserLocalPersistence, inMemoryPersistence } from 'firebase/auth';
+import { signInWithPopup, signInWithRedirect, signInWithEmailAndPassword, createUserWithEmailAndPassword, User, deleteUser, setPersistence, browserLocalPersistence, inMemoryPersistence } from 'firebase/auth';
 import { GoogleGenAI } from "@google/genai";
 
 const USERS_COL = 'users';
@@ -603,19 +604,23 @@ export const signupWithEmail = (e: string, p: string) => createUserWithEmailAndP
 export const loginWithGoogle = async () => {
     if (!auth || !googleProvider) throw new Error("Firebase Auth not initialized correctly");
     
-    // Attempt persistence, but do not block login if it fails (common in restricted iframes)
     try {
         await setPersistence(auth, browserLocalPersistence);
     } catch (e) {
         console.warn("Persistence setting failed, continuing with session:", e);
     }
 
-    // Use popup. In some environments (like StackBlitz), this may be blocked or fail to communicate back.
-    // If it fails with "auth/popup-blocked", we could fallback, but popup is standard.
-    // Ensure googleProvider has prompt: 'select_account' to force fresh token.
     googleProvider.setCustomParameters({ prompt: 'select_account' });
-    
     return await signInWithPopup(auth, googleProvider);
+};
+
+export const loginWithGoogleRedirect = async () => {
+    if (!auth || !googleProvider) throw new Error("Firebase Auth not initialized correctly");
+    try {
+        await setPersistence(auth, browserLocalPersistence);
+    } catch (e) {}
+    googleProvider.setCustomParameters({ prompt: 'select_account' });
+    return await signInWithRedirect(auth, googleProvider);
 };
 
 export const deletePortfolioFromDB = async (uid: string) => {
