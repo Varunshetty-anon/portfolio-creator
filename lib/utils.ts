@@ -167,7 +167,6 @@ export const getVideoMetadata = async (url: string): Promise<{ thumbnail: string
         if (url.includes('youtube.com') || url.includes('youtu.be')) {
             thumbnail = getYouTubeThumbnail(url);
             try {
-                // Attempt to fetch oembed metadata for accurate aspect ratio
                 const res = await fetch(`https://www.youtube.com/oembed?url=${url}&format=json`);
                 if (res.ok) {
                     const data = await res.json();
@@ -176,7 +175,6 @@ export const getVideoMetadata = async (url: string): Promise<{ thumbnail: string
                     }
                 }
             } catch (e) {
-                // Fallback: 16:9 is standard for YouTube
                 aspectRatio = '16:9';
             }
         } 
@@ -198,7 +196,6 @@ export const getVideoMetadata = async (url: string): Promise<{ thumbnail: string
             thumbnail = getDriveThumbnail(url);
             if (thumbnail) {
                 try {
-                    // For Drive, the thumbnail usually preserves the aspect ratio of the source video
                     const dims = await probeImageDimensions(thumbnail);
                     aspectRatio = getAspectRatioFromDims(dims.width, dims.height);
                 } catch (e) {
@@ -207,8 +204,6 @@ export const getVideoMetadata = async (url: string): Promise<{ thumbnail: string
             }
         }
         else if (url.includes('dropbox.com')) {
-             // Dropbox metadata is harder to get without auth.
-             // We default to 16:9 but user can override.
              aspectRatio = '16:9';
         }
     } catch (e) {
@@ -332,7 +327,6 @@ export const loadEditorState = async (uid: string): Promise<PortfolioData | null
     content = { ...content, ...(draftSnap.data() as PortfolioContent) };
   }
   
-  // Ensure albums exist even if old data format
   if (!content.albums) content.albums = [];
 
   return {
@@ -379,7 +373,6 @@ export const loadPublicPortfolio = async (slug: string): Promise<PortfolioData |
   if (!versionSnap.exists()) return null;
   const content = versionSnap.data() as PortfolioContent;
   
-  // MERGE with INITIAL_DATA to ensure all properties (like socials, skills) are present even if empty in DB
   const result: PortfolioData = { ...INITIAL_DATA, ...content, uid, meta, stats: { views: 0, clicks: 0 } };
   
   portfolioCache.set(cleanSlug, { data: result, timestamp: Date.now() });
@@ -486,13 +479,17 @@ export const generateThumbnailFromVideo = (file: File): Promise<{ url: string; b
     video.preload = "metadata";
     video.playsInline = true;
     video.muted = true;
-    video.src = URL.createObjectURL(file);
     
-    // Increased timeout for larger files
-    const timeout = setTimeout(() => reject(new Error("Video load timeout")), 15000);
+    // Create a local URL for the file
+    const fileUrl = URL.createObjectURL(file);
+    video.src = fileUrl;
+    
+    const timeout = setTimeout(() => {
+        URL.revokeObjectURL(fileUrl);
+        reject(new Error("Video load timeout"));
+    }, 15000);
 
     video.onloadedmetadata = () => {
-        // Seek to 10% or 1s, whichever is shorter, to avoid black frame
         let seekTime = Math.min(1, video.duration * 0.1);
         if (!isFinite(seekTime)) seekTime = 0;
         video.currentTime = seekTime;
@@ -509,18 +506,25 @@ export const generateThumbnailFromVideo = (file: File): Promise<{ url: string; b
       canvas.height = height;
       
       const ctx = canvas.getContext("2d");
-      if (!ctx) return reject(new Error("Canvas failure"));
+      if (!ctx) {
+          URL.revokeObjectURL(fileUrl);
+          return reject(new Error("Canvas failure"));
+      }
       
       ctx.drawImage(video, 0, 0, width, height);
       canvas.toBlob((blob) => {
+        URL.revokeObjectURL(fileUrl);
         if (blob) resolve({ url: URL.createObjectURL(blob), blob, aspectRatio });
         else reject(new Error("Blob failure"));
-        URL.revokeObjectURL(video.src);
       }, 'image/jpeg', 0.85);
     };
 
     video.addEventListener('seeked', onSeeked, { once: true });
-    video.onerror = () => { clearTimeout(timeout); reject(new Error("Video load error")); };
+    video.onerror = () => { 
+        clearTimeout(timeout); 
+        URL.revokeObjectURL(fileUrl);
+        reject(new Error("Video load error")); 
+    };
   });
 };
 
@@ -575,9 +579,11 @@ export const generateAiThumbnail = async (title: string, category: string): Prom
       contents: { parts: [{ text: `Cinematic professional video project thumbnail for "${title}" in category "${category}". High contrast, dramatic lighting, 4k.` }] }
     });
     for (const cand of response.candidates || []) {
+      for (const cand of response.candidates || []) {
       for (const part of cand.content.parts) {
         if (part.inlineData) return `data:image/png;base64,${part.inlineData.data}`;
       }
+    }
     }
     return '';
   } catch (e) { return ''; }
@@ -597,7 +603,6 @@ export const getBrandColor = (name: string): string => {
 
 export const downloadQrCode = async (url: string, filename: string) => {
   try {
-    // Attempt to fetch via proxy or direct
     const res = await fetch(url, { mode: 'cors' });
     if (!res.ok) throw new Error("Network error");
     const blob = await res.blob();
@@ -608,7 +613,6 @@ export const downloadQrCode = async (url: string, filename: string) => {
     link.click();
     document.body.removeChild(link);
   } catch (e) {
-    // Fallback: Open in new tab if programmatic download fails due to CORS
     window.open(url, '_blank');
   }
 };

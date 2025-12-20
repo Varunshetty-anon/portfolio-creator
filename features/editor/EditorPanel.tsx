@@ -6,8 +6,8 @@ import { Input, TextArea } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { ToolSelector } from '../../components/ToolSelector';
 import { ImageCropper } from '../../components/ImageCropper';
-import { Plus, Trash2, Video, Upload, ChevronDown, Loader2, CheckCircle2, AlertTriangle, Eye, Settings, LogOut, Wrench, LayoutDashboard, User, X, Link, Youtube, HardDrive, Database, Globe, ExternalLink, QrCode, Download, Copy, Link2, Check, Play, GripVertical, FolderPlus, Folder } from 'lucide-react';
-import { uploadFileToStorage, getVideoMetadata, getPortfolioStats, PROJECT_CONTENT_TYPES, EDITING_TOOLS_LIST, downloadQrCode } from '../../lib/utils';
+import { Plus, Trash2, Video, Upload, ChevronDown, Loader2, CheckCircle2, AlertTriangle, Eye, Settings, LogOut, Wrench, LayoutDashboard, User, X, Link, Youtube, HardDrive, Database, Globe, ExternalLink, QrCode, Download, Copy, Link2, Check, Play, GripVertical, FolderPlus, Folder, FileVideo } from 'lucide-react';
+import { uploadFileToStorage, getVideoMetadata, getPortfolioStats, PROJECT_CONTENT_TYPES, EDITING_TOOLS_LIST, downloadQrCode, generateThumbnailFromVideo } from '../../lib/utils';
 
 interface EditorPanelProps {
   data: PortfolioData;
@@ -181,7 +181,8 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
   // Showreel Validation State
   const [isVerifyingShowreel, setIsVerifyingShowreel] = useState(false);
   const [showreelError, setShowreelError] = useState<string | null>(null);
-  
+  const showreelInputRef = useRef<HTMLInputElement>(null);
+
   // Dashboard Link State
   const [shortUrl, setShortUrl] = useState('');
   const [isShortening, setIsShortening] = useState(false);
@@ -197,11 +198,16 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
 
   useEffect(() => { if (data.uid && activeTab === 'dashboard') getPortfolioStats(data.uid).then(setStats); }, [activeTab, data.uid]);
 
-  // Debounced Showreel Validation
+  // Debounced Showreel Validation (Only if not a direct file upload which we can assume is valid after our checks)
   useEffect(() => {
     const checkShowreel = async () => {
         setShowreelError(null);
         if (!data.showreelLink) return;
+
+        // Skip validation for direct storage links or blobs
+        if (data.showreelLink.includes('firebasestorage') || data.showreelLink.startsWith('blob:')) {
+             return;
+        }
 
         // Valid Check
         const isYoutube = data.showreelLink.match(/(youtube\.com|youtu\.?be)/i);
@@ -220,11 +226,8 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
             const meta = await getVideoMetadata(data.showreelLink);
             if (meta.thumbnail) {
                 if (meta.thumbnail !== data.showreelThumbnail) {
-                    // Update state AND auto-save
                     const updated = { ...data, showreelThumbnail: meta.thumbnail };
                     onChange(updated);
-                    // Trigger auto-save via explicit call if possible, or just let the user save. 
-                    // Visual feedback is key.
                 }
                 setShowreelError(null);
             } else {
@@ -255,10 +258,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
     setIsShortening(true);
     setShortUrl('');
     try {
-        // Construct the TinyURL API URL
         const apiUrl = `https://tinyurl.com/api-create.php?url=${encodeURIComponent(publicUrl)}`;
-        
-        // Try using allorigins.win as a proxy (often more reliable for text responses than corsproxy.io)
         const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(apiUrl)}`;
         
         const response = await fetch(proxyUrl);
@@ -268,7 +268,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
         if (short.trim().startsWith('http')) {
              setShortUrl(short);
         } else {
-             // Fallback attempt: Try unproxied just in case (rarely works but worth a shot if proxy fails)
              const directRes = await fetch(apiUrl, { mode: 'cors' }); 
              if (directRes.ok) {
                  const directShort = await directRes.text();
@@ -304,6 +303,60 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
       updateField('albums', (data.albums || []).filter(a => a.id !== id));
   };
 
+  // --- Showreel Upload Handler ---
+  const handleShowreelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      // Reset file input to allow re-selection
+      e.target.value = '';
+
+      if (file.type !== 'video/mp4') {
+          setShowreelError("Only MP4 files are supported.");
+          return;
+      }
+      
+      // Max size check (100MB)
+      if (file.size > 100 * 1024 * 1024) {
+          setShowreelError("File size limit is 100MB.");
+          return;
+      }
+
+      setIsVerifyingShowreel(true);
+      setShowreelError(null);
+      
+      try {
+          // 1. Generate Thumbnail & Check validity (implicit in generation)
+          const { blob: thumbBlob } = await generateThumbnailFromVideo(file);
+          
+          // 2. Upload Video to user's showreel folder
+          const videoPath = `users/${data.uid}/showreel/showreel.mp4`;
+          const videoUrl = await uploadFileToStorage(file, videoPath);
+
+          // 3. Upload Thumbnail to user's showreel folder
+          const thumbPath = `users/${data.uid}/showreel/thumbnail.jpg`;
+          const thumbFile = new File([thumbBlob], "thumbnail.jpg", { type: "image/jpeg" });
+          const thumbUrl = await uploadFileToStorage(thumbFile, thumbPath);
+
+          // 4. Update Data with new direct URLs
+          const updated = {
+              ...data,
+              showreelLink: videoUrl,
+              showreelThumbnail: thumbUrl
+          };
+          onChange(updated);
+          
+          // Trigger auto-save immediately to persist the new file paths
+          setTimeout(() => onSave(), 100);
+          
+      } catch (err) {
+          console.error("Showreel upload failed", err);
+          setShowreelError("Upload failed. Ensure video is a valid MP4.");
+      } finally {
+          setIsVerifyingShowreel(false);
+      }
+  }
+
   // --- Image Crop Handlers ---
   const onFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -312,31 +365,19 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
         reader.addEventListener('load', () => setCropImageSrc(reader.result?.toString() || ''));
         reader.readAsDataURL(file);
         setIsCropping(true);
-        // Reset the input value so selecting the same file works again
         e.target.value = '';
     }
   };
 
   const onCropComplete = async (croppedBlob: Blob) => {
-      // Create a File object from the Blob to reuse existing upload logic if needed, 
-      // or just upload the blob directly. `uploadFileToStorage` expects File but works with Blob mostly if type is set.
       const file = new File([croppedBlob], `avatar_${Date.now()}.jpg`, { type: 'image/jpeg' });
-      
       try {
           const url = await uploadFileToStorage(file, `users/${data.uid}/avatar_${Date.now()}`);
-          
-          // 1. Update State
           const newData = { ...data, profileImage: url };
           onChange(newData);
-          
-          // 2. Close Modal
           setIsCropping(false);
           setCropImageSrc(null);
-
-          // 3. AUTO SAVE
-          // We trigger save immediately after state update.
           setTimeout(() => onSave(), 100); 
-
       } catch (e) {
           console.error("Upload failed", e);
           alert("Failed to upload image.");
@@ -579,26 +620,48 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                                 <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-500 mb-4">Showreel</h3>
                                 <div className="p-6 bg-zinc-900/30 border border-zinc-800 rounded-2xl space-y-4">
                                     <div className="space-y-2">
-                                        <div className="relative">
-                                            <Input 
-                                                label="Showreel Link" 
-                                                value={data.showreelLink} 
-                                                onChange={e => updateField('showreelLink', e.target.value)} 
-                                                placeholder="YouTube, Vimeo, Google Drive..." 
-                                                className={`pr-10 ${showreelError ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
-                                            />
-                                            <div className="absolute right-3 top-[34px] text-zinc-500">
-                                                {isVerifyingShowreel ? (
-                                                    <Loader2 size={16} className="animate-spin" />
-                                                ) : showreelError ? (
-                                                    <AlertTriangle size={16} className="text-red-500" />
-                                                ) : data.showreelLink && data.showreelThumbnail ? (
-                                                    <CheckCircle2 size={16} className="text-green-500" />
-                                                ) : data.showreelLink ? (
-                                                    <Link size={16} />
-                                                ) : null}
+                                        <div className="relative flex items-center gap-2">
+                                            <div className="flex-1 relative">
+                                                <Input 
+                                                    label="Showreel Link" 
+                                                    value={data.showreelLink} 
+                                                    onChange={e => updateField('showreelLink', e.target.value)} 
+                                                    placeholder="Paste link or upload video..." 
+                                                    className={`pr-10 ${showreelError ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
+                                                />
+                                                <div className="absolute right-3 top-[34px] text-zinc-500">
+                                                    {isVerifyingShowreel ? (
+                                                        <Loader2 size={16} className="animate-spin" />
+                                                    ) : showreelError ? (
+                                                        <AlertTriangle size={16} className="text-red-500" />
+                                                    ) : data.showreelLink && data.showreelThumbnail ? (
+                                                        <CheckCircle2 size={16} className="text-green-500" />
+                                                    ) : data.showreelLink ? (
+                                                        <Link size={16} />
+                                                    ) : null}
+                                                </div>
+                                            </div>
+
+                                            {/* File Upload Button */}
+                                            <div className="relative top-[11px]">
+                                                <input 
+                                                    type="file" 
+                                                    ref={showreelInputRef} 
+                                                    className="hidden" 
+                                                    accept="video/mp4" 
+                                                    onChange={handleShowreelUpload}
+                                                />
+                                                <Button 
+                                                    size="sm" 
+                                                    onClick={() => showreelInputRef.current?.click()}
+                                                    className="bg-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-700 h-[42px] px-4"
+                                                    disabled={isVerifyingShowreel}
+                                                >
+                                                    <FileVideo size={16} className="mr-2" /> Upload MP4
+                                                </Button>
                                             </div>
                                         </div>
+                                        
                                         {showreelError && (
                                             <p className="text-xs text-red-500 flex items-center gap-1.5 mt-1">
                                                 <AlertTriangle size={10} /> {showreelError}

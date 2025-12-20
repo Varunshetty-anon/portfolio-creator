@@ -5,7 +5,7 @@ import {
     Volume2, VolumeX, Play, ArrowUpRight, X, Check, Zap, Layers 
 } from 'lucide-react';
 import { PortfolioData, Project, INITIAL_DATA } from '../../types';
-import { EDITING_TOOLS_LIST, AI_TOOLS_LIST, trackPortfolioView, getDriveId, getDropboxDirectLink } from '../../lib/utils';
+import { EDITING_TOOLS_LIST, AI_TOOLS_LIST, trackPortfolioView, getDropboxDirectLink } from '../../lib/utils';
 
 interface PortfolioViewProps {
   data: PortfolioData;
@@ -78,15 +78,14 @@ const VideoPlayer: React.FC<{
     onToggleMute?: () => void;
 }> = ({ src, thumbnail, autoplay = false, muted = true, controls = false, aspectRatio = '16:9', className = '', onToggleMute }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
     const [isLoaded, setIsLoaded] = useState(false);
     const [detectedRatio, setDetectedRatio] = useState<string | null>(null);
-    const [driveFallback, setDriveFallback] = useState(false);
     
     // Reset detection when src changes
     useEffect(() => {
         setDetectedRatio(null);
         setIsLoaded(false);
-        setDriveFallback(false);
     }, [src]);
 
     const effectiveAspectRatio = detectedRatio || aspectRatio || '16:9';
@@ -104,26 +103,35 @@ const VideoPlayer: React.FC<{
         const lower = src.toLowerCase();
         if (lower.includes('youtube.com') || lower.includes('youtu.be')) return 'youtube';
         if (lower.includes('vimeo.com')) return 'vimeo';
-        if (lower.includes('drive.google.com')) return 'drive';
         if (lower.includes('dropbox.com')) return 'dropbox';
+        // Treat everything else as direct/mp4 for now, especially firebase storage links
         return 'direct';
     }, [src]);
 
-    // Force play when autoplay prop changes to true
+    // IntersectionObserver for Efficient Autoplay (Direct Videos)
     useEffect(() => {
-        if ((type === 'direct' || type === 'dropbox' || (type === 'drive' && !driveFallback)) && videoRef.current) {
-            if (autoplay) {
-                const playPromise = videoRef.current.play();
-                if (playPromise !== undefined) {
-                    playPromise.catch(error => {
-                        console.debug("Autoplay triggered via effect prevented:", error);
-                    });
-                }
-            } else {
-                videoRef.current.pause();
-            }
-        }
-    }, [autoplay, type, driveFallback]);
+        const video = videoRef.current;
+        if (!video || !autoplay || (type !== 'direct' && type !== 'dropbox')) return;
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) {
+                        const playPromise = video.play();
+                        if (playPromise !== undefined) {
+                            playPromise.catch(() => { /* Silent fail */ });
+                        }
+                    } else {
+                        video.pause();
+                    }
+                });
+            },
+            { threshold: 0.5 } // Play when 50% visible
+        );
+
+        observer.observe(video);
+        return () => observer.disconnect();
+    }, [autoplay, type, src]);
 
     const getEmbedSrc = () => {
         const auto = autoplay ? 1 : 0;
@@ -144,7 +152,6 @@ const VideoPlayer: React.FC<{
             const isBackground = !controls && muted; 
             return `https://player.vimeo.com/video/${vId}?autoplay=${auto}&muted=${mute}&loop=1&background=${isBackground ? 1 : 0}&playsinline=1`;
         }
-        if (type === 'drive') return `https://drive.google.com/file/d/${getDriveId(src)}/preview`;
         return src;
     };
 
@@ -158,27 +165,16 @@ const VideoPlayer: React.FC<{
             else if (Math.abs(r - 1) < 0.05) setDetectedRatio('1:1');
             else setDetectedRatio(`${videoWidth}/${videoHeight}`);
         }
+        setIsLoaded(true);
     };
 
-    const handleCanPlay = () => {
-        setIsLoaded(true);
-        if (autoplay && videoRef.current && videoRef.current.paused) {
-            videoRef.current.play().catch(e => console.debug("Autoplay onCanPlay blocked", e));
-        }
-    }
-
-    // Direct Video Render Logic (Includes Drive Direct Stream Hack)
-    if (type === 'direct' || type === 'dropbox' || (type === 'drive' && !driveFallback)) {
-        let videoSrc = src;
-        if (type === 'dropbox') videoSrc = getDropboxDirectLink(src) || src;
-        if (type === 'drive') {
-            const dId = getDriveId(src);
-            // Attempt to stream directly from Drive to enable autoplay
-            videoSrc = dId ? `https://drive.google.com/uc?export=download&id=${dId}` : src;
-        }
+    // Direct Video Render Logic
+    if (type === 'direct' || type === 'dropbox') {
+        const videoSrc = type === 'dropbox' ? (getDropboxDirectLink(src) || src) : src;
 
         return (
              <div 
+                ref={containerRef}
                 className={`relative bg-[#050505] overflow-hidden ${isVertical ? 'w-full h-auto lg:w-auto lg:h-full' : 'w-full h-full'} ${className}`} 
                 style={{ aspectRatio: cssAspectRatio }}
             >
@@ -198,15 +194,9 @@ const VideoPlayer: React.FC<{
                     loop 
                     muted={muted} 
                     playsInline 
-                    autoPlay={autoplay}
                     preload="auto"
                     onLoadedMetadata={handleLoadedMetadata}
-                    onCanPlay={handleCanPlay}
                     controls={controls}
-                    onError={(e) => {
-                        console.warn("Direct video playback failed, fallback to iframe if applicable.", e);
-                        if (type === 'drive') setDriveFallback(true);
-                    }}
                 />
                  {onToggleMute && (
                     <motion.button 
@@ -222,7 +212,7 @@ const VideoPlayer: React.FC<{
         )
     }
 
-    // Iframe Render Logic (Youtube, Vimeo, Drive Fallback)
+    // Iframe Render Logic (Youtube, Vimeo)
     return (
         <div 
             className={`
@@ -253,7 +243,7 @@ const VideoPlayer: React.FC<{
                 onLoad={() => setIsLoaded(true)} 
             />
 
-            {onToggleMute && type !== 'drive' && ( // Drive iframe doesn't support programmatic mute toggle easily
+            {onToggleMute && ( 
                 <motion.button 
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}
