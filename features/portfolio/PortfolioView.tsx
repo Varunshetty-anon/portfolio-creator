@@ -279,6 +279,14 @@ const IntroOverlay: React.FC<{ data: PortfolioData; onComplete: () => void; isIm
 };
 
 const ProjectCard: React.FC<{ project: Project; onClick: () => void; className?: string }> = ({ project, onClick, className = '' }) => {
+    // Optimization: Clamp 9:16 vertical videos to a 3:4 aspect ratio in the grid view.
+    // This reduces the massive vertical height while still preserving the "portrait" feel.
+    // 9:16 = 0.56, 3:4 = 0.75. 
+    const displayAspectRatio = useMemo(() => {
+        if (project.aspectRatio === '9:16') return '3/4'; 
+        return project.aspectRatio ? project.aspectRatio.replace(':', '/') : '16/9';
+    }, [project.aspectRatio]);
+
     return (
         <motion.div 
             initial={{ opacity: 0, y: 30 }}
@@ -286,12 +294,13 @@ const ProjectCard: React.FC<{ project: Project; onClick: () => void; className?:
             viewport={{ once: true, margin: "-20px" }}
             onClick={onClick}
             className={`group cursor-pointer relative rounded-lg overflow-hidden bg-zinc-900 border border-zinc-800/50 hover:border-zinc-700 transition-colors shadow-lg ${className}`}
-            style={{ aspectRatio: project.aspectRatio ? project.aspectRatio.replace(':', '/') : '16/9' }}
+            style={{ aspectRatio: displayAspectRatio }}
         >
             <img 
                 src={project.thumbnail} 
                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" 
                 alt={project.title}
+                loading="lazy"
             />
             
             {/* Hover Overlay */}
@@ -318,6 +327,23 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
     const [isImageLoaded, setIsImageLoaded] = useState(false);
     const [selectedProject, setSelectedProject] = useState<Project | null>(null);
     const [isShowreelMuted, setIsShowreelMuted] = useState(true);
+    
+    // Responsive Columns State
+    const [numColumns, setNumColumns] = useState(2);
+
+    useEffect(() => {
+        const handleResize = () => {
+            // Switch to 3 columns on larger screens (2xl breakpoint approx 1536px)
+            if (window.innerWidth >= 1536) setNumColumns(3);
+            else setNumColumns(2);
+        };
+        
+        // Initial check
+        handleResize();
+        
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     // Preload Profile Image for Seamless Intro
     useEffect(() => {
@@ -334,27 +360,35 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
     // Intelligent Masonry Layout Calculation
     const projectColumns = useMemo(() => {
         const projects = safeData.projects || [];
-        const col1: Project[] = [];
-        const col2: Project[] = [];
-        let h1 = 0;
-        let h2 = 0;
+        // Create buckets based on current numColumns
+        const cols: Project[][] = Array.from({ length: numColumns }, () => []);
+        const heights: number[] = new Array(numColumns).fill(0);
 
         projects.forEach(p => {
-            let weight = 1;
-            if (p.aspectRatio === '9:16') weight = 1.77;
+            // Calculate a "weight" representing visual height.
+            // 9:16 is normally 1.77, but since we clamp it to 3:4 visually, we use 1.33 weight
+            let weight = 1; 
+            if (p.aspectRatio === '9:16') weight = 1.33;
             else if (p.aspectRatio === '16:9') weight = 0.56;
             else if (p.aspectRatio === '4:3') weight = 0.75;
             
-            if (h1 <= h2) {
-                col1.push(p);
-                h1 += weight;
-            } else {
-                col2.push(p);
-                h2 += weight;
+            // Find the shortest column
+            let shortestColIndex = 0;
+            let minHeight = heights[0];
+            
+            for (let i = 1; i < numColumns; i++) {
+                if (heights[i] < minHeight) {
+                    minHeight = heights[i];
+                    shortestColIndex = i;
+                }
             }
+            
+            cols[shortestColIndex].push(p);
+            heights[shortestColIndex] += weight;
         });
-        return [col1, col2];
-    }, [safeData.projects]);
+        
+        return cols;
+    }, [safeData.projects, numColumns]);
 
     useEffect(() => {
         if (!isPreview && safeData.uid) trackPortfolioView(safeData.uid);
@@ -563,26 +597,19 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                                     <div className="h-px flex-1 bg-zinc-900 ml-8 relative top-[-10px] hidden md:block" />
                                 </div>
 
-                                {/* Desktop: Two Balanced Columns with Compact Spacing */}
+                                {/* Desktop: Dynamic Balanced Columns with Compact Spacing */}
                                 <div className="hidden md:flex gap-3 items-start">
-                                    <div className="w-1/2 space-y-3">
-                                        {projectColumns[0].map(project => (
-                                            <ProjectCard 
-                                                key={project.id} 
-                                                project={project} 
-                                                onClick={() => setSelectedProject(project)} 
-                                            />
-                                        ))}
-                                    </div>
-                                    <div className="w-1/2 space-y-3">
-                                        {projectColumns[1].map(project => (
-                                            <ProjectCard 
-                                                key={project.id} 
-                                                project={project} 
-                                                onClick={() => setSelectedProject(project)} 
-                                            />
-                                        ))}
-                                    </div>
+                                    {projectColumns.map((col, idx) => (
+                                        <div key={idx} className={`space-y-3 ${numColumns === 3 ? 'w-1/3' : 'w-1/2'}`}>
+                                            {col.map(project => (
+                                                <ProjectCard 
+                                                    key={project.id} 
+                                                    project={project} 
+                                                    onClick={() => setSelectedProject(project)} 
+                                                />
+                                            ))}
+                                        </div>
+                                    ))}
                                 </div>
 
                                 {/* Mobile: Single Stack with Compact Spacing */}

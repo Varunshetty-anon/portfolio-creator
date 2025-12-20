@@ -5,8 +5,8 @@ import { PortfolioData, Project } from '../../types';
 import { Input, TextArea } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { ToolSelector } from '../../components/ToolSelector';
-import { Plus, Trash2, Video, Upload, ChevronDown, Loader2, CheckCircle2, AlertTriangle, Eye, Settings, LogOut, Wrench, LayoutDashboard, User, X, Link, Youtube, HardDrive, Database, Globe, ExternalLink } from 'lucide-react';
-import { uploadFileToStorage, getVideoMetadata, getPortfolioStats, PROJECT_CONTENT_TYPES, EDITING_TOOLS_LIST } from '../../lib/utils';
+import { Plus, Trash2, Video, Upload, ChevronDown, Loader2, CheckCircle2, AlertTriangle, Eye, Settings, LogOut, Wrench, LayoutDashboard, User, X, Link, Youtube, HardDrive, Database, Globe, ExternalLink, QrCode, Download, Copy, Link2, Check } from 'lucide-react';
+import { uploadFileToStorage, getVideoMetadata, getPortfolioStats, PROJECT_CONTENT_TYPES, EDITING_TOOLS_LIST, downloadQrCode } from '../../lib/utils';
 
 interface EditorPanelProps {
   data: PortfolioData;
@@ -32,6 +32,18 @@ const PublishButton = ({ onPublish }: { onPublish: () => Promise<void> }) => {
         </Button>
     );
 }
+
+const Toggle = ({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) => (
+    <div className="flex items-center justify-between p-4 bg-zinc-900/50 border border-zinc-800 rounded-xl cursor-pointer hover:border-zinc-700 transition-all" onClick={() => onChange(!checked)}>
+        <span className="text-sm font-medium text-zinc-300">{label}</span>
+        <div className={`w-12 h-6 rounded-full p-1 transition-colors duration-300 ${checked ? 'bg-green-500' : 'bg-zinc-800'}`}>
+            <motion.div 
+                animate={{ x: checked ? 24 : 0 }}
+                className="w-4 h-4 bg-white rounded-full shadow-md"
+            />
+        </div>
+    </div>
+);
 
 const ProjectCardEditor: React.FC<{ project: Project; onChange: (p: Partial<Project>) => void; onDelete: () => void }> = ({ project, onChange, onDelete }) => {
     const [isExpanded, setIsExpanded] = useState(false);
@@ -96,6 +108,11 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
   const [activeTab, setActiveTab] = useState<'dashboard' | 'profile' | 'content' | 'tools' | 'settings'>('dashboard');
   const [stats, setStats] = useState({ views: 0, clicks: 0 });
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  
+  // Dashboard Link State
+  const [shortUrl, setShortUrl] = useState('');
+  const [isShortening, setIsShortening] = useState(false);
+  const [copiedType, setCopiedType] = useState<'main' | 'short' | null>(null);
 
   useEffect(() => { if (data.uid && activeTab === 'dashboard') getPortfolioStats(data.uid).then(setStats); }, [activeTab, data.uid]);
 
@@ -104,6 +121,31 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
   const updateSocial = (key: string, val: string) => {
       onChange({ ...data, socials: { ...data.socials, [key]: val } });
   }
+
+  const publicUrl = `${window.location.origin}/#${data.username}`;
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(publicUrl)}&bgcolor=000000&color=ffffff&margin=10`;
+
+  const handleShortenLink = async () => {
+    setIsShortening(true);
+    try {
+        // Using TinyURL API which allows GET requests for creating short links
+        const response = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(publicUrl)}`);
+        if (!response.ok) throw new Error("Failed to shorten");
+        const short = await response.text();
+        setShortUrl(short);
+    } catch (e) {
+        console.error("Shortening failed", e);
+        setShortUrl(''); // Fallback or error state logic could go here
+    } finally {
+        setIsShortening(false);
+    }
+  };
+
+  const copyToClipboard = (text: string, type: 'main' | 'short') => {
+      navigator.clipboard.writeText(text);
+      setCopiedType(type);
+      setTimeout(() => setCopiedType(null), 2000);
+  };
 
   if (!data) return <div className="h-screen bg-black flex items-center justify-center"><Loader2 className="animate-spin text-zinc-500"/></div>;
 
@@ -166,6 +208,8 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                                 <h2 className="text-3xl font-display font-bold mb-2">Welcome, {data.name}</h2>
                                 <p className="text-zinc-500">Here's how your portfolio is performing.</p>
                             </div>
+                            
+                            {/* Analytics Grid */}
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-2xl">
                                     <span className="text-zinc-500 text-xs font-bold uppercase tracking-wider">Total Views</span>
@@ -176,9 +220,73 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                                     <div className="text-4xl font-display font-bold mt-2">{stats.clicks}</div>
                                 </div>
                             </div>
-                            <div className="bg-zinc-900/30 border border-zinc-800 p-4 rounded-xl flex items-center justify-between">
-                                <code className="text-zinc-500 text-xs">{window.location.origin}/#{data.username}</code>
-                                <Button size="sm" variant="outline" onClick={() => window.open(`/#${data.username}`, '_blank')} className="text-xs">Open Site <ExternalLink size={12} className="ml-2"/></Button>
+
+                            {/* Public Link Section */}
+                            <div className="bg-zinc-900/30 border border-zinc-800 p-6 rounded-2xl space-y-6">
+                                <div>
+                                    <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-500 mb-4">Public Portfolio</h3>
+                                    
+                                    {/* Main Link */}
+                                    <div className="flex items-center gap-2 bg-black/50 border border-zinc-800 p-3 rounded-lg mb-3">
+                                        <Globe size={16} className="text-zinc-500 shrink-0" />
+                                        <code className="text-zinc-300 text-xs truncate flex-1">{publicUrl}</code>
+                                        <Button size="sm" variant="ghost" onClick={() => copyToClipboard(publicUrl, 'main')} className="text-zinc-500 hover:text-white">
+                                            {copiedType === 'main' ? <Check size={14} className="text-green-500"/> : <Copy size={14}/>}
+                                        </Button>
+                                        <Button size="sm" variant="outline" onClick={() => window.open(publicUrl, '_blank')} className="text-xs h-8">
+                                            <ExternalLink size={12}/>
+                                        </Button>
+                                    </div>
+
+                                    {/* Short Link & Actions */}
+                                    <div className="flex flex-col md:flex-row gap-4">
+                                        {/* Short Link Generator */}
+                                        <div className="flex-1 bg-zinc-900/50 border border-zinc-800 rounded-xl p-4">
+                                            <h4 className="text-xs font-bold text-zinc-400 uppercase mb-3 flex items-center gap-2">
+                                                <Link2 size={12} /> Small Link
+                                            </h4>
+                                            {!shortUrl ? (
+                                                <Button 
+                                                    size="sm" 
+                                                    onClick={handleShortenLink} 
+                                                    disabled={isShortening}
+                                                    className="w-full bg-zinc-800 text-zinc-300 hover:bg-zinc-700 hover:text-white"
+                                                >
+                                                    {isShortening ? <Loader2 size={14} className="animate-spin" /> : 'Generate Short Link'}
+                                                </Button>
+                                            ) : (
+                                                <div className="flex items-center gap-2 bg-black border border-zinc-800 p-2 rounded-lg animate-in fade-in">
+                                                    <span className="text-xs text-indigo-400 flex-1 truncate">{shortUrl}</span>
+                                                    <button onClick={() => copyToClipboard(shortUrl, 'short')} className="p-1.5 hover:bg-zinc-800 rounded text-zinc-500 hover:text-white">
+                                                        {copiedType === 'short' ? <Check size={12} className="text-green-500"/> : <Copy size={12}/>}
+                                                    </button>
+                                                </div>
+                                            )}
+                                            <p className="text-[10px] text-zinc-600 mt-2">
+                                                Create a compact URL ideal for social media bios.
+                                            </p>
+                                        </div>
+
+                                        {/* QR Code */}
+                                        <div className="flex-1 bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 flex gap-4 items-center">
+                                            <div className="w-20 h-20 bg-white p-1 rounded-lg shrink-0">
+                                                <img src={qrCodeUrl} alt="Portfolio QR" className="w-full h-full object-contain" />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <h4 className="text-xs font-bold text-zinc-400 uppercase mb-1">QR Code</h4>
+                                                <p className="text-[10px] text-zinc-600 mb-2 truncate">Scan to view portfolio</p>
+                                                <Button 
+                                                    size="sm" 
+                                                    variant="outline" 
+                                                    className="w-full h-7 text-[10px]"
+                                                    onClick={() => downloadQrCode(qrCodeUrl, 'frames-portfolio-qr.png')}
+                                                >
+                                                    <Download size={10} className="mr-1.5"/> Download
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -197,9 +305,36 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                                     <p className="text-zinc-500 text-xs">Recommended 400x400px</p>
                                 </div>
                              </div>
+                             
                              <div className="space-y-4">
                                  <Input label="Display Name" value={data.name} onChange={e => updateField('name', e.target.value)} />
                                  <Input label="Role / Title" value={data.role} onChange={e => updateField('role', e.target.value)} />
+                                 
+                                 {/* Availability Toggle Section */}
+                                 <div className="py-2">
+                                    <Toggle 
+                                        label="Available for Work" 
+                                        checked={data.availability?.status || false} 
+                                        onChange={(status) => onChange({ ...data, availability: { ...data.availability, status } })} 
+                                    />
+                                    <AnimatePresence>
+                                        {data.availability?.status && (
+                                            <motion.div 
+                                                initial={{ opacity: 0, height: 0, marginTop: 0 }} 
+                                                animate={{ opacity: 1, height: 'auto', marginTop: 12 }} 
+                                                exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                                            >
+                                                <Input 
+                                                    label="Booking / Contact Link (Optional)" 
+                                                    placeholder="https://calendly.com/..." 
+                                                    value={data.availability?.link || ''} 
+                                                    onChange={(e) => onChange({ ...data, availability: { ...data.availability, link: e.target.value } })} 
+                                                />
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                 </div>
+
                                  <TextArea label="Bio" value={data.bio} onChange={e => updateField('bio', e.target.value)} rows={4} />
                                  <Input label="Location" value={data.location} onChange={e => updateField('location', e.target.value)} />
                                  <Input label="Contact Email" value={data.contactEmail} onChange={e => updateField('contactEmail', e.target.value)} />
