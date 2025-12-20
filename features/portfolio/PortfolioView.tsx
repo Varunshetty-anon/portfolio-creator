@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { motion, AnimatePresence, useInView } from 'framer-motion';
+import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { 
     Mail, Instagram, Twitter, Linkedin, Youtube, Globe, MapPin, 
-    Volume2, VolumeX, Loader2, Play, ArrowUpRight, Sparkles, X 
+    Volume2, VolumeX, Play, ArrowUpRight, X, Check, Zap, Layers 
 } from 'lucide-react';
 import { PortfolioData, Project, INITIAL_DATA } from '../../types';
 import { EDITING_TOOLS_LIST, AI_TOOLS_LIST, trackPortfolioView, getDriveId, getDropboxDirectLink } from '../../lib/utils';
@@ -11,6 +11,16 @@ interface PortfolioViewProps {
   data: PortfolioData;
   isPreview?: boolean;
 }
+
+// --- Helper Functions ---
+
+const ensureUrl = (url: string): string => {
+    if (!url) return '';
+    if (url.startsWith('http://') || url.startsWith('https://')) return url;
+    if (url.startsWith('mailto:')) return url;
+    if (url.includes('@') && !url.includes('/')) return `mailto:${url}`;
+    return `https://${url}`;
+};
 
 // --- Helper Components ---
 
@@ -124,45 +134,79 @@ const VideoPlayer: React.FC<{
 
 // --- Animations ---
 
-const IntroOverlay: React.FC<{ data: PortfolioData; onComplete: () => void }> = ({ data, onComplete }) => {
+const IntroOverlay: React.FC<{ data: PortfolioData; onComplete: () => void; isImageLoaded: boolean }> = ({ data, onComplete, isImageLoaded }) => {
     useEffect(() => {
-        const timer = setTimeout(onComplete, 2200);
-        return () => clearTimeout(timer);
-    }, [onComplete]);
+        if (isImageLoaded) {
+            const timer = setTimeout(onComplete, 2600); // Slightly longer for the new animation
+            return () => clearTimeout(timer);
+        }
+    }, [onComplete, isImageLoaded]);
+
+    const containerVariants: Variants = {
+        hidden: { opacity: 0 },
+        visible: { 
+            opacity: 1,
+            transition: { 
+                staggerChildren: 0.15,
+                delayChildren: 0.2
+            }
+        },
+        exit: { 
+            opacity: 0, 
+            y: -20, 
+            filter: 'blur(10px)',
+            transition: { duration: 0.8, ease: [0.6, 0.05, 0.01, 0.9] as [number, number, number, number] } 
+        }
+    };
+
+    const itemVariants: Variants = {
+        hidden: { y: 30, opacity: 0, scale: 0.95 },
+        visible: { 
+            y: 0, 
+            opacity: 1, 
+            scale: 1,
+            transition: { duration: 1.2, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] } 
+        }
+    };
 
     return (
         <motion.div 
-            initial={{ opacity: 1 }} 
-            exit={{ opacity: 0, filter: 'blur(20px)' }}
-            transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+            variants={containerVariants}
+            initial="hidden"
+            animate={isImageLoaded ? "visible" : "hidden"}
+            exit="exit"
             className="fixed inset-0 z-[100] bg-[#050505] flex flex-col items-center justify-center p-6"
         >
-            <motion.div 
-                initial={{ scale: 0.9, opacity: 0, y: 20 }}
-                animate={{ scale: 1, opacity: 1, y: 0 }}
-                transition={{ duration: 1, ease: "easeOut" }}
-                className="flex flex-col items-center gap-6"
-            >
+            <motion.div variants={itemVariants} className="mb-8">
                 <div className="w-32 h-32 md:w-40 md:h-40 rounded-full overflow-hidden border border-zinc-800 shadow-2xl">
-                    <img src={data.profileImage} className="w-full h-full object-cover" alt={data.name} />
-                </div>
-                <div className="text-center space-y-2">
-                    <h1 className="text-3xl md:text-5xl font-display font-bold text-white tracking-tight">{data.name}</h1>
-                    <div className="h-0.5 w-12 bg-white/20 mx-auto rounded-full" />
+                   {isImageLoaded && <img src={data.profileImage} className="w-full h-full object-cover" alt={data.name} />}
                 </div>
             </motion.div>
+            
+            <div className="text-center space-y-3">
+                <motion.h1 variants={itemVariants} className="text-4xl md:text-6xl font-display font-black uppercase text-white tracking-tight">
+                    {data.name}
+                </motion.h1>
+                
+                <motion.div variants={itemVariants} className="flex flex-col items-center gap-4">
+                     <div className="h-px w-12 bg-zinc-700" />
+                     <span className="text-lg md:text-xl font-medium text-zinc-400 tracking-wide uppercase">
+                        {data.role || 'Video Editor'}
+                     </span>
+                </motion.div>
+            </div>
         </motion.div>
     );
 };
 
-const ProjectCard: React.FC<{ project: Project; onClick: () => void }> = ({ project, onClick }) => {
+const ProjectCard: React.FC<{ project: Project; onClick: () => void; className?: string }> = ({ project, onClick, className = '' }) => {
     return (
         <motion.div 
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-50px" }}
+            viewport={{ once: true, margin: "-20px" }}
             onClick={onClick}
-            className="group cursor-pointer relative rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800/50 shadow-lg"
+            className={`group cursor-pointer relative rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800/50 shadow-lg ${className}`}
             style={{ aspectRatio: project.aspectRatio ? project.aspectRatio.replace(':', '/') : '16/9' }}
         >
             <img 
@@ -192,8 +236,46 @@ const ProjectCard: React.FC<{ project: Project; onClick: () => void }> = ({ proj
 export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = false }) => {
     const safeData = useMemo(() => ({ ...INITIAL_DATA, ...data }), [data]);
     const [introComplete, setIntroComplete] = useState(false);
+    const [isImageLoaded, setIsImageLoaded] = useState(false);
     const [selectedProject, setSelectedProject] = useState<Project | null>(null);
     const [isShowreelMuted, setIsShowreelMuted] = useState(true);
+
+    // Preload Profile Image for Seamless Intro
+    useEffect(() => {
+        if (safeData.profileImage) {
+            const img = new Image();
+            img.src = safeData.profileImage;
+            img.onload = () => setIsImageLoaded(true);
+            img.onerror = () => setIsImageLoaded(true); // Proceed even if fail
+        } else {
+            setIsImageLoaded(true);
+        }
+    }, [safeData.profileImage]);
+
+    // Intelligent Masonry Layout Calculation
+    const projectColumns = useMemo(() => {
+        const projects = safeData.projects || [];
+        const col1: Project[] = [];
+        const col2: Project[] = [];
+        let h1 = 0;
+        let h2 = 0;
+
+        projects.forEach(p => {
+            let weight = 1;
+            if (p.aspectRatio === '9:16') weight = 1.77;
+            else if (p.aspectRatio === '16:9') weight = 0.56;
+            else if (p.aspectRatio === '4:3') weight = 0.75;
+            
+            if (h1 <= h2) {
+                col1.push(p);
+                h1 += weight;
+            } else {
+                col2.push(p);
+                h2 += weight;
+            }
+        });
+        return [col1, col2];
+    }, [safeData.projects]);
 
     useEffect(() => {
         if (!isPreview && safeData.uid) trackPortfolioView(safeData.uid);
@@ -207,11 +289,11 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
             {/* Intro */}
             <AnimatePresence>
                 {!introComplete && (
-                    <IntroOverlay data={safeData} onComplete={() => setIntroComplete(true)} />
+                    <IntroOverlay data={safeData} isImageLoaded={isImageLoaded} onComplete={() => setIntroComplete(true)} />
                 )}
             </AnimatePresence>
 
-            {/* Modal */}
+            {/* Project Modal */}
             <AnimatePresence>
                 {selectedProject && (
                     <motion.div 
@@ -232,8 +314,18 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                             className="w-full max-w-7xl max-h-[90vh] flex flex-col lg:flex-row bg-[#09090b] rounded-3xl overflow-hidden border border-zinc-800 shadow-2xl" 
                             onClick={e => e.stopPropagation()}
                         >
-                            <div className="flex-1 bg-black relative flex items-center justify-center min-h-[40vh] lg:min-h-0">
-                                <div className="w-full h-full max-h-[85vh] flex items-center justify-center">
+                            {/* Video Container Logic */}
+                            <div className="flex-1 bg-black relative flex items-center justify-center min-h-[40vh] lg:min-h-0 overflow-hidden">
+                                <div 
+                                    className={`
+                                        flex items-center justify-center
+                                        ${selectedProject.aspectRatio === '9:16' 
+                                            ? 'h-full w-auto aspect-[9/16] lg:max-h-full' // 9:16 Desktop: fill height, auto width
+                                            : 'w-full aspect-video lg:max-h-full' // 16:9 Desktop: fill width (contained by flex)
+                                        }
+                                        max-h-[85vh] max-w-full
+                                    `}
+                                >
                                     <VideoPlayer 
                                         src={selectedProject.link} 
                                         thumbnail={selectedProject.thumbnail} 
@@ -244,6 +336,8 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                                     />
                                 </div>
                             </div>
+
+                            {/* Info Side */}
                             <div className="w-full lg:w-[400px] p-8 lg:p-10 border-t lg:border-t-0 lg:border-l border-zinc-800 overflow-y-auto bg-[#09090b] shrink-0">
                                 <h2 className="text-3xl md:text-4xl font-display font-bold text-white mb-4 leading-tight">{selectedProject.title}</h2>
                                 <div className="flex flex-wrap gap-2 mb-8">
@@ -266,29 +360,43 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                 transition={{ duration: 0.8 }}
                 className="flex flex-col lg:flex-row min-h-screen"
             >
-                {/* --- SIDEBAR (Desktop Sticky / Mobile Stacked) --- */}
+                {/* --- SIDEBAR --- */}
                 <aside className="
                     w-full lg:w-[35%] xl:w-[32%] 
-                    lg:h-screen lg:sticky lg:top-0 
+                    lg:h-screen lg:sticky lg:top-0 lg:overflow-hidden
                     bg-[#050505] border-b lg:border-b-0 lg:border-r border-zinc-900 
                     p-8 md:p-12 xl:p-16 
                     flex flex-col lg:justify-between gap-12 lg:gap-0
                     z-10
                 ">
-                    <div className="space-y-8 lg:space-y-10">
-                        {/* Avatar */}
-                        <div className="w-32 h-32 md:w-40 md:h-40 rounded-full overflow-hidden border border-zinc-800 shadow-2xl ring-4 ring-zinc-900/50">
-                            <img src={safeData.profileImage} className="w-full h-full object-cover" alt="Profile" />
+                    <div className="space-y-10 lg:space-y-12">
+                        {/* Avatar with Status */}
+                        <div className="relative inline-block">
+                             <div className="w-32 h-32 md:w-40 md:h-40 rounded-full overflow-hidden border border-zinc-800 shadow-2xl ring-4 ring-zinc-900/50">
+                                <img src={safeData.profileImage} className="w-full h-full object-cover" alt="Profile" />
+                            </div>
+                            {/* Availability Indicator */}
+                            {safeData.availability?.status && (
+                                <div className="absolute bottom-2 right-2 flex items-center justify-center">
+                                    <div className="w-6 h-6 bg-green-500 rounded-full border-[3px] border-[#050505] flex items-center justify-center shadow-[0_0_15px_rgba(34,197,94,0.6)] animate-pulse">
+                                        <div className="w-2 h-2 bg-white rounded-full opacity-80" />
+                                    </div>
+                                    <div className="absolute left-full ml-3 bg-zinc-900/90 text-[10px] font-bold uppercase tracking-widest text-green-400 px-2 py-1 rounded border border-zinc-800 whitespace-nowrap opacity-0 hover:opacity-100 transition-opacity pointer-events-none lg:pointer-events-auto">
+                                        Available
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Identity */}
                         <div className="space-y-4">
-                            <h1 className="text-5xl md:text-6xl font-display font-bold text-white tracking-tighter leading-[0.9]">
+                            <h1 className="text-6xl lg:text-8xl font-display font-black text-white tracking-tighter leading-[0.85] uppercase">
                                 {safeData.name}
                             </h1>
+                            <p className="text-xl font-medium text-zinc-500">{safeData.role}</p>
                             
                             {/* Meta Row */}
-                            <div className="flex flex-wrap gap-4 text-xs font-medium text-zinc-500 uppercase tracking-wider">
+                            <div className="flex flex-wrap gap-4 text-xs font-bold text-zinc-600 uppercase tracking-widest pt-2">
                                 {safeData.location && (
                                     <div className="flex items-center gap-1.5">
                                         <MapPin size={14} className="text-white"/>
@@ -314,15 +422,16 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                             {safeData.socials && Object.entries(safeData.socials).map(([key, val]) => {
                                 if (!val) return null;
                                 const Icon = { instagram: Instagram, twitter: Twitter, youtube: Youtube, linkedin: Linkedin, email: Mail, discord: Globe }[key.toLowerCase()] || Globe;
+                                const url = ensureUrl(val as string);
                                 return (
                                     <a 
                                         key={key} 
-                                        href={val as string} 
+                                        href={url} 
                                         target="_blank" 
                                         rel="noopener noreferrer"
-                                        className="p-3 rounded-full bg-zinc-900/50 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-white hover:border-white transition-all duration-300 group"
+                                        className="p-3.5 rounded-full bg-zinc-900/50 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-white hover:border-white transition-all duration-300 group"
                                     >
-                                        <Icon size={18} className="group-hover:scale-110 transition-transform" />
+                                        <Icon size={20} className="group-hover:scale-110 transition-transform" />
                                     </a>
                                 )
                             })}
@@ -366,16 +475,40 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                         </section>
                     )}
 
-                    {/* 2. Work Grid */}
-                    <div className="p-6 md:p-12 xl:p-16 space-y-20">
+                    {/* 2. Work Grid (Masonry Layout) */}
+                    <div className="p-5 md:p-10 xl:p-14">
                         {safeData.projects && safeData.projects.length > 0 && (
-                            <section>
-                                <div className="flex items-end justify-between mb-10">
-                                    <h2 className="text-4xl font-display font-bold text-white tracking-tight">My Work</h2>
+                            <section className="mb-16">
+                                <div className="flex items-end justify-between mb-8">
+                                    <h2 className="text-4xl md:text-5xl font-display font-black text-white tracking-tight">MY WORK</h2>
+                                    <div className="h-px flex-1 bg-zinc-900 ml-8 relative top-[-10px] hidden md:block" />
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-12">
-                                    {safeData.projects.map((project) => (
+                                {/* Desktop: Two Balanced Columns with Compact Spacing */}
+                                <div className="hidden md:flex gap-4 items-start">
+                                    <div className="w-1/2 space-y-4">
+                                        {projectColumns[0].map(project => (
+                                            <ProjectCard 
+                                                key={project.id} 
+                                                project={project} 
+                                                onClick={() => setSelectedProject(project)} 
+                                            />
+                                        ))}
+                                    </div>
+                                    <div className="w-1/2 space-y-4">
+                                        {projectColumns[1].map(project => (
+                                            <ProjectCard 
+                                                key={project.id} 
+                                                project={project} 
+                                                onClick={() => setSelectedProject(project)} 
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Mobile: Single Stack with Compact Spacing */}
+                                <div className="md:hidden space-y-6">
+                                    {safeData.projects.map(project => (
                                         <ProjectCard 
                                             key={project.id} 
                                             project={project} 
@@ -386,27 +519,72 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                             </section>
                         )}
 
-                        {/* 3. Tech Stack (Simplified) */}
-                        <section className="pt-12 border-t border-zinc-900">
-                             <div className="flex flex-wrap gap-4 items-center">
-                                <span className="text-xs font-bold uppercase tracking-widest text-zinc-600 mr-4">Proficiency</span>
-                                {safeData.primaryTool && (
-                                     <div className="flex items-center gap-2 px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-lg">
-                                        <ToolIcon name={safeData.primaryTool} />
-                                        <span className="text-xs font-bold text-white">{safeData.primaryTool}</span>
-                                    </div>
-                                )}
-                                {safeData.tools?.filter(t => t !== safeData.primaryTool).map(tool => (
-                                    <div key={tool} className="flex items-center gap-2 px-3 py-1.5 bg-zinc-950 border border-zinc-900 rounded-lg text-zinc-500">
-                                        <ToolIcon name={tool} className="w-4 h-4" />
-                                        <span className="text-xs font-medium">{tool}</span>
-                                    </div>
-                                ))}
+                        {/* 3. Dedicated Skills Section */}
+                        <section className="space-y-12 border-t border-zinc-900 pt-16">
+                             <div className="flex items-end gap-6 mb-8">
+                                <h2 className="text-4xl font-display font-black text-white tracking-tight uppercase">Skills & Tools</h2>
+                             </div>
+
+                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
+                                 
+                                 {/* Primary Workflow (Large Card) */}
+                                 {safeData.primaryTool && (
+                                     <div className="col-span-1 lg:col-span-5 bg-zinc-900/50 border border-zinc-800 rounded-3xl p-8 flex flex-col justify-between group hover:border-zinc-600 transition-colors">
+                                         <div>
+                                            <span className="text-xs font-bold uppercase tracking-widest text-indigo-400 mb-4 block flex items-center gap-2">
+                                                <Check size={14} strokeWidth={4} /> Primary Workflow
+                                            </span>
+                                            <h3 className="text-3xl font-bold text-white mb-2">{safeData.primaryTool}</h3>
+                                            <p className="text-zinc-500 text-sm">Specialized expertise and daily driver for high-end production.</p>
+                                         </div>
+                                         <div className="mt-8">
+                                             <div className="w-16 h-16 bg-black rounded-2xl border border-zinc-800 flex items-center justify-center">
+                                                 <ToolIcon name={safeData.primaryTool} className="w-8 h-8 opacity-100" />
+                                             </div>
+                                         </div>
+                                     </div>
+                                 )}
+
+                                 <div className="col-span-1 lg:col-span-7 grid grid-cols-1 gap-6">
+                                     {/* Standard Stack */}
+                                     <div className="bg-zinc-950 border border-zinc-900 rounded-3xl p-6">
+                                        <div className="flex items-center gap-3 mb-4">
+                                            <Layers size={18} className="text-zinc-500"/>
+                                            <h4 className="text-sm font-bold text-zinc-300 uppercase tracking-wider">Software Stack</h4>
+                                        </div>
+                                        <div className="flex flex-wrap gap-3">
+                                            {safeData.tools?.filter(t => t !== safeData.primaryTool).map(tool => (
+                                                <div key={tool} className="flex items-center gap-2 px-4 py-2 bg-zinc-900/50 border border-zinc-800 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-700 transition-all">
+                                                    <ToolIcon name={tool} className="w-4 h-4" />
+                                                    <span className="text-sm font-medium">{tool}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                     </div>
+
+                                     {/* AI Tools */}
+                                     {safeData.aiTools && safeData.aiTools.length > 0 && (
+                                         <div className="bg-gradient-to-br from-indigo-900/10 to-purple-900/10 border border-indigo-500/10 rounded-3xl p-6">
+                                            <div className="flex items-center gap-3 mb-4">
+                                                <Zap size={18} className="text-indigo-400"/>
+                                                <h4 className="text-sm font-bold text-indigo-300 uppercase tracking-wider">AI Acceleration</h4>
+                                            </div>
+                                            <div className="flex flex-wrap gap-3">
+                                                {safeData.aiTools.map(tool => (
+                                                    <div key={tool} className="flex items-center gap-2 px-4 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-xl text-indigo-200 hover:bg-indigo-500/20 transition-all">
+                                                        <ToolIcon name={tool} className="w-4 h-4" />
+                                                        <span className="text-sm font-medium">{tool}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                         </div>
+                                     )}
+                                 </div>
                              </div>
                         </section>
                         
                         {/* Mobile Only Footer */}
-                        <div className="lg:hidden pt-8 border-t border-zinc-900">
+                        <div className="lg:hidden mt-20 pt-8 border-t border-zinc-900">
                             <h2 className="text-2xl font-display font-bold text-white mb-2">Let's Create.</h2>
                             <a href={`mailto:${safeData.contactEmail}`} className="text-lg text-zinc-500">{safeData.contactEmail}</a>
                         </div>
