@@ -69,6 +69,7 @@ const VideoPlayer: React.FC<{
     // Reset detection when src changes
     useEffect(() => {
         setDetectedRatio(null);
+        setIsLoaded(false);
     }, [src]);
 
     const effectiveAspectRatio = detectedRatio || aspectRatio || '16:9';
@@ -91,31 +92,38 @@ const VideoPlayer: React.FC<{
         return 'direct';
     }, [src]);
 
+    // Force play when autoplay prop changes to true
     useEffect(() => {
         if ((type === 'direct' || type === 'dropbox') && videoRef.current) {
             if (autoplay) {
                 const playPromise = videoRef.current.play();
                 if (playPromise !== undefined) {
                     playPromise.catch(error => {
-                        console.warn("Autoplay prevented:", error);
+                        // Silent catch for autoplay blocks, we rely on the user or 'muted' to fix it
+                        console.debug("Autoplay triggered via effect prevented:", error);
                     });
                 }
             } else {
                 videoRef.current.pause();
             }
         }
-    }, [autoplay, type, src]);
+    }, [autoplay, type]);
 
     const getEmbedSrc = () => {
         const auto = autoplay ? 1 : 0;
         const mute = muted ? 1 : 0;
+        const origin = typeof window !== 'undefined' ? window.location.origin : '';
         
         if (type === 'youtube') {
-            const ytId = src.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/)?.[2];
-            return `https://www.youtube.com/embed/${ytId}?autoplay=${auto}&mute=${mute}&controls=${controls ? 1 : 0}&loop=1&playlist=${ytId}&playsinline=1&rel=0&modestbranding=1&showinfo=0`;
+            const match = src.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/);
+            const ytId = match?.[2];
+            if (!ytId) return src;
+            return `https://www.youtube.com/embed/${ytId}?autoplay=${auto}&mute=${mute}&controls=${controls ? 1 : 0}&loop=1&playlist=${ytId}&playsinline=1&rel=0&modestbranding=1&showinfo=0&origin=${origin}`;
         }
         if (type === 'vimeo') {
-            const vId = src.match(/vimeo\.com\/(?:channels\/(?:\w+\/)?|groups\/(?:[^\/]*)\/videos\/|album\/(?:\d+)\/video\/|video\/|)(\d+)(?:$|\/|\?)/)?.[1];
+            const match = src.match(/vimeo\.com\/(?:channels\/(?:\w+\/)?|groups\/(?:[^\/]*)\/videos\/|album\/(?:\d+)\/video\/|video\/|)(\d+)(?:$|\/|\?)/);
+            const vId = match?.[1];
+            if (!vId) return src;
             return `https://player.vimeo.com/video/${vId}?autoplay=${auto}&muted=${mute}&loop=1&background=${controls ? 0 : 1}&playsinline=1`;
         }
         if (type === 'drive') return `https://drive.google.com/file/d/${getDriveId(src)}/preview`;
@@ -134,6 +142,13 @@ const VideoPlayer: React.FC<{
         }
     };
 
+    const handleCanPlay = () => {
+        setIsLoaded(true);
+        if (autoplay && videoRef.current && videoRef.current.paused) {
+            videoRef.current.play().catch(e => console.debug("Autoplay onCanPlay blocked", e));
+        }
+    }
+
     return (
         <div 
             className={`
@@ -147,15 +162,17 @@ const VideoPlayer: React.FC<{
                 {!isLoaded && (
                     <motion.div 
                         initial={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.8 }}
-                        className="absolute inset-0 z-10 bg-[#09090b]"
+                        className="absolute inset-0 z-10 bg-[#09090b] flex items-center justify-center"
                     >
-                        {thumbnail && <img src={thumbnail} className="w-full h-full object-cover opacity-60 blur-lg scale-110" alt="Thumbnail" />}
+                         {/* Thumbnail Blur Background */}
+                        {thumbnail && <img src={thumbnail} className="absolute inset-0 w-full h-full object-cover opacity-60 blur-lg scale-110" alt="Thumbnail" />}
                     </motion.div>
                 )}
             </AnimatePresence>
 
             {(type === 'direct' || type === 'dropbox') ? (
                 <video 
+                    key={src} // CRITICAL: Forces remount if URL changes, fixing stuck video states
                     ref={videoRef}
                     src={type === 'dropbox' ? (getDropboxDirectLink(src) || src) : src} 
                     className="w-full h-full object-cover"
@@ -165,12 +182,7 @@ const VideoPlayer: React.FC<{
                     autoPlay={autoplay}
                     preload="auto"
                     onLoadedMetadata={handleLoadedMetadata}
-                    onLoadedData={() => {
-                        setIsLoaded(true);
-                        if (autoplay && videoRef.current && videoRef.current.paused) {
-                            videoRef.current.play().catch(() => {});
-                        }
-                    }}
+                    onCanPlay={handleCanPlay}
                     controls={controls}
                 />
             ) : (
@@ -178,7 +190,9 @@ const VideoPlayer: React.FC<{
                     src={getEmbedSrc()} 
                     className="w-full h-full pointer-events-none"
                     style={{ pointerEvents: controls ? 'auto' : 'none' }}
-                    allow="autoplay; fullscreen" 
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    allowFullScreen 
                     onLoad={() => setIsLoaded(true)} 
                 />
             )}
