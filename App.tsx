@@ -140,8 +140,10 @@ const App: React.FC = () => {
           await loginWithGoogle();
       } catch (e: any) { 
           let msg = e.message;
-          if (msg.includes('popup-closed-by-user')) msg = "Login cancelled.";
-          if (msg.includes('network-request-failed')) msg = "Network error. Check your connection.";
+          if (msg.includes('popup-closed-by-user')) msg = "Login window closed. Please try again.";
+          else if (msg.includes('network-request-failed')) msg = "Network error. Check your connection.";
+          else if (msg.includes('popup-blocked')) msg = "Popup blocked. Please allow popups for this site.";
+          
           setAuthError(msg); 
           setIsAuthProcessing(false);
       }
