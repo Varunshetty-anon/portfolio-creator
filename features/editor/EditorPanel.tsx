@@ -258,29 +258,41 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
     setIsShortening(true);
     setShortUrl('');
     try {
-        const apiUrl = `https://tinyurl.com/api-create.php?url=${encodeURIComponent(publicUrl)}`;
-        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(apiUrl)}`;
+        const encodedUrl = encodeURIComponent(publicUrl);
+        const apiUrl = `https://tinyurl.com/api-create.php?url=${encodedUrl}`;
+        
+        // Try corsproxy.io first (generally more reliable/faster)
+        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`;
         
         const response = await fetch(proxyUrl);
-        if (!response.ok) throw new Error("Network response was not ok");
+        if (!response.ok) throw new Error("Primary proxy failed");
         
         const short = await response.text();
         if (short.trim().startsWith('http')) {
              setShortUrl(short);
         } else {
-             const directRes = await fetch(apiUrl, { mode: 'cors' }); 
-             if (directRes.ok) {
-                 const directShort = await directRes.text();
-                 if (directShort.trim().startsWith('http')) {
-                     setShortUrl(directShort);
-                     return;
-                 }
-             }
              throw new Error("Invalid response");
         }
     } catch (e) {
-        console.error("Shortening failed", e);
-        setShortUrl("Error. Please copy the main link.");
+        // Fallback to allorigins.win
+        try {
+            const encodedUrl = encodeURIComponent(publicUrl);
+            const apiUrl = `https://tinyurl.com/api-create.php?url=${encodedUrl}`;
+            const backupProxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(apiUrl)}`;
+            
+            const res = await fetch(backupProxy);
+            if (!res.ok) throw new Error("Backup proxy failed");
+            
+            const short = await res.text();
+            if (short.trim().startsWith('http')) {
+                 setShortUrl(short);
+                 return;
+            }
+            throw new Error("Invalid response");
+        } catch (err) {
+            console.error("Shortening failed", err);
+            setShortUrl("Service unavailable.");
+        }
     } finally {
         setIsShortening(false);
     }
