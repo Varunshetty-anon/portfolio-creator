@@ -1,21 +1,32 @@
-// SELF-DESTRUCTING SERVICE WORKER
-// This script replaces any existing service worker to fix video playback issues.
+// Service Worker for Frames Portfolio
+// Explicitly bypasses media files to fix playback issues
 
 self.addEventListener('install', (event) => {
-  // Force this new worker to become the active one immediately
+  // Activate immediately to replace any existing broken service workers
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-  // 1. Take control of all open pages immediately
+  // Take control of all pages immediately
   event.waitUntil(self.clients.claim());
-  
-  // 2. Unregister this service worker to prevent future interference
-  self.registration.unregister().then(() => {
-    console.log('Service Worker: Unregistered to fix video streaming.');
-  });
 });
 
-// IMPORTANT: No 'fetch' event listener.
-// This ensures all network requests fall through to the browser's native network stack,
-// allowing range requests and streaming to work correctly with Firebase Storage.
+self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+
+  // CRITICAL: Bypass Firebase Storage and Media Files
+  // We explicitly DO NOT call event.respondWith() for these requests.
+  // This allows the browser to handle them natively, ensuring:
+  // 1. Range headers are sent correctly (vital for video seeking/streaming)
+  // 2. CORS checks are handled by the browser's media stack
+  // 3. 206 Partial Content responses are processed correctly
+  if (
+    url.hostname.includes('firebasestorage.googleapis.com') ||
+    url.pathname.match(/\.(mp4|webm|mov|m4v|ogg)$/i)
+  ) {
+    return; // Fall through to network
+  }
+
+  // For other requests, we currently fall through to network as well.
+  // This acts as a pass-through Service Worker.
+});
