@@ -14,12 +14,32 @@ interface PortfolioViewProps {
 
 // --- Helper Functions ---
 
-const ensureUrl = (url: string): string => {
+const ensureUrl = (url: string, key?: string): string => {
     if (!url) return '';
-    if (url.startsWith('http://') || url.startsWith('https://')) return url;
-    if (url.startsWith('mailto:')) return url;
-    if (url.includes('@') && !url.includes('/')) return `mailto:${url}`;
-    return `https://${url}`;
+    let processed = url.trim();
+    
+    // 1. If it has protocol, return as is.
+    if (processed.match(/^[a-zA-Z]+:\/\//)) return processed;
+
+    // 2. Email
+    if (key === 'email' || (processed.includes('@') && !processed.includes('/') && !key)) {
+        return `mailto:${processed}`;
+    }
+
+    // 3. Platform specific logic
+    if (key) {
+        const k = key.toLowerCase();
+        const cleanHandle = processed.startsWith('@') ? processed.substring(1) : processed;
+
+        if (k === 'instagram' && !processed.includes('instagram.com')) return `https://instagram.com/${cleanHandle}`;
+        if (k === 'twitter' && !processed.includes('twitter.com') && !processed.includes('x.com')) return `https://twitter.com/${cleanHandle}`;
+        if (k === 'linkedin' && !processed.includes('linkedin.com')) return `https://linkedin.com/in/${cleanHandle}`;
+        if (k === 'youtube' && !processed.includes('youtube.com') && !processed.includes('youtu.be')) return `https://youtube.com/${cleanHandle}`;
+        if (k === 'discord' && !processed.includes('discord.com') && !processed.includes('discord.gg')) return `https://discord.gg/${cleanHandle}`;
+    }
+
+    // 4. Generic fallback for domains
+    return `https://${processed}`;
 };
 
 // --- Helper Components ---
@@ -60,12 +80,17 @@ const VideoPlayer: React.FC<{
     useEffect(() => {
         if ((type === 'direct' || type === 'dropbox') && videoRef.current) {
             if (autoplay) {
-                videoRef.current.play().catch(() => {});
+                const playPromise = videoRef.current.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(error => {
+                        console.warn("Autoplay prevented:", error);
+                    });
+                }
             } else {
                 videoRef.current.pause();
             }
         }
-    }, [autoplay, type]);
+    }, [autoplay, type, src]);
 
     const getEmbedSrc = () => {
         const auto = autoplay ? 1 : 0;
@@ -104,8 +129,15 @@ const VideoPlayer: React.FC<{
                     loop 
                     muted={muted} 
                     playsInline 
-                    preload="metadata"
-                    onLoadedData={() => setIsLoaded(true)}
+                    autoPlay={autoplay}
+                    preload="auto"
+                    onLoadedData={() => {
+                        setIsLoaded(true);
+                        // Redundant check to force playback if autoplay is on but didn't start
+                        if (autoplay && videoRef.current && videoRef.current.paused) {
+                            videoRef.current.play().catch(() => {});
+                        }
+                    }}
                     controls={controls}
                 />
             ) : (
@@ -422,7 +454,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                             {safeData.socials && Object.entries(safeData.socials).map(([key, val]) => {
                                 if (!val) return null;
                                 const Icon = { instagram: Instagram, twitter: Twitter, youtube: Youtube, linkedin: Linkedin, email: Mail, discord: Globe }[key.toLowerCase()] || Globe;
-                                const url = ensureUrl(val as string);
+                                const url = ensureUrl(val as string, key);
                                 return (
                                     <a 
                                         key={key} 
