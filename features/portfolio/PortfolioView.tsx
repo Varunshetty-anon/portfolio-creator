@@ -64,8 +64,22 @@ const VideoPlayer: React.FC<{
 }> = ({ src, thumbnail, autoplay = false, muted = true, controls = false, aspectRatio = '16:9', className = '', onToggleMute }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const [isLoaded, setIsLoaded] = useState(false);
+    const [detectedRatio, setDetectedRatio] = useState<string | null>(null);
     
-    const cssAspectRatio = useMemo(() => aspectRatio ? aspectRatio.replace(':', '/') : '16/9', [aspectRatio]);
+    // Reset detection when src changes
+    useEffect(() => {
+        setDetectedRatio(null);
+    }, [src]);
+
+    const effectiveAspectRatio = detectedRatio || aspectRatio || '16:9';
+    const cssAspectRatio = useMemo(() => effectiveAspectRatio.replace(':', '/'), [effectiveAspectRatio]);
+    
+    const isVertical = useMemo(() => {
+        try {
+            const [w, h] = cssAspectRatio.split('/').map(Number);
+            return w < h;
+        } catch { return false; }
+    }, [cssAspectRatio]);
 
     const type = useMemo(() => {
         if (!src) return 'none';
@@ -108,8 +122,27 @@ const VideoPlayer: React.FC<{
         return src;
     };
 
+    const handleLoadedMetadata = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+        const { videoWidth, videoHeight } = e.currentTarget;
+        if (videoWidth && videoHeight) {
+            const r = videoWidth / videoHeight;
+            if (Math.abs(r - 9/16) < 0.05) setDetectedRatio('9:16');
+            else if (Math.abs(r - 16/9) < 0.05) setDetectedRatio('16:9');
+            else if (Math.abs(r - 4/3) < 0.05) setDetectedRatio('4:3');
+            else if (Math.abs(r - 1) < 0.05) setDetectedRatio('1:1');
+            else setDetectedRatio(`${videoWidth}/${videoHeight}`);
+        }
+    };
+
     return (
-        <div className={`relative w-full h-full bg-[#050505] overflow-hidden ${className}`} style={{ aspectRatio: cssAspectRatio }}>
+        <div 
+            className={`
+                relative bg-[#050505] overflow-hidden 
+                ${isVertical ? 'w-full h-auto lg:w-auto lg:h-full' : 'w-full h-full'} 
+                ${className}
+            `} 
+            style={{ aspectRatio: cssAspectRatio }}
+        >
             <AnimatePresence>
                 {!isLoaded && (
                     <motion.div 
@@ -131,9 +164,9 @@ const VideoPlayer: React.FC<{
                     playsInline 
                     autoPlay={autoplay}
                     preload="auto"
+                    onLoadedMetadata={handleLoadedMetadata}
                     onLoadedData={() => {
                         setIsLoaded(true);
-                        // Redundant check to force playback if autoplay is on but didn't start
                         if (autoplay && videoRef.current && videoRef.current.paused) {
                             videoRef.current.play().catch(() => {});
                         }
