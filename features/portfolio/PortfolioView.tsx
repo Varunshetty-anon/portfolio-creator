@@ -80,11 +80,13 @@ const VideoPlayer: React.FC<{
     const videoRef = useRef<HTMLVideoElement>(null);
     const [isLoaded, setIsLoaded] = useState(false);
     const [detectedRatio, setDetectedRatio] = useState<string | null>(null);
+    const [driveFallback, setDriveFallback] = useState(false);
     
     // Reset detection when src changes
     useEffect(() => {
         setDetectedRatio(null);
         setIsLoaded(false);
+        setDriveFallback(false);
     }, [src]);
 
     const effectiveAspectRatio = detectedRatio || aspectRatio || '16:9';
@@ -109,12 +111,11 @@ const VideoPlayer: React.FC<{
 
     // Force play when autoplay prop changes to true
     useEffect(() => {
-        if ((type === 'direct' || type === 'dropbox') && videoRef.current) {
+        if ((type === 'direct' || type === 'dropbox' || (type === 'drive' && !driveFallback)) && videoRef.current) {
             if (autoplay) {
                 const playPromise = videoRef.current.play();
                 if (playPromise !== undefined) {
                     playPromise.catch(error => {
-                        // Silent catch for autoplay blocks, we rely on the user or 'muted' to fix it
                         console.debug("Autoplay triggered via effect prevented:", error);
                     });
                 }
@@ -122,7 +123,7 @@ const VideoPlayer: React.FC<{
                 videoRef.current.pause();
             }
         }
-    }, [autoplay, type]);
+    }, [autoplay, type, driveFallback]);
 
     const getEmbedSrc = () => {
         const auto = autoplay ? 1 : 0;
@@ -133,20 +134,14 @@ const VideoPlayer: React.FC<{
             const match = src.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/);
             const ytId = match?.[2];
             if (!ytId) return src;
-            
-            // Critical for Autoplay: If autoplaying, default to muted (1) unless specifically unmuted (0).
-            // Browsers often block unmuted autoplay without prior interaction.
             const forceMute = (auto && muted) ? 1 : mute;
-
             return `https://www.youtube.com/embed/${ytId}?autoplay=${auto}&mute=${forceMute}&controls=${controls ? 1 : 0}&loop=1&playlist=${ytId}&playsinline=1&rel=0&modestbranding=1&showinfo=0&enablejsapi=1&origin=${origin}`;
         }
         if (type === 'vimeo') {
             const match = src.match(/vimeo\.com\/(?:channels\/(?:\w+\/)?|groups\/(?:[^\/]*)\/videos\/|album\/(?:\d+)\/video\/|video\/|)(\d+)(?:$|\/|\?)/);
             const vId = match?.[1];
             if (!vId) return src;
-            
             const isBackground = !controls && muted; 
-            
             return `https://player.vimeo.com/video/${vId}?autoplay=${auto}&muted=${mute}&loop=1&background=${isBackground ? 1 : 0}&playsinline=1`;
         }
         if (type === 'drive') return `https://drive.google.com/file/d/${getDriveId(src)}/preview`;
@@ -172,6 +167,62 @@ const VideoPlayer: React.FC<{
         }
     }
 
+    // Direct Video Render Logic (Includes Drive Direct Stream Hack)
+    if (type === 'direct' || type === 'dropbox' || (type === 'drive' && !driveFallback)) {
+        let videoSrc = src;
+        if (type === 'dropbox') videoSrc = getDropboxDirectLink(src) || src;
+        if (type === 'drive') {
+            const dId = getDriveId(src);
+            // Attempt to stream directly from Drive to enable autoplay
+            videoSrc = dId ? `https://drive.google.com/uc?export=download&id=${dId}` : src;
+        }
+
+        return (
+             <div 
+                className={`relative bg-[#050505] overflow-hidden ${isVertical ? 'w-full h-auto lg:w-auto lg:h-full' : 'w-full h-full'} ${className}`} 
+                style={{ aspectRatio: cssAspectRatio }}
+            >
+                <AnimatePresence>
+                    {!isLoaded && (
+                        <motion.div initial={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.8 }} className="absolute inset-0 z-10 bg-[#09090b] flex items-center justify-center">
+                            {thumbnail && <img src={thumbnail} className="absolute inset-0 w-full h-full object-cover opacity-60 blur-lg scale-110" alt="Thumbnail" />}
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
+                <video 
+                    key={videoSrc}
+                    ref={videoRef}
+                    src={videoSrc}
+                    className="w-full h-full object-cover"
+                    loop 
+                    muted={muted} 
+                    playsInline 
+                    autoPlay={autoplay}
+                    preload="auto"
+                    onLoadedMetadata={handleLoadedMetadata}
+                    onCanPlay={handleCanPlay}
+                    controls={controls}
+                    onError={(e) => {
+                        console.warn("Direct video playback failed, fallback to iframe if applicable.", e);
+                        if (type === 'drive') setDriveFallback(true);
+                    }}
+                />
+                 {onToggleMute && (
+                    <motion.button 
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                        onClick={(e) => { e.stopPropagation(); onToggleMute(); }}
+                        className="absolute bottom-4 right-4 z-20 p-3 rounded-full bg-black/40 backdrop-blur-md text-white hover:bg-white hover:text-black transition-all border border-white/10"
+                    >
+                        {muted ? <VolumeX size={18}/> : <Volume2 size={18}/>}
+                    </motion.button>
+                )}
+            </div>
+        )
+    }
+
+    // Iframe Render Logic (Youtube, Vimeo, Drive Fallback)
     return (
         <div 
             className={`
@@ -187,40 +238,22 @@ const VideoPlayer: React.FC<{
                         initial={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.8 }}
                         className="absolute inset-0 z-10 bg-[#09090b] flex items-center justify-center"
                     >
-                         {/* Thumbnail Blur Background */}
                         {thumbnail && <img src={thumbnail} className="absolute inset-0 w-full h-full object-cover opacity-60 blur-lg scale-110" alt="Thumbnail" />}
                     </motion.div>
                 )}
             </AnimatePresence>
 
-            {(type === 'direct' || type === 'dropbox') ? (
-                <video 
-                    key={src} // CRITICAL: Forces remount if URL changes, fixing stuck video states
-                    ref={videoRef}
-                    src={type === 'dropbox' ? (getDropboxDirectLink(src) || src) : src} 
-                    className="w-full h-full object-cover"
-                    loop 
-                    muted={muted} 
-                    playsInline 
-                    autoPlay={autoplay}
-                    preload="auto"
-                    onLoadedMetadata={handleLoadedMetadata}
-                    onCanPlay={handleCanPlay}
-                    controls={controls}
-                />
-            ) : (
-                <iframe 
-                    src={getEmbedSrc()} 
-                    className="w-full h-full pointer-events-none"
-                    style={{ pointerEvents: controls ? 'auto' : 'none' }}
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                    referrerPolicy="strict-origin-when-cross-origin"
-                    allowFullScreen 
-                    onLoad={() => setIsLoaded(true)} 
-                />
-            )}
+            <iframe 
+                src={getEmbedSrc()} 
+                className="w-full h-full pointer-events-none"
+                style={{ pointerEvents: controls ? 'auto' : 'none' }}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                referrerPolicy="strict-origin-when-cross-origin"
+                allowFullScreen 
+                onLoad={() => setIsLoaded(true)} 
+            />
 
-            {onToggleMute && (
+            {onToggleMute && type !== 'drive' && ( // Drive iframe doesn't support programmatic mute toggle easily
                 <motion.button 
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}
@@ -239,7 +272,7 @@ const VideoPlayer: React.FC<{
 const IntroOverlay: React.FC<{ data: PortfolioData; onComplete: () => void; isImageLoaded: boolean }> = ({ data, onComplete, isImageLoaded }) => {
     useEffect(() => {
         if (isImageLoaded) {
-            const timer = setTimeout(onComplete, 2600); // Slightly longer for the new animation
+            const timer = setTimeout(onComplete, 2600); 
             return () => clearTimeout(timer);
         }
     }, [onComplete, isImageLoaded]);
@@ -248,10 +281,7 @@ const IntroOverlay: React.FC<{ data: PortfolioData; onComplete: () => void; isIm
         hidden: { opacity: 0 },
         visible: { 
             opacity: 1,
-            transition: { 
-                staggerChildren: 0.15,
-                delayChildren: 0.2
-            }
+            transition: { staggerChildren: 0.15, delayChildren: 0.2 }
         },
         exit: { 
             opacity: 0, 
@@ -289,7 +319,6 @@ const IntroOverlay: React.FC<{ data: PortfolioData; onComplete: () => void; isIm
                 <motion.h1 variants={itemVariants} className="text-4xl md:text-6xl font-display font-black uppercase text-white tracking-tight">
                     {data.name}
                 </motion.h1>
-                
                 <motion.div variants={itemVariants} className="flex flex-col items-center gap-4">
                      <div className="h-px w-12 bg-zinc-700" />
                      <span className="text-lg md:text-xl font-medium text-zinc-400 tracking-wide uppercase">
@@ -302,9 +331,6 @@ const IntroOverlay: React.FC<{ data: PortfolioData; onComplete: () => void; isIm
 };
 
 const ProjectCard: React.FC<{ project: Project; onClick: () => void; className?: string }> = ({ project, onClick, className = '' }) => {
-    // Optimization: Clamp 9:16 vertical videos to a 3:4 aspect ratio in the grid view.
-    // This reduces the massive vertical height while still preserving the "portrait" feel.
-    // 9:16 = 0.56, 3:4 = 0.75. 
     const displayAspectRatio = useMemo(() => {
         if (project.aspectRatio === '9:16') return '3/4'; 
         return project.aspectRatio ? project.aspectRatio.replace(':', '/') : '16/9';
@@ -325,8 +351,6 @@ const ProjectCard: React.FC<{ project: Project; onClick: () => void; className?:
                 alt={project.title}
                 loading="lazy"
             />
-            
-            {/* Hover Overlay */}
             <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center p-6 text-center backdrop-blur-[2px]">
                  <div className="transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300 flex flex-col items-center gap-4">
                      <div className="w-12 h-12 rounded-full bg-white text-black flex items-center justify-center shadow-lg mb-2">
@@ -357,7 +381,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
             const img = new Image();
             img.src = safeData.profileImage;
             img.onload = () => setIsImageLoaded(true);
-            img.onerror = () => setIsImageLoaded(true); // Proceed even if fail
+            img.onerror = () => setIsImageLoaded(true); 
         } else {
             setIsImageLoaded(true);
         }
@@ -367,15 +391,9 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
     const categorizedProjects = useMemo(() => {
         const projects = safeData.projects || [];
         const albums = safeData.albums || [];
-        
-        // Map of Album ID -> Projects
         const mapping = new Map<string, Project[]>();
         const uncategorized: Project[] = [];
-
-        // Initialize mapping with order from albums array
         albums.forEach(a => mapping.set(a.id, []));
-
-        // Distribute projects
         projects.forEach(p => {
             if (p.albumId && mapping.has(p.albumId)) {
                 mapping.get(p.albumId)?.push(p);
@@ -383,26 +401,16 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                 uncategorized.push(p);
             }
         });
-
-        // Build result array
         const result: { title: string; projects: Project[] }[] = [];
-        
         albums.forEach(a => {
             const projs = mapping.get(a.id);
-            if (projs && projs.length > 0) {
-                result.push({ title: a.title, projects: projs });
-            }
+            if (projs && projs.length > 0) result.push({ title: a.title, projects: projs });
         });
-
         if (uncategorized.length > 0) {
-            // If no albums exist at all, don't show "Uncategorized" header, just show the projects.
-            // If albums DO exist, show "General" or "Other Work".
             const title = albums.length > 0 ? "Other Work" : "My Work";
             result.push({ title, projects: uncategorized });
         }
-        
         return result;
-
     }, [safeData.projects, safeData.albums]);
 
     useEffect(() => {
@@ -442,18 +450,8 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                             className="w-full max-w-7xl max-h-[90vh] flex flex-col lg:flex-row bg-[#09090b] rounded-3xl overflow-hidden border border-zinc-800 shadow-2xl" 
                             onClick={e => e.stopPropagation()}
                         >
-                            {/* Video Container Logic */}
                             <div className="flex-1 bg-black relative flex items-center justify-center min-h-[40vh] lg:min-h-0 overflow-hidden">
-                                <div 
-                                    className={`
-                                        flex items-center justify-center
-                                        ${selectedProject.aspectRatio === '9:16' 
-                                            ? 'h-full w-auto aspect-[9/16] lg:max-h-full' // 9:16 Desktop: fill height, auto width
-                                            : 'w-full aspect-video lg:max-h-full' // 16:9 Desktop: fill width (contained by flex)
-                                        }
-                                        max-h-[85vh] max-w-full
-                                    `}
-                                >
+                                <div className={`flex items-center justify-center ${selectedProject.aspectRatio === '9:16' ? 'h-full w-auto aspect-[9/16] lg:max-h-full' : 'w-full aspect-video lg:max-h-full'} max-h-[85vh] max-w-full`}>
                                     <VideoPlayer 
                                         src={selectedProject.link} 
                                         thumbnail={selectedProject.thumbnail} 
@@ -464,8 +462,6 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                                     />
                                 </div>
                             </div>
-
-                            {/* Info Side */}
                             <div className="w-full lg:w-[400px] p-8 lg:p-10 border-t lg:border-t-0 lg:border-l border-zinc-800 overflow-y-auto bg-[#09090b] shrink-0">
                                 <h2 className="text-3xl md:text-4xl font-display font-bold text-white mb-4 leading-tight">{selectedProject.title}</h2>
                                 <div className="flex flex-wrap gap-2 mb-8">
@@ -489,7 +485,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                 className="flex flex-col lg:flex-row min-h-screen"
             >
                 {/* --- SIDEBAR --- */}
-                {/* Fixed: Allow independent scrolling on sidebar if content overflows height, but keep it sticky to viewport top */}
+                {/* Sticky sidebar that enables split-screen independent scrolling logic */}
                 <aside className="
                     w-full lg:w-[35%] xl:w-[32%] 
                     lg:h-screen lg:sticky lg:top-0 
@@ -500,32 +496,24 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                     z-10
                 ">
                     <div className="space-y-10 lg:space-y-12">
-                        {/* Avatar with Status */}
                         <div className="relative inline-block">
                              <div className="w-32 h-32 md:w-40 md:h-40 rounded-full overflow-hidden border border-zinc-800 shadow-2xl ring-4 ring-zinc-900/50">
                                 <img src={safeData.profileImage} className="w-full h-full object-cover" alt="Profile" />
                             </div>
-                            {/* Availability Indicator */}
                             {safeData.availability?.status && (
                                 <div className="absolute bottom-2 right-2 flex items-center justify-center">
                                     <div className="w-6 h-6 bg-green-500 rounded-full border-[3px] border-[#050505] flex items-center justify-center shadow-[0_0_15px_rgba(34,197,94,0.6)] animate-pulse">
                                         <div className="w-2 h-2 bg-white rounded-full opacity-80" />
                                     </div>
-                                    <div className="absolute left-full ml-3 bg-zinc-900/90 text-[10px] font-bold uppercase tracking-widest text-green-400 px-2 py-1 rounded border border-zinc-800 whitespace-nowrap opacity-0 hover:opacity-100 transition-opacity pointer-events-none lg:pointer-events-auto">
-                                        Available
-                                    </div>
                                 </div>
                             )}
                         </div>
 
-                        {/* Identity */}
                         <div className="space-y-4">
                             <h1 className="text-6xl lg:text-8xl font-display font-black text-white tracking-tighter leading-[0.85] uppercase">
                                 {safeData.name}
                             </h1>
                             <p className="text-xl font-medium text-zinc-500">{safeData.role}</p>
-                            
-                            {/* Meta Row */}
                             <div className="flex flex-wrap gap-4 text-xs font-bold text-zinc-600 uppercase tracking-widest pt-2">
                                 {safeData.location && (
                                     <div className="flex items-center gap-1.5">
@@ -542,26 +530,17 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                             </div>
                         </div>
 
-                        {/* Bio */}
                         <p className="text-zinc-400 text-base md:text-lg leading-relaxed font-light max-w-sm">
                             {safeData.bio}
                         </p>
 
-                        {/* Socials Dock */}
-                        {/* Fixed: Use wrap to prevent cutting off if width is constrained, and padding to avoid clipping */}
                         <div className="flex flex-wrap gap-3 pb-2">
                             {safeData.socials && Object.entries(safeData.socials).map(([key, val]) => {
                                 if (!val) return null;
                                 const Icon = { instagram: Instagram, twitter: Twitter, youtube: Youtube, linkedin: Linkedin, email: Mail, discord: Globe }[key.toLowerCase()] || Globe;
                                 const url = ensureUrl(val as string, key);
                                 return (
-                                    <a 
-                                        key={key} 
-                                        href={url} 
-                                        target="_blank" 
-                                        rel="noopener noreferrer"
-                                        className="p-3.5 rounded-full bg-zinc-900/50 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-white hover:border-white transition-all duration-300 group"
-                                    >
+                                    <a key={key} href={url} target="_blank" rel="noopener noreferrer" className="p-3.5 rounded-full bg-zinc-900/50 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-white hover:border-white transition-all duration-300 group">
                                         <Icon size={20} className="group-hover:scale-110 transition-transform" />
                                     </a>
                                 )
@@ -569,7 +548,6 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                         </div>
                     </div>
 
-                    {/* Footer / CTA */}
                     <div className="hidden lg:block space-y-4 pt-4">
                          <div className="w-full h-px bg-zinc-900" />
                          <div className="flex justify-between items-end">
@@ -588,15 +566,16 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                     {/* 1. Showreel Section */}
                     {safeData.showreelLink && (
                         <section className="p-6 md:p-12 xl:p-16 border-b border-zinc-900/50">
-                            <div className="flex items-center gap-3 mb-6 max-w-5xl mx-auto">
+                            <div className="flex items-center gap-3 mb-6 max-w-3xl mx-auto">
                                 <h2 className="text-3xl font-display font-bold text-white tracking-tight">Showreel</h2>
                             </div>
                             
-                            <div className="max-w-5xl mx-auto w-full aspect-video md:aspect-[2.35/1] rounded-2xl overflow-hidden ring-1 ring-zinc-800 shadow-2xl relative group bg-black">
+                            {/* Decreased width to max-w-3xl as requested */}
+                            <div className="max-w-3xl mx-auto w-full aspect-video md:aspect-[2.35/1] rounded-2xl overflow-hidden ring-1 ring-zinc-800 shadow-2xl relative group bg-black">
                                 <VideoPlayer 
                                     src={safeData.showreelLink} 
                                     thumbnail={safeData.showreelThumbnail} 
-                                    autoplay={true} // Fixed: Always true so video starts buffering/playing behind intro overlay
+                                    autoplay={true} 
                                     muted={isShowreelMuted}
                                     onToggleMute={() => setIsShowreelMuted(!isShowreelMuted)}
                                     className="scale-[1.01] group-hover:scale-100 transition-transform duration-1000"
@@ -614,7 +593,6 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                                     <div className="h-px flex-1 bg-zinc-900 ml-6 relative top-[-8px] hidden md:block" />
                                 </div>
 
-                                {/* Updated Grid: Denser for smaller thumbnails (2 cols on mobile, 3 on md, 4 on lg) */}
                                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                                     {section.projects.map(project => (
                                         <ProjectCard 
@@ -627,7 +605,6 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                             </section>
                         ))}
                         
-                        {/* Fallback if no projects */}
                         {categorizedProjects.length === 0 && (
                             <div className="p-12 text-center text-zinc-600 border border-zinc-900 border-dashed rounded-xl">
                                 No projects to display.
@@ -641,8 +618,6 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                              </div>
 
                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6">
-                                 
-                                 {/* Primary Workflow (Large Card) */}
                                  {safeData.primaryTool && (
                                      <div className="col-span-1 lg:col-span-5 bg-zinc-900/50 border border-zinc-800 rounded-3xl p-8 flex flex-col justify-between group hover:border-zinc-600 transition-colors">
                                          <div>
@@ -661,7 +636,6 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                                  )}
 
                                  <div className="col-span-1 lg:col-span-7 grid grid-cols-1 gap-6">
-                                     {/* Standard Stack */}
                                      <div className="bg-zinc-950 border border-zinc-900 rounded-3xl p-6">
                                         <div className="flex items-center gap-3 mb-4">
                                             <Layers size={18} className="text-zinc-500"/>
@@ -677,7 +651,6 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                                         </div>
                                      </div>
 
-                                     {/* AI Tools */}
                                      {safeData.aiTools && safeData.aiTools.length > 0 && (
                                          <div className="bg-gradient-to-br from-indigo-900/10 to-purple-900/10 border border-indigo-500/10 rounded-3xl p-6">
                                             <div className="flex items-center gap-3 mb-4">
@@ -698,7 +671,6 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                              </div>
                         </section>
                         
-                        {/* Mobile Only Footer */}
                         <div className="lg:hidden mt-20 pt-8 border-t border-zinc-900">
                             <h2 className="text-2xl font-display font-bold text-white mb-2">Let's Create.</h2>
                             <a href={`mailto:${safeData.contactEmail}`} className="text-lg text-zinc-500">{safeData.contactEmail}</a>
