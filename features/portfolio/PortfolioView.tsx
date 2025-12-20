@@ -100,6 +100,13 @@ const VideoPlayer: React.FC<{
         setDetectedRatio(null);
     }, [src, isShowreel, isNative]);
 
+    // Fix for autoplay policy: Sync defaultMuted via ref since React prop isn't fully supported in all TS definitions
+    useEffect(() => {
+        if (videoRef.current) {
+            videoRef.current.defaultMuted = muted;
+        }
+    }, [muted]);
+
     const effectiveAspectRatio = detectedRatio || aspectRatio || '16:9';
     const cssAspectRatio = useMemo(() => effectiveAspectRatio.replace(':', '/'), [effectiveAspectRatio]);
     
