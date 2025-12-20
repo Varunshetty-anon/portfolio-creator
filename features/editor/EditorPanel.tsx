@@ -100,6 +100,10 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
   useEffect(() => { if (data.uid && activeTab === 'dashboard') getPortfolioStats(data.uid).then(setStats); }, [activeTab, data.uid]);
 
   const updateField = (f: keyof PortfolioData, v: any) => onChange({ ...data, [f]: v });
+  
+  const updateSocial = (key: string, val: string) => {
+      onChange({ ...data, socials: { ...data.socials, [key]: val } });
+  }
 
   if (!data) return <div className="h-screen bg-black flex items-center justify-center"><Loader2 className="animate-spin text-zinc-500"/></div>;
 
@@ -199,6 +203,18 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
                                  <TextArea label="Bio" value={data.bio} onChange={e => updateField('bio', e.target.value)} rows={4} />
                                  <Input label="Location" value={data.location} onChange={e => updateField('location', e.target.value)} />
                                  <Input label="Contact Email" value={data.contactEmail} onChange={e => updateField('contactEmail', e.target.value)} />
+                                 <Input label="Languages" value={data.languages} onChange={e => updateField('languages', e.target.value)} placeholder="English, Spanish, etc." />
+                             </div>
+                             
+                             <div className="pt-8 border-t border-zinc-900 space-y-4">
+                                <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-500">Social Presence</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <Input label="Instagram" placeholder="https://instagram.com/..." value={data.socials?.instagram || ''} onChange={e => updateSocial('instagram', e.target.value)} />
+                                    <Input label="Twitter / X" placeholder="https://twitter.com/..." value={data.socials?.twitter || ''} onChange={e => updateSocial('twitter', e.target.value)} />
+                                    <Input label="LinkedIn" placeholder="https://linkedin.com/in/..." value={data.socials?.linkedin || ''} onChange={e => updateSocial('linkedin', e.target.value)} />
+                                    <Input label="YouTube" placeholder="https://youtube.com/..." value={data.socials?.youtube || ''} onChange={e => updateSocial('youtube', e.target.value)} />
+                                    <Input label="Discord" placeholder="Server Invite or Handle" value={data.socials?.discord || ''} onChange={e => updateSocial('discord', e.target.value)} />
+                                </div>
                              </div>
                         </div>
                     )}
