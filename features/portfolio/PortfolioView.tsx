@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { motion, AnimatePresence, useScroll, useTransform, useInView } from 'framer-motion';
-import { Mail, Instagram, Twitter, Linkedin, Youtube, Globe, X, Volume2, VolumeX, Loader2, Play, ArrowDown, Sparkles } from 'lucide-react';
+import { motion, AnimatePresence, useScroll, useTransform, useSpring } from 'framer-motion';
+import { Mail, Instagram, Twitter, Linkedin, Youtube, Globe, X, Volume2, VolumeX, Loader2, Play, ArrowDown, Sparkles, ExternalLink, ArrowRight } from 'lucide-react';
 import { PortfolioData, Project, INITIAL_DATA } from '../../types';
 import { EDITING_TOOLS_LIST, AI_TOOLS_LIST, trackPortfolioView, getDriveId, getDropboxDirectLink } from '../../lib/utils';
 
@@ -9,7 +9,7 @@ interface PortfolioViewProps {
   isPreview?: boolean;
 }
 
-// --- Components ---
+// --- Helper Components ---
 
 const ToolIcon = React.memo(({ name, className = "w-5 h-5" }: { name: string; className?: string }) => {
     const tool = [...EDITING_TOOLS_LIST, ...AI_TOOLS_LIST].find(t => t.name === name);
@@ -19,12 +19,22 @@ const ToolIcon = React.memo(({ name, className = "w-5 h-5" }: { name: string; cl
     return <img src={imgSrc} alt={name} className={`${className} object-contain opacity-70 group-hover:opacity-100 transition-opacity`} onError={(e) => (e.currentTarget.style.display = 'none')} />;
 });
 
-const VideoPlayer: React.FC<{ src: string; thumbnail: string; autoplay?: boolean; isModal?: boolean; aspectRatio?: string }> = ({ src, thumbnail, autoplay = false, isModal = false, aspectRatio = '16/9' }) => {
-    const [isReady, setIsReady] = useState(false);
-    const [isMuted, setIsMuted] = useState(true);
-    const containerRef = useRef<HTMLDivElement>(null);
+// Optimized Video Player for Showreel & Projects
+const VideoPlayer: React.FC<{ 
+    src: string; 
+    thumbnail: string; 
+    autoplay?: boolean; 
+    muted?: boolean;
+    controls?: boolean;
+    aspectRatio?: string;
+    className?: string;
+    onToggleMute?: () => void;
+}> = ({ src, thumbnail, autoplay = false, muted = true, controls = false, aspectRatio = '16:9', className = '', onToggleMute }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
-    const isInView = useInView(containerRef, { margin: "0px", amount: 0.2 });
+    const [isLoaded, setIsLoaded] = useState(false);
+    
+    // Normalize Aspect Ratio for CSS
+    const cssAspectRatio = useMemo(() => aspectRatio.replace(':', '/'), [aspectRatio]);
 
     const type = useMemo(() => {
         if (!src) return 'none';
@@ -38,89 +48,145 @@ const VideoPlayer: React.FC<{ src: string; thumbnail: string; autoplay?: boolean
 
     useEffect(() => {
         if ((type === 'direct' || type === 'dropbox') && videoRef.current) {
-            if (autoplay && isInView) {
-                videoRef.current.play().catch(() => setIsMuted(true));
-            } else if (!isModal) {
+            if (autoplay) {
+                videoRef.current.play().catch(e => console.warn("Autoplay blocked", e));
+            } else {
                 videoRef.current.pause();
             }
         }
-    }, [isInView, type, autoplay, isModal]);
+    }, [autoplay, type]);
 
     const getEmbedSrc = () => {
+        const auto = autoplay ? 1 : 0;
+        const mute = muted ? 1 : 0;
+        
         if (type === 'youtube') {
             const ytId = src.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/)?.[2];
-            return `https://www.youtube.com/embed/${ytId}?autoplay=${autoplay && isInView ? 1 : 0}&mute=1&controls=${isModal ? 1 : 0}&loop=1&playlist=${ytId}&playsinline=1&rel=0&modestbranding=1`;
+            return `https://www.youtube.com/embed/${ytId}?autoplay=${auto}&mute=${mute}&controls=${controls ? 1 : 0}&loop=1&playlist=${ytId}&playsinline=1&rel=0&modestbranding=1&showinfo=0`;
         }
         if (type === 'vimeo') {
             const vId = src.match(/vimeo\.com\/(?:channels\/(?:\w+\/)?|groups\/(?:[^\/]*)\/videos\/|album\/(?:\d+)\/video\/|video\/|)(\d+)(?:$|\/|\?)/)?.[1];
-            return `https://player.vimeo.com/video/${vId}?autoplay=${autoplay && isInView ? 1 : 0}&muted=1&loop=1&background=${isModal ? 0 : 1}&playsinline=1`;
+            return `https://player.vimeo.com/video/${vId}?autoplay=${auto}&muted=${mute}&loop=1&background=${controls ? 0 : 1}&playsinline=1`;
         }
         if (type === 'drive') return `https://drive.google.com/file/d/${getDriveId(src)}/preview`;
         return src;
     };
 
     return (
-        <div 
-            ref={containerRef} 
-            className={`relative w-full bg-zinc-950 overflow-hidden ${!isModal ? 'rounded-xl md:rounded-2xl' : ''}`}
-            style={{ aspectRatio: isModal ? undefined : aspectRatio.replace(':', '/') }}
-        >
+        <div className={`relative w-full h-full bg-black overflow-hidden ${className}`} style={{ aspectRatio: cssAspectRatio }}>
+            {/* Loading / Thumbnail Layer */}
             <AnimatePresence>
-                {!isReady && (
-                    <motion.div initial={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-20 bg-zinc-900 flex items-center justify-center">
-                        {thumbnail && <img src={thumbnail} className="absolute inset-0 w-full h-full object-cover opacity-50 blur-xl scale-110" />}
-                        <Loader2 className="animate-spin text-zinc-500 relative z-30" />
+                {!isLoaded && (
+                    <motion.div 
+                        initial={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.5 }}
+                        className="absolute inset-0 z-10 bg-zinc-900"
+                    >
+                        {thumbnail && <img src={thumbnail} className="w-full h-full object-cover opacity-60 blur-sm" alt="Thumbnail" />}
+                        <div className="absolute inset-0 flex items-center justify-center">
+                            <Loader2 className="animate-spin text-white/50" />
+                        </div>
                     </motion.div>
                 )}
             </AnimatePresence>
 
+            {/* Video Layer */}
             {(type === 'direct' || type === 'dropbox') ? (
-                <div className="w-full h-full relative group">
-                    <video 
-                        ref={videoRef} src={type === 'dropbox' ? (getDropboxDirectLink(src) || src) : src} 
-                        className="w-full h-full object-cover"
-                        loop muted={isMuted} playsInline preload="metadata"
-                        onLoadedData={() => setIsReady(true)}
-                        controls={isModal}
-                    />
-                </div>
+                <video 
+                    ref={videoRef}
+                    src={type === 'dropbox' ? (getDropboxDirectLink(src) || src) : src} 
+                    className="w-full h-full object-cover"
+                    loop 
+                    muted={muted} 
+                    playsInline 
+                    preload="metadata"
+                    onLoadedData={() => setIsLoaded(true)}
+                    controls={controls}
+                />
             ) : (
-                <iframe src={getEmbedSrc()} className="w-full h-full" allow="autoplay; fullscreen" onLoad={() => setIsReady(true)} />
+                <iframe 
+                    src={getEmbedSrc()} 
+                    className="w-full h-full pointer-events-none" // Pointer events none for embeds to prevent hijacking scroll/click, unless modal
+                    style={{ pointerEvents: controls ? 'auto' : 'none' }}
+                    allow="autoplay; fullscreen" 
+                    onLoad={() => setIsLoaded(true)} 
+                />
+            )}
+
+            {/* Custom Overlay Controls (For Showreel) */}
+            {onToggleMute && (
+                <button 
+                    onClick={(e) => { e.stopPropagation(); onToggleMute(); }}
+                    className="absolute bottom-6 right-6 z-20 p-3 rounded-full bg-black/50 backdrop-blur-md text-white hover:bg-white hover:text-black transition-all border border-white/10"
+                >
+                    {muted ? <VolumeX size={20}/> : <Volume2 size={20}/>}
+                </button>
             )}
         </div>
     );
 };
 
-const ProjectModal: React.FC<{ project: Project; onClose: () => void }> = ({ project, onClose }) => {
+// --- Sub-Components ---
+
+const IntroOverlay: React.FC<{ data: PortfolioData; onComplete: () => void }> = ({ data, onComplete }) => {
+    useEffect(() => {
+        const timer = setTimeout(onComplete, 2500);
+        return () => clearTimeout(timer);
+    }, [onComplete]);
+
     return (
         <motion.div 
-            className="fixed inset-0 z-[1000] bg-black/95 backdrop-blur-md flex items-center justify-center p-4 md:p-8"
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}
+            initial={{ opacity: 1 }} 
+            exit={{ opacity: 0, filter: 'blur(20px)' }}
+            transition={{ duration: 0.8, ease: "easeInOut" }}
+            className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center p-6"
         >
-            <button className="absolute top-4 right-4 z-50 p-3 rounded-full bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors"><X size={24} /></button>
             <motion.div 
-                className="bg-[#09090b] w-full max-w-6xl max-h-[90vh] rounded-3xl border border-zinc-800 overflow-hidden flex flex-col lg:flex-row shadow-2xl"
-                initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }} onClick={e => e.stopPropagation()}
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ duration: 1, ease: "easeOut" }}
+                className="flex flex-col items-center"
             >
-                <div className="flex-1 bg-black flex items-center justify-center relative min-h-[40vh]">
-                     <div className="w-full h-full flex items-center justify-center">
-                         <VideoPlayer src={project.link} thumbnail={project.thumbnail} autoplay={true} isModal={true} aspectRatio={project.aspectRatio} />
-                     </div>
+                <div className="w-32 h-32 md:w-48 md:h-48 rounded-full overflow-hidden border-2 border-zinc-800 shadow-[0_0_50px_rgba(255,255,255,0.1)] mb-8">
+                    <img src={data.profileImage} className="w-full h-full object-cover" alt={data.name} />
                 </div>
-                <div className="w-full lg:w-[400px] bg-zinc-900/50 border-t lg:border-t-0 lg:border-l border-zinc-800 p-8 lg:p-10 overflow-y-auto shrink-0">
-                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-indigo-400 mb-4 block">{project.contentType || 'Project'}</span>
-                    <h2 className="text-3xl font-display font-bold text-white mb-6 leading-tight">{project.title}</h2>
-                    <p className="text-zinc-400 text-sm leading-relaxed mb-8">{project.description}</p>
-                    {project.softwareUsed && (
-                        <div className="space-y-3">
-                            <h4 className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">Tools</h4>
-                            <div className="flex flex-wrap gap-2">
-                                {project.softwareUsed.map(t => <span key={t} className="px-3 py-1 bg-zinc-800 rounded-md text-[10px] text-zinc-300 border border-zinc-700">{t}</span>)}
+                <h1 className="text-4xl md:text-6xl font-display font-bold text-white tracking-tighter text-center">{data.name}</h1>
+                <p className="text-zinc-500 text-sm tracking-[0.3em] uppercase mt-4">{data.role}</p>
+            </motion.div>
+        </motion.div>
+    );
+};
+
+const ProjectCard: React.FC<{ project: Project; onClick: () => void }> = ({ project, onClick }) => {
+    return (
+        <motion.div 
+            whileHover={{ y: -5 }}
+            onClick={onClick}
+            className="group cursor-pointer flex flex-col gap-3"
+        >
+            <div 
+                className="relative w-full rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-800 shadow-xl"
+                style={{ aspectRatio: project.aspectRatio ? project.aspectRatio.replace(':', '/') : '16/9' }}
+            >
+                {/* Image */}
+                <img 
+                    src={project.thumbnail} 
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 opacity-80 group-hover:opacity-100" 
+                    alt={project.title}
+                />
+                
+                {/* Overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-6">
+                     <div className="translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-indigo-400 mb-2 block">{project.contentType}</span>
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-white font-bold text-lg leading-tight">{project.title}</h3>
+                            <div className="w-10 h-10 rounded-full bg-white text-black flex items-center justify-center">
+                                <Play size={16} fill="currentColor" />
                             </div>
                         </div>
-                    )}
+                     </div>
                 </div>
-            </motion.div>
+            </div>
         </motion.div>
     );
 };
@@ -129,192 +195,207 @@ const ProjectModal: React.FC<{ project: Project; onClose: () => void }> = ({ pro
 
 export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = false }) => {
     const safeData = useMemo(() => ({ ...INITIAL_DATA, ...data }), [data]);
+    const [introComplete, setIntroComplete] = useState(false);
     const [selectedProject, setSelectedProject] = useState<Project | null>(null);
-    const { scrollY } = useScroll();
-    
-    // --- Layout Transforms ---
-    // Desktop: Sidebar transition
-    const desktopLogoScale = useTransform(scrollY, [0, 400], [1, 0.6]);
-    const desktopTextOpacity = useTransform(scrollY, [0, 200], [1, 0]);
-    
-    // Mobile: Header transition
-    const mobileHeaderHeight = useTransform(scrollY, [0, 300], [400, 80]);
-    const mobileLogoScale = useTransform(scrollY, [0, 300], [1, 0.4]);
-    const mobileTextOpacity = useTransform(scrollY, [0, 150], [1, 0]);
+    const [isShowreelMuted, setIsShowreelMuted] = useState(true);
 
     useEffect(() => {
         if (!isPreview && safeData.uid) trackPortfolioView(safeData.uid);
-        document.body.style.overflow = selectedProject ? 'hidden' : 'auto';
+        document.body.style.overflow = selectedProject || !introComplete ? 'hidden' : 'auto';
         return () => { document.body.style.overflow = 'auto'; }
-    }, [selectedProject, safeData.uid, isPreview]);
+    }, [selectedProject, safeData.uid, isPreview, introComplete]);
 
     return (
-        <div className="bg-[#050505] min-h-screen w-full relative text-zinc-100 font-sans selection:bg-white/20">
+        <div className="bg-[#030303] min-h-screen w-full relative text-zinc-100 font-sans selection:bg-indigo-500/30 selection:text-white">
+            
+            {/* Intro Animation */}
             <AnimatePresence>
-                {selectedProject && <ProjectModal project={selectedProject} onClose={() => setSelectedProject(null)} />}
+                {!introComplete && (
+                    <IntroOverlay data={safeData} onComplete={() => setIntroComplete(true)} />
+                )}
             </AnimatePresence>
 
-            {/* --- LAYOUT STRUCTURE --- */}
-            <div className="flex flex-col lg:flex-row min-h-screen">
-                
-                {/* --- SIDEBAR / HEADER (STICKY) --- */}
-                {/* 
-                   Mobile: Sticky Header at Top
-                   Desktop: Sticky Sidebar at Left
-                */}
-                <motion.aside 
-                    className="sticky top-0 z-30 flex flex-col items-center justify-center border-b lg:border-b-0 lg:border-r border-zinc-900 bg-[#050505] overflow-hidden shadow-2xl lg:shadow-none"
-                    style={{
-                        height: mobileHeaderHeight, // Dynamic on Mobile
-                        width: '100%', // Full width on Mobile
-                    }}
-                    // Desktop Override via Tailwind classes for fixed width/height
-                    // Note: Framer Motion style override takes precedence, so we use a media query conditioned logic or css modules.
-                    // Instead, simplified: Let's rely on standard classes for Desktop and use motion for mobile height
-                >
-                    <div className="hidden lg:flex flex-col items-center justify-center w-full h-screen sticky top-0 lg:w-[400px] shrink-0 p-8">
-                         {/* DESKTOP CONTENT */}
-                        <motion.div style={{ scale: desktopLogoScale }} className="relative z-10">
-                            <div className="w-48 h-48 rounded-full border border-zinc-800 bg-zinc-900 overflow-hidden shadow-2xl mb-8 mx-auto">
-                                <img src={safeData.profileImage} className="w-full h-full object-cover" alt={safeData.name} />
-                            </div>
-                            <div className="text-center">
-                                <h1 className="font-display font-bold text-5xl tracking-tighter text-white mb-2">{safeData.name}</h1>
-                                <p className="text-zinc-500 font-medium tracking-[0.2em] text-sm uppercase">{safeData.role}</p>
-                            </div>
-                        </motion.div>
-
-                        <motion.div style={{ opacity: desktopTextOpacity }} className="mt-8 flex flex-col items-center gap-6 max-w-xs text-center">
-                             <div className="w-12 h-px bg-zinc-800"/>
-                             <p className="text-zinc-400 text-sm leading-relaxed font-light">{safeData.bio}</p>
-                             <div className="flex gap-4">
-                                {safeData.socials && Object.entries(safeData.socials).map(([key, val]) => {
-                                    if (!val) return null;
-                                    const Icon = { instagram: Instagram, twitter: Twitter, youtube: Youtube, linkedin: Linkedin, email: Mail }[key] || Globe;
-                                    return <a key={key} href={val as string} target="_blank" className="p-3 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-500 hover:bg-white hover:text-black transition-all"><Icon size={16}/></a>
-                                })}
-                            </div>
-                            <div className="mt-8 animate-bounce opacity-30">
-                                <ArrowDown size={16} />
-                            </div>
-                        </motion.div>
-                    </div>
-
-                    {/* MOBILE CONTENT (Visible only on small screens via CSS/Height logic) */}
-                    <div className="lg:hidden w-full h-full flex flex-col items-center justify-center p-6 relative">
-                         <motion.div style={{ scale: mobileLogoScale }} className="origin-top">
-                            <div className="w-32 h-32 rounded-full border border-zinc-800 bg-zinc-900 overflow-hidden shadow-lg mx-auto mb-4">
-                                <img src={safeData.profileImage} className="w-full h-full object-cover" alt={safeData.name} />
-                            </div>
-                             <div className="text-center">
-                                <h1 className="font-display font-bold text-3xl tracking-tighter text-white">{safeData.name}</h1>
-                            </div>
-                         </motion.div>
-                         
-                         <motion.div style={{ opacity: mobileTextOpacity }} className="text-center mt-4">
-                            <p className="text-zinc-500 text-xs font-medium uppercase tracking-widest mb-4">{safeData.role}</p>
-                            <p className="text-zinc-400 text-sm max-w-xs mx-auto line-clamp-3">{safeData.bio}</p>
-                         </motion.div>
-                    </div>
-                </motion.aside>
-
-                {/* --- MAIN SCROLLABLE CONTENT --- */}
-                <main className="flex-1 bg-[#050505] relative z-10 w-full">
-                    {/* Spacer for Desktop to allow Hero to shine initially */}
-                    <div className="hidden lg:block h-[40vh]" /> 
-
-                    <div className="p-6 md:p-12 lg:p-20 pb-48 max-w-5xl mx-auto space-y-32">
+            {/* Project Modal */}
+            <AnimatePresence>
+                {selectedProject && (
+                    <motion.div 
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[50] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4"
+                        onClick={() => setSelectedProject(null)}
+                    >
+                        <button className="absolute top-6 right-6 z-50 p-3 bg-zinc-800 rounded-full text-zinc-400 hover:text-white transition-colors">
+                            <X size={24} />
+                        </button>
                         
-                        {/* 1. Showreel */}
-                        {safeData.showreelLink && (
-                            <section>
-                                <div className="flex items-center gap-4 mb-8">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"/>
-                                    <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">Showreel</h2>
+                        <div className="w-full max-w-6xl max-h-[90vh] flex flex-col lg:flex-row bg-[#09090b] rounded-3xl overflow-hidden border border-zinc-800 shadow-2xl" onClick={e => e.stopPropagation()}>
+                            <div className="flex-1 bg-black relative flex items-center justify-center">
+                                <div className="w-full h-full max-h-[70vh] lg:max-h-full aspect-video">
+                                    <VideoPlayer 
+                                        src={selectedProject.link} 
+                                        thumbnail={selectedProject.thumbnail} 
+                                        autoplay={true} 
+                                        muted={false} 
+                                        controls={true}
+                                        aspectRatio={selectedProject.aspectRatio}
+                                    />
                                 </div>
-                                <div className="w-full rounded-2xl overflow-hidden shadow-2xl bg-zinc-900 ring-1 ring-white/5">
-                                    <VideoPlayer src={safeData.showreelLink} thumbnail={safeData.showreelThumbnail} autoplay={true} aspectRatio="16:9" />
-                                </div>
-                            </section>
-                        )}
-
-                        {/* 2. Works */}
-                        {safeData.projects && safeData.projects.length > 0 && (
-                            <section>
-                                <div className="flex items-center gap-4 mb-8">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"/>
-                                    <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">Selected Works</h2>
-                                </div>
-                                
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                    {safeData.projects.map((project) => (
-                                        <div 
-                                            key={project.id}
-                                            onClick={() => setSelectedProject(project)}
-                                            className="group cursor-pointer flex flex-col gap-4"
-                                        >
-                                            <div className="relative w-full rounded-xl overflow-hidden bg-zinc-900 ring-1 ring-white/5 transition-transform duration-300 group-hover:-translate-y-1 shadow-lg">
-                                                <div className="w-full" style={{ aspectRatio: project.aspectRatio ? project.aspectRatio.replace(':', '/') : '16/9' }}>
-                                                    {project.thumbnail && <img src={project.thumbnail} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />}
-                                                </div>
-                                                <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors flex items-center justify-center">
-                                                    <div className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center border border-white/20 opacity-0 group-hover:opacity-100 transition-all duration-300 transform scale-75 group-hover:scale-100">
-                                                        <Play size={16} fill="white" className="ml-0.5 text-white"/>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div className="px-1">
-                                                <h3 className="font-display font-bold text-lg text-zinc-200 leading-tight group-hover:text-white transition-colors">{project.title}</h3>
-                                                <p className="text-xs text-zinc-500 mt-1 uppercase tracking-wide">{project.contentType}</p>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </section>
-                        )}
-
-                        {/* 3. Skills */}
-                        <section>
-                            <div className="flex items-center gap-4 mb-10">
-                                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"/>
-                                <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">Arsenal</h2>
                             </div>
-
-                            <div className="space-y-12">
-                                {safeData.primaryTool && (
-                                    <div className="bg-zinc-900/30 border border-zinc-800 p-6 rounded-2xl flex items-center gap-6">
-                                        <div className="w-14 h-14 bg-zinc-950 border border-zinc-800 rounded-xl flex items-center justify-center shadow-lg shrink-0">
-                                            <ToolIcon name={safeData.primaryTool} className="w-8 h-8" />
-                                        </div>
-                                        <div>
-                                            <h4 className="text-lg font-bold text-white">{safeData.primaryTool}</h4>
-                                            <p className="text-[10px] text-zinc-500 uppercase tracking-widest mt-1">Core Workflow</p>
+                            <div className="w-full lg:w-[350px] p-8 border-l border-zinc-800 overflow-y-auto bg-zinc-900/50">
+                                <h2 className="text-3xl font-display font-bold text-white mb-2">{selectedProject.title}</h2>
+                                <span className="text-xs font-bold uppercase tracking-wider text-indigo-400 mb-6 block">{selectedProject.contentType}</span>
+                                <p className="text-zinc-400 text-sm leading-relaxed mb-8">{selectedProject.description}</p>
+                                
+                                {selectedProject.softwareUsed && (
+                                    <div className="space-y-3">
+                                        <h4 className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">Tools Used</h4>
+                                        <div className="flex flex-wrap gap-2">
+                                            {selectedProject.softwareUsed.map(t => (
+                                                <span key={t} className="px-3 py-1 bg-zinc-800 border border-zinc-700 rounded-md text-[10px] text-zinc-300">
+                                                    {t}
+                                                </span>
+                                            ))}
                                         </div>
                                     </div>
                                 )}
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
-                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                                    {safeData.tools?.filter(t => t !== safeData.primaryTool).map(tool => (
-                                        <div key={tool} className="p-4 bg-zinc-900/30 border border-zinc-800 rounded-xl flex items-center gap-3 hover:bg-zinc-800 transition-colors">
-                                            <ToolIcon name={tool} />
-                                            <span className="text-xs font-medium text-zinc-400">{tool}</span>
-                                        </div>
+            {/* MAIN CONTENT */}
+            <motion.div 
+                initial={{ opacity: 0, filter: 'blur(10px)' }}
+                animate={{ opacity: introComplete ? 1 : 0, filter: introComplete ? 'blur(0px)' : 'blur(10px)' }}
+                transition={{ duration: 1 }}
+                className="flex flex-col lg:flex-row min-h-screen"
+            >
+                {/* --- LEFT SIDEBAR (Sticky Identity) --- */}
+                <aside className="lg:w-[35%] xl:w-[30%] lg:h-screen lg:sticky lg:top-0 border-r border-zinc-900/50 flex flex-col justify-between p-8 lg:p-12 z-20 bg-[#030303]">
+                    <div>
+                        <div className="flex items-center gap-4 mb-12">
+                            <div className="w-16 h-16 rounded-full overflow-hidden border border-zinc-800">
+                                <img src={safeData.profileImage} className="w-full h-full object-cover" alt="Profile" />
+                            </div>
+                            <div>
+                                <h1 className="font-display font-bold text-3xl text-white leading-none">{safeData.name}</h1>
+                                <p className="text-zinc-500 text-xs uppercase tracking-widest mt-1">{safeData.role}</p>
+                            </div>
+                        </div>
+                        
+                        <p className="text-zinc-400 text-base leading-relaxed font-light mb-8 max-w-sm">
+                            {safeData.bio}
+                        </p>
+
+                        <div className="flex flex-wrap gap-3">
+                             {safeData.socials && Object.entries(safeData.socials).map(([key, val]) => {
+                                if (!val) return null;
+                                const Icon = { instagram: Instagram, twitter: Twitter, youtube: Youtube, linkedin: Linkedin, email: Mail }[key] || Globe;
+                                return (
+                                    <a key={key} href={val as string} target="_blank" className="flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-400 text-xs font-medium hover:bg-white hover:text-black transition-all group">
+                                        <Icon size={14} />
+                                        <span className="capitalize hidden sm:inline">{key}</span>
+                                        <ArrowRight size={10} className="opacity-0 -ml-2 group-hover:opacity-100 group-hover:ml-0 transition-all"/>
+                                    </a>
+                                )
+                            })}
+                        </div>
+                    </div>
+                    
+                    <div className="hidden lg:block">
+                        <div className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest mb-2">Available for work</div>
+                        <a href={`mailto:${safeData.contactEmail}`} className="text-xl text-white hover:text-indigo-400 transition-colors font-display font-bold">
+                            {safeData.contactEmail}
+                        </a>
+                    </div>
+                </aside>
+
+                {/* --- RIGHT CONTENT (Scrollable) --- */}
+                <main className="flex-1 min-w-0 bg-[#030303] relative">
+                    
+                    {/* 1. Cinematic Showreel */}
+                    {safeData.showreelLink && (
+                        <section className="w-full border-b border-zinc-900/50">
+                           <div className="w-full aspect-video md:aspect-[21/9] lg:aspect-[16/7] relative overflow-hidden group">
+                                <VideoPlayer 
+                                    src={safeData.showreelLink} 
+                                    thumbnail={safeData.showreelThumbnail} 
+                                    autoplay={introComplete} // Only play after intro
+                                    muted={isShowreelMuted}
+                                    onToggleMute={() => setIsShowreelMuted(!isShowreelMuted)}
+                                    className="scale-105 group-hover:scale-100 transition-transform duration-[2s]"
+                                />
+                                <div className="absolute top-6 left-6 z-20 bg-black/50 backdrop-blur px-3 py-1 rounded text-[10px] font-bold uppercase tracking-widest text-white border border-white/10">
+                                    Showreel 2024
+                                </div>
+                           </div>
+                        </section>
+                    )}
+
+                    <div className="p-6 md:p-12 lg:p-16 space-y-24">
+                        
+                        {/* 2. Selected Works Grid */}
+                        {safeData.projects && safeData.projects.length > 0 && (
+                            <section>
+                                <div className="flex items-end justify-between mb-8 border-b border-zinc-900 pb-4">
+                                    <h2 className="text-4xl md:text-5xl font-display font-bold text-white tracking-tight">Selected Works</h2>
+                                    <span className="text-zinc-500 text-sm hidden md:block">{safeData.projects.length} Projects</span>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-6 auto-rows-max">
+                                    {safeData.projects.map((project) => (
+                                        <ProjectCard 
+                                            key={project.id} 
+                                            project={project} 
+                                            onClick={() => setSelectedProject(project)} 
+                                        />
                                     ))}
                                 </div>
+                            </section>
+                        )}
+
+                        {/* 3. Toolset */}
+                        <section>
+                            <h3 className="text-sm font-bold uppercase tracking-[0.2em] text-zinc-500 mb-8">Technical Arsenal</h3>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                                {safeData.primaryTool && (
+                                     <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-xl flex items-center gap-3">
+                                        <div className="p-2 bg-black rounded-lg border border-zinc-800">
+                                            <ToolIcon name={safeData.primaryTool} />
+                                        </div>
+                                        <div>
+                                            <span className="text-xs font-bold text-white block">{safeData.primaryTool}</span>
+                                            <span className="text-[10px] text-zinc-500 uppercase">Primary</span>
+                                        </div>
+                                    </div>
+                                )}
+                                {safeData.tools?.filter(t => t !== safeData.primaryTool).map(tool => (
+                                    <div key={tool} className="p-4 bg-zinc-900/30 border border-zinc-800 rounded-xl flex items-center gap-3 hover:bg-zinc-800 transition-colors">
+                                        <ToolIcon name={tool} />
+                                        <span className="text-xs font-medium text-zinc-400">{tool}</span>
+                                    </div>
+                                ))}
                             </div>
                         </section>
 
-                        {/* 4. Contact CTA */}
-                        <section className="border-t border-zinc-900 pt-16">
-                            <h2 className="text-3xl md:text-5xl font-display font-bold text-white mb-8 tracking-tight">Let's create together.</h2>
-                            <a href={`mailto:${safeData.contactEmail}`} className="text-xl md:text-2xl text-zinc-500 hover:text-white transition-colors border-b border-zinc-800 pb-1 hover:border-white break-all">
+                        {/* Mobile Footer */}
+                        <div className="lg:hidden pt-12 border-t border-zinc-900">
+                            <h2 className="text-2xl font-display font-bold text-white mb-4">Let's Work Together</h2>
+                             <a href={`mailto:${safeData.contactEmail}`} className="text-lg text-zinc-400 hover:text-white transition-colors">
                                 {safeData.contactEmail}
                             </a>
-                        </section>
+                        </div>
 
                     </div>
+                    
+                    {/* Footer Credits */}
+                    <div className="p-6 md:p-12 border-t border-zinc-900 bg-[#030303] flex justify-between items-center text-[10px] text-zinc-600 uppercase tracking-widest">
+                         <span>© {new Date().getFullYear()} {safeData.name}</span>
+                         <span>Frames Studio</span>
+                    </div>
+
                 </main>
-            </div>
+            </motion.div>
         </div>
     );
 };
