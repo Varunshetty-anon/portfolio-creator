@@ -1,4 +1,3 @@
-
 import { PortfolioData, PortfolioContent, UserProfile, PortfolioMeta, INITIAL_DATA, Project } from '../types';
 import { db, storage, auth, googleProvider, isConfigured } from './firebase';
 import { doc, getDoc, setDoc, collection, query, where, getDocs, deleteDoc, addDoc, serverTimestamp, increment, writeBatch, getDocsFromServer, getDocFromServer, DocumentSnapshot } from 'firebase/firestore';
@@ -375,7 +374,10 @@ export const loadPublicPortfolio = async (slug: string): Promise<PortfolioData |
   }
   if (!versionSnap.exists()) return null;
   const content = versionSnap.data() as PortfolioContent;
-  const result: PortfolioData = { ...content, uid, meta, stats: { views: 0, clicks: 0 } };
+  
+  // MERGE with INITIAL_DATA to ensure all properties (like socials, skills) are present even if empty in DB
+  const result: PortfolioData = { ...INITIAL_DATA, ...content, uid, meta, stats: { views: 0, clicks: 0 } };
+  
   portfolioCache.set(cleanSlug, { data: result, timestamp: Date.now() });
   return result;
 };
@@ -408,7 +410,7 @@ export const completeOnboarding = async (uid: string, initialData: PortfolioData
     await saveDraft(uid, initialData);
 }
 
-export const trackPortfolioView = async (uid: string) => {
+export const trackPortfolioview = async (uid: string) => {
     if (!db || !uid) return;
     try {
         const storageKey = `frames_view_${uid}`;
@@ -648,3 +650,5 @@ export const deletePortfolioFromDB = async (uid: string) => {
 export const deleteUserAuth = async () => {
   if (auth?.currentUser) await deleteUser(auth.currentUser);
 };
+
+export const trackPortfolioView = trackPortfolioview;

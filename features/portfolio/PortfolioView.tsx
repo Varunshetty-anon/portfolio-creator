@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useLayoutEffect } from 'react';
 import { motion, AnimatePresence, useScroll, useTransform, useInView } from 'framer-motion';
 import { Mail, Instagram, Twitter, Linkedin, Youtube, Globe, X, Volume2, VolumeX, Loader2, Play, ExternalLink, ArrowDown, Sparkles, CheckCircle2 } from 'lucide-react';
-import { PortfolioData, Project } from '../../types';
+import { PortfolioData, Project, INITIAL_DATA } from '../../types';
 import { EDITING_TOOLS_LIST, AI_TOOLS_LIST, trackPortfolioView, getDriveId, getDropboxDirectLink } from '../../lib/utils';
 
 interface PortfolioViewProps {
@@ -196,13 +196,17 @@ const ProjectLightbox: React.FC<{ project: Project; onClose: () => void }> = ({ 
 };
 
 export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = false }) => {
+    // Merge with INITIAL_DATA to ensure all properties exist
+    const safeData = useMemo(() => ({ ...INITIAL_DATA, ...data }), [data]);
+    
     const [selectedProject, setSelectedProject] = useState<Project | null>(null);
     const { scrollY } = useScroll();
-    const [isMobile, setIsMobile] = useState(false);
-    const [mounted, setMounted] = useState(false);
+    
+    // Use synchronous check for initial render if possible, otherwise default to Desktop to ensure full content load
+    const isMobileInitial = typeof window !== 'undefined' ? window.innerWidth < 1024 : false;
+    const [isMobile, setIsMobile] = useState(isMobileInitial);
 
-    useEffect(() => {
-        setMounted(true);
+    useLayoutEffect(() => {
         const checkMobile = () => setIsMobile(window.innerWidth < 1024);
         checkMobile();
         window.addEventListener('resize', checkMobile);
@@ -210,10 +214,10 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
     }, []);
 
     useEffect(() => {
-        if (!isPreview && data.uid) trackPortfolioView(data.uid);
+        if (!isPreview && safeData.uid) trackPortfolioView(safeData.uid);
         document.body.style.overflow = selectedProject ? 'hidden' : 'auto';
         return () => { document.body.style.overflow = 'auto'; }
-    }, [data.uid, isPreview, selectedProject]);
+    }, [safeData.uid, isPreview, selectedProject]);
 
     const SCROLL_THRESHOLD = isMobile ? 300 : 500;
 
@@ -229,14 +233,12 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
     const dNameSize = useTransform(scrollY, [0, SCROLL_THRESHOLD], ["6rem", "2rem"]);
     
     // Mobile: Header shrinks from full screen to top bar
-    const mHeight = useTransform(scrollY, [0, SCROLL_THRESHOLD], ["90vh", "80px"]); // Reduced from 100vh to 90vh to show hint of content
+    const mHeight = useTransform(scrollY, [0, SCROLL_THRESHOLD], ["90vh", "80px"]); 
     const mAvatarSize = useTransform(scrollY, [0, SCROLL_THRESHOLD], [120, 40]);
     const mNameSize = useTransform(scrollY, [0, SCROLL_THRESHOLD], ["2.5rem", "1.1rem"]);
     const mDetailsOpacity = useTransform(scrollY, [0, SCROLL_THRESHOLD / 2], [1, 0]);
 
-    if (!mounted) return <div className="min-h-screen bg-[#050505]" />;
-
-    const displayName = data.name || "VARUN SHETTY";
+    const displayName = safeData.name || "CREATOR";
 
     return (
         <div className="bg-[#050505] min-h-[200vh] w-full relative text-zinc-100 font-sans selection:bg-indigo-500/40 overflow-x-hidden">
@@ -265,12 +267,12 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                 >
                     <motion.div 
                         style={{ width: isMobile ? mAvatarSize : dAvatarSize, height: isMobile ? mAvatarSize : dAvatarSize }} 
-                        className="rounded-full overflow-hidden border border-zinc-800 bg-zinc-950 shrink-0 shadow-2xl relative"
+                        className="rounded-full overflow-hidden border border-zinc-800 bg-zinc-950 shrink-0 shadow-2xl relative z-10"
                     >
-                        <img src={data.profileImage} className="w-full h-full object-cover" alt={displayName} />
+                        <img src={safeData.profileImage || INITIAL_DATA.profileImage} className="w-full h-full object-cover" alt={displayName} />
                     </motion.div>
 
-                    <div className={`flex flex-col ${isMobile && scrollY.get() > SCROLL_THRESHOLD ? 'items-start' : 'items-center md:items-start'}`}>
+                    <div className={`flex flex-col relative z-10 ${isMobile && scrollY.get() > SCROLL_THRESHOLD ? 'items-start' : 'items-center md:items-start'}`}>
                         <motion.h1 
                             style={{ fontSize: isMobile ? mNameSize : dNameSize }} 
                             className="font-display font-black tracking-tighter uppercase leading-[0.85] text-white whitespace-nowrap"
@@ -286,12 +288,12 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                             }}
                             className={`${isMobile && scrollY.get() > SCROLL_THRESHOLD ? 'hidden' : 'block'} mt-4 md:mt-6 text-center md:text-left`}
                         >
-                            <p className="text-lg md:text-2xl text-zinc-500 font-bold tracking-tight mb-4">{data.role}</p>
+                            <p className="text-lg md:text-2xl text-zinc-500 font-bold tracking-tight mb-4">{safeData.role || "Video Editor"}</p>
                             {!isMobile && (
                                 <>
-                                    <p className="text-zinc-400 text-base leading-relaxed font-light max-w-sm mb-6">{data.bio}</p>
+                                    <p className="text-zinc-400 text-base leading-relaxed font-light max-w-sm mb-6">{safeData.bio}</p>
                                     <div className="flex gap-4 justify-center md:justify-start">
-                                        {Object.entries(data.socials).map(([key, val]) => {
+                                        {safeData.socials && Object.entries(safeData.socials).map(([key, val]) => {
                                             if (!val) return null;
                                             const Icon = { instagram: Instagram, twitter: Twitter, youtube: Youtube, linkedin: Linkedin, email: Mail }[key] || Globe;
                                             return (
@@ -303,9 +305,9 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                                     </div>
                                 </>
                             )}
-                             {isMobile && (
+                             {isMobile && safeData.socials && (
                                  <div className="flex gap-6 justify-center mt-6">
-                                     {Object.entries(data.socials).map(([key, val]) => {
+                                     {Object.entries(safeData.socials).map(([key, val]) => {
                                         if (!val) return null;
                                         const Icon = { instagram: Instagram, twitter: Twitter, youtube: Youtube, linkedin: Linkedin, email: Mail }[key] || Globe;
                                         return <a key={key} href={val as string} className="text-zinc-500"><Icon size={24}/></a>
@@ -331,11 +333,9 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
             {/* MAIN CONTENT */}
             <main 
                 className={`container mx-auto px-6 md:px-12 pb-48 relative z-10 ${isMobile ? 'pt-12' : 'lg:ml-[30%] lg:w-[70%]'}`}
-                // REMOVED: Opacity/Y transform dependency on scroll for mobile to prevent "blank screen" issues.
-                // We use standard flow for content visibility.
             >
                 {/* 1. SHOWREEL */}
-                {data.showreelLink && (
+                {safeData.showreelLink && (
                     <section className="mb-32 md:mb-48">
                         <div className="flex items-center gap-6 mb-10">
                             <h2 className="text-[10px] font-black uppercase tracking-[0.6em] text-zinc-700 whitespace-nowrap">01 // Showreel</h2>
@@ -344,14 +344,14 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                         <div className="w-full rounded-3xl overflow-hidden bg-zinc-950 border border-zinc-900 shadow-2xl relative">
                             <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 blur-xl opacity-50 animate-pulse" />
                             <div className="relative z-10">
-                                <VideoPlayer src={data.showreelLink} thumbnail={data.showreelThumbnail} autoplay={true} aspectRatio="16:9" />
+                                <VideoPlayer src={safeData.showreelLink} thumbnail={safeData.showreelThumbnail} autoplay={true} aspectRatio="16:9" />
                             </div>
                         </div>
                     </section>
                 )}
 
                 {/* 2. WORKS */}
-                {data.projects && data.projects.length > 0 ? (
+                {safeData.projects && safeData.projects.length > 0 ? (
                     <section className="mb-32 md:mb-48">
                         <div className="flex items-center gap-6 mb-10">
                             <h2 className="text-[10px] font-black uppercase tracking-[0.6em] text-zinc-700 whitespace-nowrap">02 // Works</h2>
@@ -359,7 +359,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                         </div>
                         
                         <div className="columns-1 md:columns-2 gap-6 space-y-6">
-                            {data.projects.map((project) => (
+                            {safeData.projects.map((project) => (
                                 <div 
                                     key={project.id}
                                     className="break-inside-avoid relative group cursor-pointer rounded-2xl overflow-hidden border border-zinc-900 bg-zinc-950 shadow-lg hover:border-zinc-700 transition-colors"
@@ -367,7 +367,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                                 >
                                     <div className="relative w-full">
                                         <div className="w-full" style={{ aspectRatio: project.aspectRatio ? project.aspectRatio.replace(':', '/') : '16/9' }}>
-                                             <img src={project.thumbnail} alt={project.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                                             {project.thumbnail && <img src={project.thumbnail} alt={project.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />}
                                         </div>
                                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                             <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-xl scale-75 group-hover:scale-100 transition-transform">
@@ -401,15 +401,15 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
 
                     <div className="space-y-12">
                         {/* Primary Tool */}
-                        {data.primaryTool && (
+                        {safeData.primaryTool && (
                             <div>
                                 <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-4">Core Mastery</h4>
                                 <div className="bg-gradient-to-br from-zinc-900 to-black border border-zinc-800 p-6 rounded-2xl flex items-center gap-6">
                                     <div className="w-16 h-16 bg-black border border-zinc-800 rounded-xl flex items-center justify-center shadow-2xl">
-                                        <ToolIcon name={data.primaryTool} className="w-10 h-10" />
+                                        <ToolIcon name={safeData.primaryTool} className="w-10 h-10" />
                                     </div>
                                     <div>
-                                        <h5 className="text-xl font-bold text-white tracking-tight">{data.primaryTool}</h5>
+                                        <h5 className="text-xl font-bold text-white tracking-tight">{safeData.primaryTool}</h5>
                                         <p className="text-[10px] text-zinc-500 mt-1">Primary Workflow</p>
                                     </div>
                                 </div>
@@ -420,7 +420,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                         <div>
                             <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-4">Production Stack</h4>
                             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                                {data.tools?.filter(t => t !== data.primaryTool).map((tool) => (
+                                {safeData.tools?.filter(t => t !== safeData.primaryTool).map((tool) => (
                                     <div key={tool} className="bg-zinc-950 border border-zinc-900 p-4 rounded-xl flex flex-col items-center gap-3 hover:bg-zinc-900 transition-colors">
                                         <ToolIcon name={tool} className="w-8 h-8" />
                                         <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest text-center">{tool}</span>
@@ -430,11 +430,11 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                         </div>
 
                          {/* AI Tools */}
-                        {data.aiTools && data.aiTools.length > 0 && (
+                        {safeData.aiTools && safeData.aiTools.length > 0 && (
                              <div>
                                 <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-4 flex items-center gap-2"><Sparkles size={12} className="text-yellow-500"/> AI Extensions</h4>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                                    {data.aiTools.map((tool) => (
+                                    {safeData.aiTools.map((tool) => (
                                         <div key={tool} className="bg-zinc-950/50 border border-yellow-900/20 p-4 rounded-xl flex flex-col items-center gap-3">
                                             <ToolIcon name={tool} className="w-8 h-8" />
                                             <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest text-center">{tool}</span>
@@ -451,20 +451,20 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                     <div className="flex flex-col md:flex-row justify-between items-start gap-12">
                         <div>
                              <h2 className="text-4xl md:text-6xl font-display font-black uppercase tracking-tighter text-white mb-8">Let's create.</h2>
-                             <a href={`mailto:${data.contactEmail}`} className="text-lg md:text-2xl text-zinc-500 hover:text-white transition-colors border-b border-zinc-800 pb-2">
-                                {data.contactEmail}
+                             <a href={`mailto:${safeData.contactEmail}`} className="text-lg md:text-2xl text-zinc-500 hover:text-white transition-colors border-b border-zinc-800 pb-2">
+                                {safeData.contactEmail}
                              </a>
                         </div>
                         <div className="flex flex-col gap-4">
                              <div className="flex gap-4">
-                                 {Object.entries(data.socials).map(([key, val]) => {
+                                 {safeData.socials && Object.entries(safeData.socials).map(([key, val]) => {
                                         if (!val) return null;
                                         const Icon = { instagram: Instagram, twitter: Twitter, youtube: Youtube, linkedin: Linkedin, email: Mail }[key] || Globe;
                                         return <a key={key} href={val as string} className="text-zinc-600 hover:text-white transition-colors"><Icon size={24}/></a>
                                  })}
                              </div>
                              <p className="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-800">
-                                © {new Date().getFullYear()} {data.name}
+                                © {new Date().getFullYear()} {safeData.name}
                              </p>
                         </div>
                     </div>
