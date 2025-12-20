@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef, useMemo, useLayoutEffect } from 'react';
-import { motion, AnimatePresence, useScroll, useTransform, useInView } from 'framer-motion';
-import { Mail, Instagram, Twitter, Linkedin, Youtube, Globe, X, Volume2, VolumeX, Loader2, Play, ExternalLink, ArrowDown, Sparkles, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { motion, AnimatePresence, useScroll, useTransform, useSpring, useInView } from 'framer-motion';
+import { Mail, Instagram, Twitter, Linkedin, Youtube, Globe, X, Volume2, VolumeX, Loader2, Play, ExternalLink, ArrowDown, Sparkles } from 'lucide-react';
 import { PortfolioData, Project, INITIAL_DATA } from '../../types';
 import { EDITING_TOOLS_LIST, AI_TOOLS_LIST, trackPortfolioView, getDriveId, getDropboxDirectLink } from '../../lib/utils';
 
@@ -9,28 +9,19 @@ interface PortfolioViewProps {
   isPreview?: boolean;
 }
 
-const ToolIcon = React.memo(({ name, className = "w-6 h-6" }: { name: string; className?: string }) => {
+// --- Components ---
+
+const ToolIcon = React.memo(({ name, className = "w-5 h-5" }: { name: string; className?: string }) => {
     const tool = [...EDITING_TOOLS_LIST, ...AI_TOOLS_LIST].find(t => t.name === name);
     const [imgSrc, setImgSrc] = useState(tool ? `https://cdn.simpleicons.org/${tool.slug}/white` : '');
-    const [hasError, setHasError] = useState(false);
-
-    useEffect(() => {
-        if (tool) {
-            setImgSrc(`https://cdn.simpleicons.org/${tool.slug}/white`);
-            setHasError(false);
-        }
-    }, [name, tool]);
-
-    if (!tool || hasError) {
-        return <span className={`flex items-center justify-center font-bold text-zinc-600 text-[10px] uppercase border border-zinc-800 rounded bg-zinc-900 ${className}`}>{name ? name.charAt(0) : '?'}</span>;
-    }
-    return <img src={imgSrc} alt={name} loading="lazy" className={`${className} object-contain opacity-70 group-hover:opacity-100 transition-opacity`} onError={() => setHasError(true)} />;
+    
+    if (!tool) return <span className={`flex items-center justify-center font-bold text-zinc-600 text-[9px] uppercase border border-zinc-800 rounded bg-zinc-900 ${className}`}>{name ? name.charAt(0) : '?'}</span>;
+    return <img src={imgSrc} alt={name} className={`${className} object-contain opacity-70 group-hover:opacity-100 transition-opacity`} onError={(e) => (e.currentTarget.style.display = 'none')} />;
 });
 
 const VideoPlayer: React.FC<{ src: string; thumbnail: string; autoplay?: boolean; isModal?: boolean; aspectRatio?: string }> = ({ src, thumbnail, autoplay = false, isModal = false, aspectRatio = '16/9' }) => {
     const [isReady, setIsReady] = useState(false);
     const [isMuted, setIsMuted] = useState(true);
-    const [hasInteraction, setHasInteraction] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
     const isInView = useInView(containerRef, { margin: "0px", amount: 0.2 });
@@ -45,440 +36,291 @@ const VideoPlayer: React.FC<{ src: string; thumbnail: string; autoplay?: boolean
         return 'direct';
     }, [src]);
 
-    const directSrc = type === 'dropbox' ? getDropboxDirectLink(src) || src : src;
-
     useEffect(() => {
-        if ((type !== 'direct' && type !== 'dropbox') || !videoRef.current) return;
-        
-        if (autoplay && isInView) {
-            const playPromise = videoRef.current.play();
-            if (playPromise !== undefined) {
-                playPromise.catch(() => setIsMuted(true));
+        if ((type === 'direct' || type === 'dropbox') && videoRef.current) {
+            if (autoplay && isInView) {
+                videoRef.current.play().catch(() => setIsMuted(true));
+            } else if (!isModal) {
+                videoRef.current.pause();
             }
-        } else if (!isModal) {
-            videoRef.current.pause();
         }
     }, [isInView, type, autoplay, isModal]);
 
     const getEmbedSrc = () => {
         if (type === 'youtube') {
             const ytId = src.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/)?.[2];
-            return `https://www.youtube.com/embed/${ytId}?autoplay=${autoplay && isInView ? 1 : 0}&mute=1&controls=${isModal ? 1 : 0}&loop=1&playlist=${ytId}&playsinline=1&rel=0&modestbranding=1&iv_load_policy=3`;
+            return `https://www.youtube.com/embed/${ytId}?autoplay=${autoplay && isInView ? 1 : 0}&mute=1&controls=${isModal ? 1 : 0}&loop=1&playlist=${ytId}&playsinline=1&rel=0&modestbranding=1`;
         }
         if (type === 'vimeo') {
             const vId = src.match(/vimeo\.com\/(?:channels\/(?:\w+\/)?|groups\/(?:[^\/]*)\/videos\/|album\/(?:\d+)\/video\/|video\/|)(\d+)(?:$|\/|\?)/)?.[1];
             return `https://player.vimeo.com/video/${vId}?autoplay=${autoplay && isInView ? 1 : 0}&muted=1&loop=1&background=${isModal ? 0 : 1}&playsinline=1`;
         }
-        if (type === 'drive') {
-            const id = getDriveId(src);
-            return `https://drive.google.com/file/d/${id}/preview`;
-        }
+        if (type === 'drive') return `https://drive.google.com/file/d/${getDriveId(src)}/preview`;
         return src;
     };
-
-    const ratioStyle = useMemo(() => {
-        if (!aspectRatio) return { aspectRatio: '16/9' };
-        return { aspectRatio: aspectRatio.replace(':', '/') };
-    }, [aspectRatio]);
 
     return (
         <div 
             ref={containerRef} 
-            className={`relative w-full bg-black overflow-hidden group ${!isModal ? 'rounded-2xl md:rounded-3xl' : ''}`}
-            style={isModal ? { height: '100%', width: '100%' } : ratioStyle}
+            className={`relative w-full bg-zinc-950 overflow-hidden ${!isModal ? 'rounded-xl md:rounded-2xl' : ''}`}
+            style={{ aspectRatio: isModal ? undefined : aspectRatio.replace(':', '/') }}
         >
             <AnimatePresence>
                 {!isReady && (
-                    <motion.div 
-                        initial={{ opacity: 1 }} exit={{ opacity: 0 }}
-                        className="absolute inset-0 z-20 bg-zinc-950 flex items-center justify-center"
-                    >
-                        {thumbnail && <img src={thumbnail} className="absolute inset-0 w-full h-full object-cover opacity-60 blur-sm" />}
+                    <motion.div initial={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 z-20 bg-zinc-900 flex items-center justify-center">
+                        {thumbnail && <img src={thumbnail} className="absolute inset-0 w-full h-full object-cover opacity-50 blur-xl scale-110" />}
                         <Loader2 className="animate-spin text-zinc-500 relative z-30" />
                     </motion.div>
                 )}
             </AnimatePresence>
 
-            {!hasInteraction && !isReady && (
-                <div 
-                    className="absolute inset-0 z-30 flex items-center justify-center cursor-pointer"
-                    onClick={() => setHasInteraction(true)}
-                />
-            )}
-
             {(type === 'direct' || type === 'dropbox') ? (
-                <div className="w-full h-full relative">
+                <div className="w-full h-full relative group">
                     <video 
-                        ref={videoRef} src={directSrc} 
-                        className="w-full h-full"
-                        style={{ objectFit: isModal ? 'contain' : 'cover' }}
+                        ref={videoRef} src={type === 'dropbox' ? (getDropboxDirectLink(src) || src) : src} 
+                        className="w-full h-full object-cover"
                         loop muted={isMuted} playsInline preload="metadata"
                         onLoadedData={() => setIsReady(true)}
-                        onClick={() => {
-                            if (videoRef.current) {
-                                if (videoRef.current.paused) videoRef.current.play();
-                                else videoRef.current.pause();
-                            }
-                        }}
                     />
-                     {isModal && (
-                         <button 
-                            onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }}
-                            className="absolute bottom-6 right-6 z-30 w-12 h-12 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white flex items-center justify-center hover:bg-white hover:text-black transition-all"
-                        >
+                    {isModal && (
+                        <button onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }} className="absolute bottom-6 right-6 z-30 p-3 rounded-full bg-black/40 backdrop-blur-md text-white hover:bg-white hover:text-black transition-all">
                             {isMuted ? <VolumeX size={20}/> : <Volume2 size={20}/>}
                         </button>
                     )}
                 </div>
             ) : (
-                <iframe 
-                    src={getEmbedSrc()} 
-                    className="w-full h-full border-none" 
-                    allow="autoplay; fullscreen; picture-in-picture" 
-                    onLoad={() => setIsReady(true)} 
-                />
+                <iframe src={getEmbedSrc()} className="w-full h-full" allow="autoplay; fullscreen" onLoad={() => setIsReady(true)} />
             )}
         </div>
     );
 };
 
-const ProjectLightbox: React.FC<{ project: Project; onClose: () => void }> = ({ project, onClose }) => {
-    const ar = project.aspectRatio || '16:9';
-
+const ProjectModal: React.FC<{ project: Project; onClose: () => void }> = ({ project, onClose }) => {
     return (
         <motion.div 
-            className="fixed inset-0 z-[2000] bg-black/98 backdrop-blur-xl flex items-center justify-center p-0 md:p-8"
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            onClick={onClose}
+            className="fixed inset-0 z-[1000] bg-black/95 backdrop-blur-md flex items-center justify-center p-4 md:p-8"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose}
         >
-            <button className="absolute top-4 right-4 md:top-6 md:right-6 p-3 text-zinc-500 hover:text-white transition-all z-[2100] bg-zinc-900/80 rounded-full border border-zinc-800 backdrop-blur-md"><X size={24} /></button>
-            
+            <button className="absolute top-4 right-4 z-50 p-3 rounded-full bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors"><X size={24} /></button>
             <motion.div 
-                className="relative bg-[#050505] w-full h-[100dvh] md:h-auto md:max-h-[90vh] md:aspect-video max-w-[1600px] flex flex-col lg:flex-row overflow-hidden md:rounded-[2.5rem] border-0 md:border border-zinc-900 shadow-2xl"
-                initial={{ scale: 0.95, opacity: 0, y: 40 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 40 }}
-                onClick={e => e.stopPropagation()}
+                className="bg-[#09090b] w-full max-w-6xl max-h-[90vh] rounded-3xl border border-zinc-800 overflow-hidden flex flex-col lg:flex-row shadow-2xl"
+                initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }} onClick={e => e.stopPropagation()}
             >
-                <div className="flex-1 bg-black flex items-center justify-center relative overflow-hidden h-[40vh] lg:h-auto w-full">
-                    <div className={`w-full h-full flex items-center justify-center bg-zinc-950`}>
-                         <VideoPlayer src={project.link} thumbnail={project.thumbnail} autoplay={true} isModal={true} aspectRatio={ar} />
-                    </div>
+                <div className="flex-1 bg-black flex items-center justify-center relative min-h-[40vh]">
+                     <div className="w-full h-full flex items-center justify-center">
+                         <VideoPlayer src={project.link} thumbnail={project.thumbnail} autoplay={true} isModal={true} aspectRatio={project.aspectRatio} />
+                     </div>
                 </div>
-
-                <div className="w-full lg:w-[450px] bg-[#09090b] flex flex-col shrink-0 border-t lg:border-t-0 lg:border-l border-zinc-900 h-[60vh] lg:h-auto">
-                    <div className="p-8 md:p-12 overflow-y-auto custom-scrollbar h-full">
-                        <span className="text-[10px] font-black uppercase tracking-[0.4em] text-indigo-500 mb-6 block">{project.contentType || 'Project'}</span>
-                        <h2 className="text-3xl md:text-5xl font-display font-black text-white mb-8 tracking-tighter leading-[0.9]">{project.title}</h2>
-                        <p className="text-zinc-400 text-base md:text-lg leading-relaxed mb-10 font-light">{project.description}</p>
-                        
-                        <div className="space-y-8">
-                            {project.softwareUsed && project.softwareUsed.length > 0 && (
-                                <div className="space-y-4">
-                                    <h4 className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.3em]">Production Tools</h4>
-                                    <div className="flex flex-wrap gap-2">
-                                        {project.softwareUsed.map(t => (
-                                            <span key={t} className="px-3 py-1.5 bg-zinc-900 border border-zinc-800 rounded-lg text-[10px] text-zinc-300 font-bold tracking-tight">{t}</span>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                             <div className="space-y-4">
-                                <h4 className="text-[9px] font-black text-zinc-600 uppercase tracking-[0.3em]">Format</h4>
-                                <div className="flex items-center gap-4">
-                                     <span className="text-xs font-mono text-zinc-400 border border-zinc-800 px-3 py-1 rounded bg-zinc-950">{project.aspectRatio || '16:9'}</span>
-                                </div>
+                <div className="w-full lg:w-[400px] bg-zinc-900/50 border-t lg:border-t-0 lg:border-l border-zinc-800 p-8 lg:p-10 overflow-y-auto shrink-0">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-indigo-400 mb-4 block">{project.contentType || 'Project'}</span>
+                    <h2 className="text-3xl font-display font-bold text-white mb-6 leading-tight">{project.title}</h2>
+                    <p className="text-zinc-400 text-sm leading-relaxed mb-8">{project.description}</p>
+                    {project.softwareUsed && (
+                        <div className="space-y-3">
+                            <h4 className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">Tools</h4>
+                            <div className="flex flex-wrap gap-2">
+                                {project.softwareUsed.map(t => <span key={t} className="px-3 py-1 bg-zinc-800 rounded-md text-[10px] text-zinc-300 border border-zinc-700">{t}</span>)}
                             </div>
                         </div>
-                    </div>
+                    )}
                 </div>
             </motion.div>
         </motion.div>
     );
 };
 
+// --- Main View ---
+
 export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = false }) => {
-    // Merge with INITIAL_DATA to ensure all properties exist
     const safeData = useMemo(() => ({ ...INITIAL_DATA, ...data }), [data]);
-    
     const [selectedProject, setSelectedProject] = useState<Project | null>(null);
     const { scrollY } = useScroll();
-    
-    // Responsive Detection
-    const isMobileInitial = typeof window !== 'undefined' ? window.innerWidth < 1024 : false;
-    const [isMobile, setIsMobile] = useState(isMobileInitial);
+    const [isMobile, setIsMobile] = useState(false);
 
-    useLayoutEffect(() => {
-        const checkMobile = () => setIsMobile(window.innerWidth < 1024);
-        checkMobile();
-        window.addEventListener('resize', checkMobile);
-        return () => window.removeEventListener('resize', checkMobile);
+    useEffect(() => {
+        const check = () => setIsMobile(window.innerWidth < 1024);
+        check();
+        window.addEventListener('resize', check);
+        return () => window.removeEventListener('resize', check);
     }, []);
 
     useEffect(() => {
         if (!isPreview && safeData.uid) trackPortfolioView(safeData.uid);
         document.body.style.overflow = selectedProject ? 'hidden' : 'auto';
         return () => { document.body.style.overflow = 'auto'; }
-    }, [safeData.uid, isPreview, selectedProject]);
+    }, [selectedProject, safeData.uid, isPreview]);
 
-    // --- SCROLL ANIMATION CONFIG ---
-    // The range of pixels over which the "Intro to Sidebar/Header" transition happens
-    const TRANSITION_RANGE = [0, 500];
-
-    // -- DESKTOP TRANSFORMS --
-    // Header starts full width (Hero), shrinks to 25% (Sidebar)
-    const dWidth = useTransform(scrollY, TRANSITION_RANGE, ["100%", "28%"]); 
-    const dLogoSize = useTransform(scrollY, TRANSITION_RANGE, [200, 80]);
-    const dNameSize = useTransform(scrollY, TRANSITION_RANGE, ["5rem", "1.8rem"]);
-    const dContainerGap = useTransform(scrollY, TRANSITION_RANGE, ["2.5rem", "1rem"]);
-    // Background becomes slightly transparent on scroll if desired, but solid looks better for sidebar
-    const dBg = useTransform(scrollY, TRANSITION_RANGE, ["rgba(5,5,5,1)", "rgba(5,5,5,1)"]); 
+    // --- Physics Animations ---
+    const springConfig = { stiffness: 100, damping: 20, mass: 1 };
     
-    // -- MOBILE TRANSFORMS --
-    // Header starts full height (Hero), shrinks to 80px (Top Bar)
-    const mHeight = useTransform(scrollY, TRANSITION_RANGE, ["100dvh", "80px"]);
-    const mLogoSize = useTransform(scrollY, TRANSITION_RANGE, [140, 40]);
-    const mNameSize = useTransform(scrollY, TRANSITION_RANGE, ["2.5rem", "1rem"]);
-    const mContainerGap = useTransform(scrollY, TRANSITION_RANGE, ["1.5rem", "0.5rem"]);
-    const mOpacity = useTransform(scrollY, [0, 200], [1, 0]); // Fade out details quickly
-
-    const displayName = safeData.name || "CREATOR";
-    const displayRole = safeData.role || "Visual Artist";
+    // Desktop: Sidebar Width 100% -> 25%
+    const desktopWidth = useSpring(useTransform(scrollY, [0, 600], ["100%", "28%"]), springConfig);
+    const desktopLogoScale = useSpring(useTransform(scrollY, [0, 600], [1, 0.5]), springConfig);
+    const desktopContentOpacity = useSpring(useTransform(scrollY, [0, 400], [1, 0]), springConfig); // Fades out extra bio details on scroll
+    
+    // Mobile: Header Height 100vh -> 80px
+    const mobileHeight = useSpring(useTransform(scrollY, [0, 400], ["100vh", "84px"]), springConfig);
+    const mobileLogoScale = useSpring(useTransform(scrollY, [0, 400], [1.5, 0.4]), springConfig);
+    const mobileContentOpacity = useSpring(useTransform(scrollY, [0, 200], [1, 0]), springConfig);
 
     return (
-        <div className="bg-[#050505] min-h-screen w-full relative text-zinc-100 font-sans selection:bg-indigo-500/40">
+        <div className="bg-[#050505] min-h-screen w-full relative text-zinc-100 font-sans selection:bg-white/20">
             <AnimatePresence>
-                {selectedProject && <ProjectLightbox project={selectedProject} onClose={() => setSelectedProject(null)} />}
+                {selectedProject && <ProjectModal project={selectedProject} onClose={() => setSelectedProject(null)} />}
             </AnimatePresence>
 
-            {/* --- FIXED HEADER / SIDEBAR --- */}
-            {/* This container animates from Full Screen Hero to Sidebar (Desktop) or Top Bar (Mobile) */}
+            {/* --- HERO / SIDEBAR CONTAINER --- */}
             <motion.header
-                className="fixed top-0 left-0 z-40 flex flex-col items-center overflow-hidden border-b lg:border-b-0 lg:border-r border-zinc-900 shadow-2xl"
+                className="fixed top-0 left-0 z-40 bg-[#050505] border-b lg:border-b-0 lg:border-r border-zinc-900 shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col items-center justify-center lg:justify-start lg:pt-0"
                 style={{
-                    backgroundColor: dBg,
-                    // Mobile Styles
-                    height: isMobile ? mHeight : '100dvh',
-                    width: isMobile ? '100%' : dWidth,
-                    minWidth: isMobile ? 'auto' : '320px', // Prevent sidebar getting too squished
-                    // Desktop Alignment: Center initially, then stays centered in the sidebar width
-                    // Mobile Alignment: Center initially, then centers in the top bar
-                    justifyContent: 'center', 
+                    width: isMobile ? "100%" : desktopWidth,
+                    height: isMobile ? mobileHeight : "100vh",
+                    justifyContent: isMobile ? 'center' : 'center', // Initially center, logic handled by inner container placement
                 }}
             >
                 {/* Content Wrapper */}
-                <motion.div 
-                    className="flex flex-col items-center text-center p-6 w-full max-w-xl mx-auto"
-                    style={{ gap: isMobile ? mContainerGap : dContainerGap }}
-                >
-                    {/* Profile Image */}
+                <div className={`relative w-full max-w-lg mx-auto flex flex-col items-center text-center p-6 transition-all duration-500 ${isMobile ? '' : 'lg:h-screen lg:justify-center'}`}>
+                    
+                    {/* Dynamic Profile Image */}
                     <motion.div 
-                        style={{ 
-                            width: isMobile ? mLogoSize : dLogoSize, 
-                            height: isMobile ? mLogoSize : dLogoSize 
-                        }} 
-                        className="rounded-full overflow-hidden border border-zinc-800 bg-zinc-950 shrink-0 shadow-2xl relative z-10"
+                        className="rounded-full overflow-hidden border border-zinc-800 bg-zinc-900 shadow-2xl relative z-10 shrink-0"
+                        style={{
+                            width: 200, height: 200,
+                            scale: isMobile ? mobileLogoScale : desktopLogoScale,
+                            marginBottom: isMobile ? 0 : 30 // Gap managed by scale
+                        }}
                     >
-                        <img 
-                            src={safeData.profileImage || INITIAL_DATA.profileImage} 
-                            className="w-full h-full object-cover" 
-                            alt={displayName} 
-                        />
+                        <img src={safeData.profileImage} className="w-full h-full object-cover" alt={safeData.name} />
                     </motion.div>
 
-                    {/* Identity Info */}
-                    <div className="flex flex-col items-center">
-                        <motion.h1 
-                            style={{ fontSize: isMobile ? mNameSize : dNameSize }} 
-                            className="font-display font-black tracking-tighter uppercase leading-[0.9] text-white whitespace-nowrap"
-                        >
-                            {displayName}
-                        </motion.h1>
-                        
-                        {/* Role - Scales slightly but always visible on Desktop, hides on mobile scroll end */}
-                        <motion.p 
-                            className="text-zinc-500 font-bold tracking-widest uppercase mt-2"
-                            style={{ 
-                                fontSize: isMobile ? '0.7rem' : '0.8rem',
-                                opacity: isMobile ? mOpacity : 1,
-                                height: isMobile && scrollY.get() > 400 ? 0 : 'auto',
-                                overflow: 'hidden'
-                            }}
-                        >
-                            {displayRole}
-                        </motion.p>
-                    </div>
+                    {/* Text Content - Fades out on Mobile Header state, shrinks on Desktop Sidebar state */}
+                    <motion.div className="flex flex-col items-center" style={{ scale: isMobile ? mobileLogoScale : desktopLogoScale, originY: 0 }}>
+                        <h1 className="font-display font-bold text-5xl tracking-tighter text-white mt-6 mb-2 leading-none whitespace-nowrap">{safeData.name}</h1>
+                        <p className="text-zinc-500 font-medium tracking-[0.2em] text-sm uppercase">{safeData.role}</p>
+                    </motion.div>
 
-                    {/* Extended Bio & Socials - Hidden on Mobile Scroll, Visible on Desktop Sidebar */}
+                    {/* Extended Details - Only visible when Hero is expanded or Desktop Sidebar is large */}
                     <motion.div 
-                        style={{ 
-                            opacity: isMobile ? mOpacity : 1,
-                            display: isMobile && scrollY.get() > 400 ? 'none' : 'block' // Performance optimization
-                        }}
-                        className="flex flex-col items-center gap-6 md:gap-8 w-full"
+                        style={{ opacity: isMobile ? mobileContentOpacity : desktopContentOpacity }}
+                        className="flex flex-col items-center gap-8 mt-8 w-full"
                     >
-                        <div className="h-px w-12 bg-zinc-800" />
+                        <div className="w-12 h-px bg-zinc-800"/>
+                        <p className="text-zinc-400 text-base leading-relaxed font-light max-w-xs">{safeData.bio}</p>
                         
-                        {/* Location */}
-                        <div className="flex items-center gap-2 text-zinc-500 text-xs uppercase tracking-wider font-medium">
-                            <Globe size={14} /> {safeData.location || "Earth"}
-                        </div>
-
-                        {/* Bio */}
-                        <p className="text-zinc-400 text-sm md:text-base leading-relaxed font-light max-w-sm">
-                            {safeData.bio}
-                        </p>
-
-                        {/* Social Links */}
-                        <div className="flex gap-4 justify-center flex-wrap">
+                        <div className="flex gap-4">
                             {safeData.socials && Object.entries(safeData.socials).map(([key, val]) => {
                                 if (!val) return null;
                                 const Icon = { instagram: Instagram, twitter: Twitter, youtube: Youtube, linkedin: Linkedin, email: Mail }[key] || Globe;
-                                return (
-                                    <a 
-                                        key={key} 
-                                        href={val as string} 
-                                        target="_blank" 
-                                        rel="noreferrer" 
-                                        className="w-10 h-10 rounded-full bg-zinc-900/50 hover:bg-white hover:text-black flex items-center justify-center text-zinc-500 transition-all border border-zinc-800"
-                                    >
-                                        <Icon size={16} />
-                                    </a>
-                                )
+                                return <a key={key} href={val as string} target="_blank" className="p-3 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-500 hover:bg-white hover:text-black transition-all"><Icon size={18}/></a>
                             })}
                         </div>
                         
-                        <a href={`mailto:${safeData.contactEmail}`} className="px-8 py-3 rounded-full border border-zinc-800 text-xs font-bold uppercase tracking-widest hover:bg-white hover:text-black transition-all">
-                            Contact Me
-                        </a>
+                        <div className="flex flex-col items-center gap-2 mt-8 animate-bounce opacity-30">
+                             <span className="text-[9px] uppercase tracking-widest text-zinc-500">Scroll</span>
+                             <ArrowDown size={14} className="text-zinc-500" />
+                        </div>
                     </motion.div>
-                </motion.div>
-
-                {/* Scroll Indicator - Fades out immediately on scroll */}
-                <motion.div 
-                    style={{ opacity: useTransform(scrollY, [0, 100], [1, 0]) }}
-                    className="absolute bottom-8 left-0 w-full flex flex-col items-center gap-2 pointer-events-none"
-                >
-                    <span className="text-[9px] font-black tracking-[0.6em] text-zinc-700 uppercase">Scroll</span>
-                    <motion.div animate={{ y: [0, 5, 0] }} transition={{ repeat: Infinity, duration: 2 }} className="text-zinc-800"><ArrowDown size={16}/></motion.div>
-                </motion.div>
+                </div>
             </motion.header>
 
             {/* --- SCROLL SPACER --- */}
-            {/* This invisible div forces the page to be scrollable initially, driving the animation from Hero -> Sidebar */}
-            <div style={{ height: '100vh' }} className="w-full pointer-events-none" />
+            {/* Creates the height for the initial scroll effect */}
+            <div style={{ height: '100vh' }} />
 
-            {/* --- MAIN CONTENT FLOW --- */}
-            {/* Content naturally flows after the spacer. Layout shifts based on sidebar presence */}
+            {/* --- MAIN CONTENT --- */}
             <main 
-                className={`relative z-10 pb-48 px-6 md:px-12 pt-24 md:pt-32 transition-all duration-300 ease-out`}
+                className="relative z-10 p-6 md:p-12 lg:p-24 pb-48 transition-all duration-500"
                 style={{
-                    marginLeft: isMobile ? '0' : '28%', // Matches the final desktop sidebar width
-                    width: isMobile ? '100%' : '72%',    // Takes up the remaining space
+                    marginLeft: isMobile ? 0 : '28%', // Align right of sidebar
+                    width: isMobile ? '100%' : '72%',
+                    paddingTop: isMobile ? '120px' : '6rem'
                 }}
             >
-                {/* 1. SHOWREEL */}
+                {/* 1. Showreel */}
                 {safeData.showreelLink && (
-                    <section className="mb-32 md:mb-48">
-                        <div className="flex items-center gap-6 mb-10">
-                            <h2 className="text-[10px] font-black uppercase tracking-[0.6em] text-zinc-700 whitespace-nowrap">01 // Showreel</h2>
-                            <div className="h-px w-full bg-zinc-900" />
+                    <section className="mb-32">
+                        <div className="flex items-center gap-4 mb-8">
+                            <span className="w-2 h-2 rounded-full bg-indigo-500"/>
+                            <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">Showreel</h2>
                         </div>
-                        <div className="w-full rounded-3xl overflow-hidden bg-zinc-950 border border-zinc-900 shadow-2xl relative">
-                            <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 blur-xl opacity-50 animate-pulse" />
-                            <div className="relative z-10">
-                                <VideoPlayer src={safeData.showreelLink} thumbnail={safeData.showreelThumbnail} autoplay={true} aspectRatio="16:9" />
-                            </div>
+                        <div className="w-full rounded-2xl overflow-hidden shadow-2xl bg-zinc-900 ring-1 ring-white/5">
+                            <VideoPlayer src={safeData.showreelLink} thumbnail={safeData.showreelThumbnail} autoplay={true} aspectRatio="16:9" />
                         </div>
                     </section>
                 )}
 
-                {/* 2. WORKS */}
-                {safeData.projects && safeData.projects.length > 0 ? (
-                    <section className="mb-32 md:mb-48">
-                        <div className="flex items-center gap-6 mb-10">
-                            <h2 className="text-[10px] font-black uppercase tracking-[0.6em] text-zinc-700 whitespace-nowrap">02 // Works</h2>
-                            <div className="h-px w-full bg-zinc-900" />
+                {/* 2. Works - Masonry Grid */}
+                {safeData.projects && safeData.projects.length > 0 && (
+                     <section className="mb-32">
+                        <div className="flex items-center gap-4 mb-8">
+                            <span className="w-2 h-2 rounded-full bg-indigo-500"/>
+                            <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">Selected Works</h2>
                         </div>
                         
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
                             {safeData.projects.map((project) => (
                                 <div 
                                     key={project.id}
-                                    className="group cursor-pointer rounded-2xl overflow-hidden border border-zinc-900 bg-zinc-950 shadow-lg hover:border-zinc-700 transition-colors"
                                     onClick={() => setSelectedProject(project)}
+                                    className="group cursor-pointer flex flex-col gap-3"
                                 >
-                                    <div className="relative w-full">
+                                    <div className="relative w-full rounded-xl overflow-hidden bg-zinc-900 ring-1 ring-white/5 transition-transform duration-500 group-hover:-translate-y-1 shadow-lg">
                                         <div className="w-full" style={{ aspectRatio: project.aspectRatio ? project.aspectRatio.replace(':', '/') : '16/9' }}>
-                                             {project.thumbnail && <img src={project.thumbnail} alt={project.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />}
+                                            {project.thumbnail && <img src={project.thumbnail} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />}
                                         </div>
-                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                            <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-xl scale-75 group-hover:scale-100 transition-transform">
-                                                <Play size={16} fill="black" className="ml-1" />
+                                        <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                            <div className="w-12 h-12 bg-white/90 backdrop-blur rounded-full flex items-center justify-center shadow-xl transform scale-75 group-hover:scale-100 transition-all duration-300">
+                                                <Play size={16} fill="black" className="ml-0.5 text-black"/>
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="p-5">
-                                        <div className="flex justify-between items-start mb-2">
-                                            <span className="text-[9px] font-black uppercase tracking-widest text-indigo-400">{project.contentType || 'Video'}</span>
-                                            {project.type === 'video' && <span className="text-[9px] font-bold text-zinc-600 bg-zinc-900 px-2 py-0.5 rounded border border-zinc-800">VID</span>}
-                                        </div>
-                                        <h3 className="text-lg font-display font-bold text-white leading-tight">{project.title}</h3>
+                                    <div className="px-1">
+                                        <h3 className="font-display font-bold text-lg text-zinc-200 leading-tight group-hover:text-white transition-colors">{project.title}</h3>
+                                        <p className="text-xs text-zinc-500 mt-1 uppercase tracking-wide">{project.contentType}</p>
                                     </div>
                                 </div>
                             ))}
                         </div>
                     </section>
-                ) : (
-                    <section className="mb-32 opacity-50 text-center py-20 border border-dashed border-zinc-800 rounded-3xl">
-                        <p className="text-zinc-600 text-sm uppercase tracking-widest">No projects added yet.</p>
-                    </section>
                 )}
 
-                {/* 3. SKILLS */}
-                <section className="mb-32 md:mb-48">
-                    <div className="flex items-center gap-6 mb-10">
-                        <h2 className="text-[10px] font-black uppercase tracking-[0.6em] text-zinc-700 whitespace-nowrap">03 // Arsenal</h2>
-                        <div className="h-px w-full bg-zinc-900" />
+                {/* 3. Skills */}
+                <section className="mb-32">
+                    <div className="flex items-center gap-4 mb-10">
+                        <span className="w-2 h-2 rounded-full bg-indigo-500"/>
+                        <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">Arsenal</h2>
                     </div>
 
                     <div className="space-y-12">
-                        {/* Primary Tool */}
                         {safeData.primaryTool && (
-                            <div>
-                                <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-4">Core Mastery</h4>
-                                <div className="bg-gradient-to-br from-zinc-900 to-black border border-zinc-800 p-6 rounded-2xl flex items-center gap-6">
-                                    <div className="w-16 h-16 bg-black border border-zinc-800 rounded-xl flex items-center justify-center shadow-2xl">
-                                        <ToolIcon name={safeData.primaryTool} className="w-10 h-10" />
-                                    </div>
-                                    <div>
-                                        <h5 className="text-xl font-bold text-white tracking-tight">{safeData.primaryTool}</h5>
-                                        <p className="text-[10px] text-zinc-500 mt-1">Primary Workflow</p>
-                                    </div>
+                            <div className="bg-zinc-900/30 border border-zinc-800 p-6 rounded-2xl flex items-center gap-6">
+                                <div className="w-14 h-14 bg-zinc-950 border border-zinc-800 rounded-xl flex items-center justify-center shadow-lg">
+                                    <ToolIcon name={safeData.primaryTool} className="w-8 h-8" />
+                                </div>
+                                <div>
+                                    <h4 className="text-lg font-bold text-white">{safeData.primaryTool}</h4>
+                                    <p className="text-[10px] text-zinc-500 uppercase tracking-widest mt-1">Core Workflow</p>
                                 </div>
                             </div>
                         )}
 
-                        {/* Other Tools */}
-                        <div>
-                            <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-4">Production Stack</h4>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                                {safeData.tools?.filter(t => t !== safeData.primaryTool).map((tool) => (
-                                    <div key={tool} className="bg-zinc-950 border border-zinc-900 p-4 rounded-xl flex flex-col items-center gap-3 hover:bg-zinc-900 transition-colors">
-                                        <ToolIcon name={tool} className="w-8 h-8" />
-                                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest text-center">{tool}</span>
-                                    </div>
-                                ))}
-                            </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                            {safeData.tools?.filter(t => t !== safeData.primaryTool).map(tool => (
+                                <div key={tool} className="p-4 bg-zinc-900/30 border border-zinc-800 rounded-xl flex items-center gap-3 hover:bg-zinc-800 transition-colors">
+                                    <ToolIcon name={tool} />
+                                    <span className="text-xs font-medium text-zinc-400">{tool}</span>
+                                </div>
+                            ))}
                         </div>
 
-                         {/* AI Tools */}
-                        {safeData.aiTools && safeData.aiTools.length > 0 && (
-                             <div>
-                                <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-4 flex items-center gap-2"><Sparkles size={12} className="text-yellow-500"/> AI Extensions</h4>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                                    {safeData.aiTools.map((tool) => (
-                                        <div key={tool} className="bg-zinc-950/50 border border-yellow-900/20 p-4 rounded-xl flex flex-col items-center gap-3">
-                                            <ToolIcon name={tool} className="w-8 h-8" />
-                                            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest text-center">{tool}</span>
+                         {safeData.aiTools && safeData.aiTools.length > 0 && (
+                            <div>
+                                <h4 className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest mb-4 flex items-center gap-2"><Sparkles size={10} /> AI Enhanced</h4>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                                    {safeData.aiTools.map(tool => (
+                                        <div key={tool} className="p-4 bg-indigo-500/5 border border-indigo-500/10 rounded-xl flex items-center gap-3">
+                                            <ToolIcon name={tool} />
+                                            <span className="text-xs font-medium text-indigo-200">{tool}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -487,28 +329,12 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                     </div>
                 </section>
 
-                {/* 4. CONNECT */}
-                <section className="pt-20 border-t border-zinc-900">
-                    <div className="flex flex-col md:flex-row justify-between items-start gap-12">
-                        <div>
-                             <h2 className="text-4xl md:text-6xl font-display font-black uppercase tracking-tighter text-white mb-8">Let's create.</h2>
-                             <a href={`mailto:${safeData.contactEmail}`} className="text-lg md:text-2xl text-zinc-500 hover:text-white transition-colors border-b border-zinc-800 pb-2">
-                                {safeData.contactEmail}
-                             </a>
-                        </div>
-                        <div className="flex flex-col gap-4">
-                             <div className="flex gap-4">
-                                 {safeData.socials && Object.entries(safeData.socials).map(([key, val]) => {
-                                        if (!val) return null;
-                                        const Icon = { instagram: Instagram, twitter: Twitter, youtube: Youtube, linkedin: Linkedin, email: Mail }[key] || Globe;
-                                        return <a key={key} href={val as string} className="text-zinc-600 hover:text-white transition-colors"><Icon size={24}/></a>
-                                 })}
-                             </div>
-                             <p className="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-800">
-                                © {new Date().getFullYear()} {safeData.name}
-                             </p>
-                        </div>
-                    </div>
+                {/* 4. Contact CTA */}
+                <section className="border-t border-zinc-900 pt-16">
+                    <h2 className="text-4xl md:text-5xl font-display font-bold text-white mb-8 tracking-tight">Let's create together.</h2>
+                    <a href={`mailto:${safeData.contactEmail}`} className="text-xl md:text-2xl text-zinc-500 hover:text-white transition-colors border-b border-zinc-800 pb-1 hover:border-white">
+                        {safeData.contactEmail}
+                    </a>
                 </section>
             </main>
         </div>

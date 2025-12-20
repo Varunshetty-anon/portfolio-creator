@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { PortfolioView } from './features/portfolio/PortfolioView';
 import { EditorPanel } from './features/editor/EditorPanel';
 import { OnboardingFlow } from './features/onboarding/OnboardingFlow';
@@ -21,7 +21,7 @@ import {
     deletePortfolioFromDB, 
     deleteUserAuth 
 } from './lib/utils';
-import { Loader2, Eye, EyeOff, PenTool, AlertCircle, RefreshCw, LogOut } from 'lucide-react';
+import { Loader2, Eye, EyeOff, PenTool, AlertCircle, RefreshCw, LogOut, ArrowRight, Sparkles } from 'lucide-react';
 import { Button } from './components/ui/Button';
 import { Input } from './components/ui/Input';
 import { onAuthStateChanged, User, getRedirectResult } from 'firebase/auth';
@@ -31,7 +31,7 @@ const App: React.FC = () => {
   const [editorViewMode, setEditorViewMode] = useState<'edit' | 'preview'>('edit');
   const [data, setData] = useState<PortfolioData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [loadingMessage, setLoadingMessage] = useState('Loading Studio...');
+  const [loadingMessage, setLoadingMessage] = useState('Initializing Studio...');
   
   // Editor States
   const [isSaving, setIsSaving] = useState(false);
@@ -45,11 +45,8 @@ const App: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState('');
   const [isAuthProcessing, setIsAuthProcessing] = useState(false);
-
-  // App Fatal Error State (e.g. User logged in but profile load failed)
   const [fatalError, setFatalError] = useState<string | null>(null);
 
-  // Ref to hold current data for sync operations
   const dataRef = useRef<PortfolioData | null>(null);
   useEffect(() => { dataRef.current = data; }, [data]);
 
@@ -60,7 +57,6 @@ const App: React.FC = () => {
         setIsLoading(true);
         setLoadingMessage('Initializing...');
 
-        // 1. Check for Public URL (Slug or Custom Domain logic would go here)
         const path = window.location.pathname;
         const hash = window.location.hash.replace('#', '');
         let slug = null;
@@ -87,18 +83,12 @@ const App: React.FC = () => {
             }
         }
 
-        // 2. Initialize Firebase Auth
         if (isConfigured && auth) {
-            
-            // Non-blocking redirect check to clear pending redirect states
             getRedirectResult(auth).catch(e => console.warn("Redirect check:", e));
 
             unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
-                // Determine if this is an initial load or a state change
-                // We keep loading true if we are transitioning
-                
                 if (user) {
-                    setLoadingMessage('Synchronizing Profile...');
+                    setLoadingMessage('Syncing Profile...');
                     try {
                         const userProfile = await ensureUserProfile(user);
                         
@@ -118,7 +108,7 @@ const App: React.FC = () => {
                             setData(draftData || INITIAL_DATA);
                             setRoute('editor');
                         }
-                        setFatalError(null); // Clear errors on success
+                        setFatalError(null);
                     } catch (e: any) {
                         console.error("Auth load error", e);
                         setFatalError("Failed to load your profile data. Please check your connection.");
@@ -128,7 +118,6 @@ const App: React.FC = () => {
                         setIsLoading(false);
                     }
                 } else {
-                    // Logged out
                     setRoute('home');
                     setData(null);
                     setIsAuthProcessing(false);
@@ -136,16 +125,12 @@ const App: React.FC = () => {
                 }
             });
         } else {
-            // No Auth configured
             setIsLoading(false);
         }
     };
 
     initApp();
-
-    return () => {
-        if (unsubscribe) unsubscribe();
-    };
+    return () => { if (unsubscribe) unsubscribe(); };
   }, []);
 
   const handleEmailAuth = async (e: React.FormEvent) => {
@@ -172,7 +157,6 @@ const App: React.FC = () => {
       setIsAuthProcessing(true);
       try {
           await loginWithGoogle();
-          // onAuthStateChanged will handle the rest
       } catch (e: any) { 
           let msg = e.message;
           if (msg.includes('popup-closed-by-user') || msg.includes('popup-blocked')) {
@@ -190,7 +174,6 @@ const App: React.FC = () => {
       setIsAuthProcessing(true);
       try {
           await loginWithGoogleRedirect();
-          // The page will redirect, so no state update needed here usually.
       } catch (e: any) {
           setAuthError(e.message);
           setIsAuthProcessing(false);
@@ -239,31 +222,34 @@ const App: React.FC = () => {
       await auth?.signOut();
       setRoute('home');
       setData(null);
-      // Optional: window.location.reload() if deep cleaning needed
   };
 
   // --- RENDER STATES ---
 
   if (isLoading) {
       return (
-          <div className="h-screen bg-black flex flex-col items-center justify-center font-display text-white">
-              <motion.div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4" />
-              <p className="text-xs uppercase tracking-widest text-zinc-500 animate-pulse">{loadingMessage}</p>
+          <div className="h-screen bg-[#050505] flex flex-col items-center justify-center font-sans text-white">
+              <motion.div 
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                className="w-8 h-8 border-2 border-zinc-800 border-t-white rounded-full mb-6" 
+              />
+              <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 animate-pulse">{loadingMessage}</p>
           </div>
       );
   }
 
   if (route === 'error' && fatalError) {
       return (
-          <div className="h-screen bg-black flex flex-col items-center justify-center p-6 text-center">
-              <div className="w-16 h-16 bg-red-900/20 text-red-500 rounded-full flex items-center justify-center mb-6 border border-red-900/50">
-                  <AlertCircle size={32} />
+          <div className="h-screen bg-[#050505] flex flex-col items-center justify-center p-8 text-center">
+              <div className="w-12 h-12 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mb-6 ring-1 ring-red-500/20">
+                  <AlertCircle size={24} />
               </div>
-              <h2 className="text-2xl font-display font-bold text-white mb-2">Connection Error</h2>
-              <p className="text-zinc-500 max-w-sm mb-8">{fatalError}</p>
+              <h2 className="text-xl font-display font-medium text-white mb-2">Connection Issue</h2>
+              <p className="text-zinc-500 text-sm max-w-sm mb-8 leading-relaxed">{fatalError}</p>
               <div className="flex gap-4">
-                  <Button variant="outline" onClick={() => window.location.reload()} icon={<RefreshCw size={16}/>}>Retry</Button>
-                  <Button variant="ghost" onClick={handleLogout} icon={<LogOut size={16}/>}>Log Out</Button>
+                  <Button variant="outline" onClick={() => window.location.reload()} icon={<RefreshCw size={14}/>}>Retry</Button>
+                  <Button variant="ghost" onClick={handleLogout} icon={<LogOut size={14}/>}>Reset</Button>
               </div>
           </div>
       );
@@ -280,10 +266,12 @@ const App: React.FC = () => {
   if (route === 'editor' && data) {
     if (editorViewMode === 'preview') {
         return (
-            <div className="relative min-h-screen w-full bg-black">
-                <Button onClick={() => setEditorViewMode('edit')} className="fixed bottom-8 right-8 z-[200] rounded-full shadow-2xl px-6 py-3 bg-zinc-900 text-white border border-zinc-700 hover:bg-white hover:text-black transition-all">
-                    <PenTool size={18} className="mr-2" /> Back to Editor
-                </Button>
+            <div className="relative min-h-screen w-full bg-[#050505]">
+                <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="fixed bottom-6 right-6 z-[200]">
+                    <Button onClick={() => setEditorViewMode('edit')} className="rounded-full shadow-2xl px-6 py-3 bg-white text-black hover:scale-105 transition-transform font-bold tracking-tight">
+                        <PenTool size={16} className="mr-2" /> Back to Editor
+                    </Button>
+                </motion.div>
                 <PortfolioView data={data} isPreview={true} />
             </div>
         );
@@ -314,42 +302,73 @@ const App: React.FC = () => {
 
   // DEFAULT: HOME / LOGIN
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center p-6 relative overflow-hidden">
-       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(99,102,241,0.15),transparent)] animate-pulse" />
-       <div className="w-full max-w-md bg-zinc-900/50 backdrop-blur-2xl border border-zinc-800 p-8 rounded-3xl shadow-2xl relative z-10">
-          <div className="text-center mb-10">
-              <h1 className="text-5xl font-display font-black text-white tracking-tighter">FRAMES</h1>
-              <p className="text-zinc-500 text-xs mt-2 uppercase tracking-[0.3em]">by VARUN</p>
-          </div>
-          <div className="flex gap-2 p-1 bg-black/40 rounded-xl mb-8">
-              <button onClick={() => setAuthMode('login')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${authMode === 'login' ? 'bg-zinc-800 text-white' : 'text-zinc-600'}`}>LOGIN</button>
-              <button onClick={() => setAuthMode('signup')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${authMode === 'signup' ? 'bg-zinc-800 text-white' : 'text-zinc-600'}`}>SIGNUP</button>
-          </div>
-          <form onSubmit={handleEmailAuth} className="space-y-4">
-              {authMode === 'signup' && <Input label="Username" placeholder="yourname" value={username} onChange={e => setUsername(e.target.value)} required />}
-              <Input label="Email" type="email" placeholder="editor@example.com" value={email} onChange={e => setEmail(e.target.value)} required />
-              <div className="relative">
-                <Input label="Password" type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required />
-                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 bottom-2.5 text-zinc-500 hover:text-white transition-colors">{showPassword ? <EyeOff size={16}/> : <Eye size={16}/>}</button>
-              </div>
-              
-              {authError && (
-                  <div className="text-center bg-red-500/10 p-3 rounded-lg border border-red-500/20">
-                      <p className="text-red-500 text-[10px] uppercase font-bold mb-2">{authError}</p>
-                      {authError.includes('Popups blocked') && (
-                          <Button type="button" size="sm" onClick={handleGoogleRedirect} className="w-full bg-red-900/40 text-red-200 border border-red-800 hover:bg-red-800">
-                             Use Redirect Login
-                          </Button>
-                      )}
-                  </div>
-              )}
-              
-              <Button className="w-full py-4 uppercase tracking-widest font-black" disabled={isAuthProcessing}>{isAuthProcessing ? <Loader2 className="animate-spin" /> : 'Enter Studio'}</Button>
-              <div className="flex items-center gap-4 py-4"><div className="h-px flex-1 bg-zinc-800"/><span className="text-[10px] text-zinc-600 font-bold">OR</span><div className="h-px flex-1 bg-zinc-800"/></div>
-              <Button type="button" variant="secondary" className="w-full py-3" onClick={handleGoogleAuth} disabled={isAuthProcessing}>
-                  {isAuthProcessing ? 'Connecting...' : 'Google Account'}
-              </Button>
-          </form>
+    <div className="min-h-screen bg-[#050505] flex flex-col md:flex-row relative overflow-hidden font-sans selection:bg-white/20">
+       
+       {/* Left Side - Brand */}
+       <div className="flex-1 flex flex-col justify-between p-8 md:p-12 lg:p-16 relative z-10 border-b md:border-b-0 md:border-r border-zinc-900/50">
+           <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center">
+               <span className="font-display font-black text-black text-lg">F</span>
+           </div>
+           
+           <div className="py-12 md:py-0">
+               <h1 className="text-5xl md:text-7xl font-display font-bold text-white tracking-tight mb-6 leading-[0.9]">
+                   Your Portfolio.<br/>
+                   <span className="text-zinc-600">Reimagined.</span>
+               </h1>
+               <p className="text-zinc-400 text-lg max-w-md font-light leading-relaxed">
+                   Frames is the premium portfolio builder designed specifically for video editors and motion designers. 
+               </p>
+           </div>
+
+           <div className="flex gap-6 text-[10px] font-bold uppercase tracking-widest text-zinc-600">
+               <span>© FRAMES STUDIO</span>
+               <span>VARUN</span>
+           </div>
+       </div>
+
+       {/* Right Side - Auth */}
+       <div className="flex-1 flex items-center justify-center p-8 bg-zinc-950/30">
+           <div className="w-full max-w-sm">
+                <div className="mb-8 flex gap-4 border-b border-zinc-800 pb-1">
+                    <button onClick={() => setAuthMode('login')} className={`pb-3 text-sm font-medium transition-colors border-b-2 -mb-1.5 ${authMode === 'login' ? 'text-white border-white' : 'text-zinc-500 border-transparent hover:text-zinc-300'}`}>Sign In</button>
+                    <button onClick={() => setAuthMode('signup')} className={`pb-3 text-sm font-medium transition-colors border-b-2 -mb-1.5 ${authMode === 'signup' ? 'text-white border-white' : 'text-zinc-500 border-transparent hover:text-zinc-300'}`}>Create Account</button>
+                </div>
+
+                <form onSubmit={handleEmailAuth} className="space-y-5">
+                    <AnimatePresence mode="popLayout">
+                        {authMode === 'signup' && (
+                            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
+                                <Input label="Username" placeholder="yourname" value={username} onChange={e => setUsername(e.target.value)} required className="bg-transparent" />
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                    
+                    <Input label="Email" type="email" placeholder="editor@example.com" value={email} onChange={e => setEmail(e.target.value)} required className="bg-transparent" />
+                    
+                    <div className="relative">
+                        <Input label="Password" type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required className="bg-transparent" />
+                        <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-[34px] text-zinc-500 hover:text-white transition-colors">{showPassword ? <EyeOff size={16}/> : <Eye size={16}/>}</button>
+                    </div>
+                    
+                    {authError && (
+                        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="p-4 rounded-lg bg-red-500/5 border border-red-500/10">
+                            <p className="text-red-400 text-xs">{authError}</p>
+                            {authError.includes('Popups blocked') && (
+                                <button type="button" onClick={handleGoogleRedirect} className="mt-2 text-xs underline text-red-300 hover:text-white">Try Redirect Method</button>
+                            )}
+                        </motion.div>
+                    )}
+                    
+                    <div className="pt-4 space-y-3">
+                        <Button className="w-full py-6 text-sm font-medium bg-white text-black hover:bg-zinc-200" disabled={isAuthProcessing}>
+                            {isAuthProcessing ? <Loader2 className="animate-spin" size={18}/> : (authMode === 'login' ? 'Enter Studio' : 'Get Started')}
+                        </Button>
+                        <Button type="button" variant="outline" className="w-full py-6 text-sm font-medium border-zinc-800 text-zinc-400 hover:bg-zinc-900 hover:text-white hover:border-zinc-700" onClick={handleGoogleAuth} disabled={isAuthProcessing}>
+                            <span className="flex items-center gap-2"><Sparkles size={14}/> Continue with Google</span>
+                        </Button>
+                    </div>
+                </form>
+           </div>
        </div>
     </div>
   );
