@@ -258,42 +258,57 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
   const handleShortenLink = async () => {
     setIsShortening(true);
     setShortUrl('');
+    
+    // Base URL for TinyURL API
+    const targetUrl = `https://tinyurl.com/api-create.php?url=${encodeURIComponent(publicUrl)}`;
+    
+    // Proxies to bypass CORS with fallback strategies
+    const proxies = [
+        // 1. AllOrigins (JSON mode is usually the most reliable for text responses)
+        async () => {
+            const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`);
+            if (!res.ok) throw new Error("AllOrigins Error");
+            const data = await res.json();
+            return data.contents;
+        },
+        // 2. Corsproxy.io (Direct proxy)
+        async () => {
+            const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(targetUrl)}`);
+            if (!res.ok) throw new Error("Corsproxy Error");
+            return await res.text();
+        },
+        // 3. CodeTabs (Backup)
+        async () => {
+             const res = await fetch(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(targetUrl)}`);
+             if (!res.ok) throw new Error("CodeTabs Error");
+             return await res.text();
+        }
+    ];
+
     try {
-        const encodedUrl = encodeURIComponent(publicUrl);
-        const apiUrl = `https://tinyurl.com/api-create.php?url=${encodedUrl}`;
-        
-        // Try corsproxy.io first (generally more reliable/faster)
-        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`;
-        
-        const response = await fetch(proxyUrl);
-        if (!response.ok) throw new Error("Primary proxy failed");
-        
-        const short = await response.text();
-        if (short.trim().startsWith('http')) {
+        let short = '';
+        // Try each proxy sequentially
+        for (const proxy of proxies) {
+            try {
+                const result = await proxy();
+                if (result && result.trim().startsWith('http')) {
+                    short = result.trim();
+                    break; // Success
+                }
+            } catch (e) {
+                // Continue to next strategy
+                console.warn("Proxy strategy failed", e);
+            }
+        }
+
+        if (short) {
              setShortUrl(short);
         } else {
-             throw new Error("Invalid response");
+             setShortUrl("Service unavailable. Please try again later.");
         }
     } catch (e) {
-        // Fallback to allorigins.win
-        try {
-            const encodedUrl = encodeURIComponent(publicUrl);
-            const apiUrl = `https://tinyurl.com/api-create.php?url=${encodedUrl}`;
-            const backupProxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(apiUrl)}`;
-            
-            const res = await fetch(backupProxy);
-            if (!res.ok) throw new Error("Backup proxy failed");
-            
-            const short = await res.text();
-            if (short.trim().startsWith('http')) {
-                 setShortUrl(short);
-                 return;
-            }
-            throw new Error("Invalid response");
-        } catch (err) {
-            console.error("Shortening failed", err);
-            setShortUrl("Service unavailable.");
-        }
+        console.error("Shortening failed", e);
+        setShortUrl("Service unavailable.");
     } finally {
         setIsShortening(false);
     }

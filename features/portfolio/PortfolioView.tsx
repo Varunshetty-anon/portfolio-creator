@@ -96,13 +96,6 @@ const VideoPlayer: React.FC<{
         setHasError(false);
     }, [src]);
 
-    // Fix for autoplay policy: Sync defaultMuted via ref since React prop isn't fully supported in all TS definitions
-    useEffect(() => {
-        if (videoRef.current) {
-            videoRef.current.defaultMuted = muted;
-        }
-    }, [muted]);
-
     const effectiveAspectRatio = detectedRatio || aspectRatio || '16:9';
     const cssAspectRatio = useMemo(() => effectiveAspectRatio.replace(':', '/'), [effectiveAspectRatio]);
     
@@ -114,7 +107,6 @@ const VideoPlayer: React.FC<{
         const amb = ambienceRef.current;
 
         const syncPlay = () => {
-            // Attempt playback on ambience. Silent catch if browser blocks unmuted play (ambience is muted though)
             amb.play().catch(() => {});
         };
         const syncPause = () => amb.pause();
@@ -137,38 +129,51 @@ const VideoPlayer: React.FC<{
         };
     }, [ambience, isNative, hasError, src]); 
 
-    // --- Intersection Observer for Autoplay ---
-    // Only runs if autoplay is explicitly true
+    // --- Autoplay Logic (Smart Fallback) ---
     useEffect(() => {
         const video = videoRef.current;
-        if (!video || !autoplay || !isNative || hasError) return;
+        if (!video || !isNative || hasError) return;
 
-        // If we are in the Modal (controls=true), we play immediately on mount if autoplay is requested
+        // Modal Autoplay Strategy: Try Unmuted -> Fail -> Try Muted
         if (controls && autoplay) {
-            video.muted = muted;
-            video.play().catch(e => console.warn("Modal autoplay blocked:", e));
+            const playVideo = async () => {
+                try {
+                    // Try playing unmuted first (if user intent allows)
+                    video.muted = false;
+                    await video.play();
+                } catch (err) {
+                    // If that fails (autoplay policy), fallback to muted
+                    video.muted = true;
+                    try {
+                        await video.play();
+                    } catch (e) {
+                        console.warn("Autoplay blocked completely:", e);
+                    }
+                }
+            };
+            playVideo();
             return;
         }
 
-        const observer = new IntersectionObserver(
-            (entries) => {
-                entries.forEach((entry) => {
-                    if (entry.isIntersecting) {
-                        video.muted = muted; // Ensure muted setting is applied before play
-                        video.play().catch((e) => { 
-                             console.warn("Autoplay blocked", e);
-                        });
-                    } else {
-                        video.pause();
-                    }
-                });
-            },
-            { threshold: 0.5 }
-        );
-
-        observer.observe(video);
-        return () => observer.disconnect();
-    }, [autoplay, isNative, normalizedSrc, muted, hasError, controls]);
+        // Standard Scroll-based Autoplay (Always Muted)
+        if (autoplay && !controls) {
+            video.muted = true; // Always muted for scroll autoplay
+            const observer = new IntersectionObserver(
+                (entries) => {
+                    entries.forEach((entry) => {
+                        if (entry.isIntersecting) {
+                            video.play().catch(() => {});
+                        } else {
+                            video.pause();
+                        }
+                    });
+                },
+                { threshold: 0.5 }
+            );
+            observer.observe(video);
+            return () => observer.disconnect();
+        }
+    }, [autoplay, isNative, normalizedSrc, hasError, controls]);
 
     const getEmbedSrc = () => {
         const auto = autoplay ? 1 : 0;
@@ -196,7 +201,6 @@ const VideoPlayer: React.FC<{
         const { videoWidth, videoHeight } = e.currentTarget;
         if (videoWidth && videoHeight) {
             const r = videoWidth / videoHeight;
-            // Precise ratio detection for smoother layout
             if (Math.abs(r - 9/16) < 0.05) setDetectedRatio('9:16');
             else if (Math.abs(r - 16/9) < 0.05) setDetectedRatio('16:9');
             else if (Math.abs(r - 4/3) < 0.05) setDetectedRatio('4:3');
@@ -216,7 +220,7 @@ const VideoPlayer: React.FC<{
         return (
              <div 
                 className={`relative bg-[#050505] ${className}`} 
-                style={{ aspectRatio: cssAspectRatio }}
+                style={controls ? {} : { aspectRatio: cssAspectRatio }} // Only enforce aspect ratio on container if NOT in modal/controls mode
             >
                 {/* Ambience Glow (Dual Video) */}
                 {ambience && !hasError && (
@@ -248,8 +252,7 @@ const VideoPlayer: React.FC<{
                         src={normalizedSrc}
                         className={`relative w-full h-full object-${objectFit} z-10 rounded-2xl bg-black`} 
                         loop 
-                        autoPlay={autoplay}
-                        muted={muted}
+                        // AutoPlay is handled via useEffect for better control
                         playsInline 
                         preload="auto"
                         controls={controls}
@@ -259,8 +262,8 @@ const VideoPlayer: React.FC<{
                     />
                 )}
                 
-                 {/* Mute Toggle */}
-                 {onToggleMute && !hasError && (
+                 {/* Mute Toggle (Only if not using native controls) */}
+                 {onToggleMute && !hasError && !controls && (
                     <motion.button 
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
@@ -271,9 +274,9 @@ const VideoPlayer: React.FC<{
                     </motion.button>
                 )}
 
-                {/* Fallback for Errors OR Invalid Showreel Links */}
+                {/* Fallback for Errors */}
                 {hasError && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center z-20 bg-zinc-900 rounded-2xl overflow-hidden">
+                    <div className="absolute inset-0 flex flex-col items-center justify-center z-20 bg-zinc-900 rounded-2xl overflow-hidden" style={{ aspectRatio: cssAspectRatio }}>
                         {thumbnail && <img src={thumbnail} className="absolute inset-0 w-full h-full object-cover opacity-50" alt="Fallback" />}
                         <div className="relative z-10 bg-black/60 p-4 rounded-full backdrop-blur-sm">
                             <Play size={32} className="text-white fill-white ml-1" />
@@ -284,7 +287,7 @@ const VideoPlayer: React.FC<{
         )
     }
 
-    // --- IFRAME RENDER (Default for non-native, including Drive Preview) ---
+    // --- IFRAME RENDER ---
     return (
         <div 
             className={`
@@ -313,22 +316,11 @@ const VideoPlayer: React.FC<{
                 allowFullScreen 
                 onLoad={() => setIsLoaded(true)} 
             />
-
-            {onToggleMute && ( 
-                <motion.button 
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                    onClick={(e) => { e.stopPropagation(); onToggleMute(); }}
-                    className="absolute bottom-4 right-4 z-20 p-3 rounded-full bg-black/40 backdrop-blur-md text-white hover:bg-white hover:text-black transition-all border border-white/10"
-                >
-                    {muted ? <VolumeX size={18}/> : <Volume2 size={18}/>}
-                </motion.button>
-            )}
         </div>
     );
 };
 
-// --- Animations ---
+// --- Animations & Sections ---
 
 const IntroOverlay: React.FC<{ data: PortfolioData; onComplete: () => void; isImageLoaded: boolean }> = ({ data, onComplete, isImageLoaded }) => {
     useEffect(() => {
@@ -393,7 +385,6 @@ const IntroOverlay: React.FC<{ data: PortfolioData; onComplete: () => void; isIm
 
 const ProjectCard: React.FC<{ project: Project; onClick: () => void; className?: string }> = ({ project, onClick, className = '' }) => {
     const displayAspectRatio = useMemo(() => {
-        // CHANGED: Use true aspect ratio for vertical videos to prevent black bars/cropping issues
         if (project.aspectRatio === '9:16') return '9/16'; 
         return project.aspectRatio ? project.aspectRatio.replace(':', '/') : '16/9';
     }, [project.aspectRatio]);
@@ -437,7 +428,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
     const [selectedProject, setSelectedProject] = useState<Project | null>(null);
     const [isShowreelMuted, setIsShowreelMuted] = useState(true);
     
-    // Preload Profile Image for Seamless Intro
+    // Preload Profile Image
     useEffect(() => {
         if (safeData.profileImage) {
             const img = new Image();
@@ -512,7 +503,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                             className="w-full max-w-7xl max-h-[90vh] flex flex-col lg:flex-row bg-[#09090b] rounded-3xl overflow-hidden border border-zinc-800 shadow-2xl" 
                             onClick={e => e.stopPropagation()}
                         >
-                            {/* Video Section - Improved Logic for 16:9 and 9:16 sizing */}
+                            {/* Video Section */}
                             <div className="flex-1 bg-black relative flex items-center justify-center min-h-[40vh] lg:min-h-0 overflow-hidden p-0 lg:p-4 self-stretch">
                                 <div className="relative w-full h-full flex items-center justify-center">
                                      <VideoPlayer 
@@ -522,9 +513,9 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                                         muted={false} 
                                         controls={true}
                                         aspectRatio={selectedProject.aspectRatio}
-                                        // FIX: Use contain for modal playback to prevent cropping on vertical videos
+                                        // Use contain for modal playback to prevent cropping on vertical videos, without enforcing container ratio
                                         objectFit="contain"
-                                        className="w-full h-full max-h-[85vh] mx-auto"
+                                        className="w-full h-full mx-auto"
                                     />
                                 </div>
                             </div>
@@ -553,7 +544,6 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                 className="flex flex-col lg:block min-h-screen"
             >
                 {/* --- SIDEBAR --- */}
-                {/* Fixed sidebar on desktop for strictly static behavior */}
                 <aside className="
                     w-full lg:w-[35%] xl:w-[32%] 
                     lg:fixed lg:top-0 lg:left-0 lg:bottom-0 
@@ -629,7 +619,6 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                 </aside>
 
                 {/* --- CONTENT AREA --- */}
-                {/* Margin offset to clear fixed sidebar on desktop */}
                 <main className="w-full lg:ml-[35%] xl:ml-[32%] lg:w-auto relative z-10 bg-[#050505]">
                     
                     {/* 1. Showreel Section */}
@@ -639,7 +628,6 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                                 <h2 className="text-3xl font-display font-bold text-white tracking-tight">Showreel</h2>
                             </div>
                             
-                            {/* Decreased width to max-w-2xl and allow overflow for ambience */}
                             <div className="max-w-2xl mx-auto w-full aspect-video md:aspect-[2.35/1] relative group overflow-visible">
                                 <VideoPlayer 
                                     src={safeData.showreelLink} 
@@ -664,14 +652,20 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                                     <div className="h-px flex-1 bg-zinc-900 ml-6 relative top-[-8px] hidden md:block" />
                                 </div>
 
-                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                                    {section.projects.map(project => (
-                                        <ProjectCard 
-                                            key={project.id} 
-                                            project={project} 
-                                            onClick={() => setSelectedProject(project)} 
-                                        />
-                                    ))}
+                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 auto-rows-min grid-flow-dense">
+                                    {section.projects.map(project => {
+                                        // Landscape items (16:9 or 4:3) span 2 columns to be bigger and balance better against vertical items
+                                        const isLandscape = !project.aspectRatio || project.aspectRatio === '16:9' || project.aspectRatio === '4:3';
+                                        
+                                        return (
+                                            <ProjectCard 
+                                                key={project.id} 
+                                                project={project} 
+                                                onClick={() => setSelectedProject(project)} 
+                                                className={isLandscape ? 'col-span-2' : 'col-span-1'}
+                                            />
+                                        )
+                                    })}
                                 </div>
                             </section>
                         ))}
