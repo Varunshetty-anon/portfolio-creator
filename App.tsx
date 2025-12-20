@@ -51,20 +51,14 @@ const App: React.FC = () => {
   useEffect(() => {
     const initApp = async () => {
         setIsLoading(true);
-
-        // 1. PUBLIC ROUTE CHECK
-        // Supports both Hash (#varun) and Path (/v/varun) routing
         const path = window.location.pathname;
         const hash = window.location.hash.replace('#', '');
         let slug = null;
         
-        // Priority to Path Routing /v/:username
-        // We use a regex to cleanly extract the username segment immediately after /v/
         const pathMatch = path.match(/^\/v\/([^/]+)/);
         if (pathMatch) {
             slug = pathMatch[1];
         } else if (hash && !['editor', 'onboarding'].includes(hash)) {
-            // Fallback to Hash Routing for legacy links or simple hosting
             slug = hash;
         }
 
@@ -75,25 +69,17 @@ const App: React.FC = () => {
                 setData(publicData);
                 setRoute('public');
                 setIsLoading(false);
-                return; // Stop here, public view doesn't need auth
-            } else {
-                console.log("Slug not found, defaulting to home");
-                // Optional: setRoute('not-found');
+                return;
             }
         }
 
-        // 2. AUTH CHECK (For Editor/Onboarding)
         if (isConfigured && auth) {
             const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
                 if (user) {
-                    console.log("DEBUG: User authenticated", user.uid);
                     try {
-                        // Ensure user profile exists in Firestore, create if new.
-                        // This MUST happen before we try to read other data.
                         const userProfile = await ensureUserProfile(user);
                         
                         if (!userProfile.onboarded) {
-                             // User exists but not onboarded
                              const cleanUsername = (user.displayName?.split(' ')[0] || user.email?.split('@')[0] || 'user').toLowerCase() + Math.floor(Math.random()*1000);
                              const initialData: PortfolioData = { 
                                 ...INITIAL_DATA, 
@@ -105,7 +91,6 @@ const App: React.FC = () => {
                             setData(initialData);
                             setRoute('onboarding');
                         } else {
-                            // User is onboarded, load Editor State (Draft)
                             const draftData = await loadEditorState(user.uid);
                             setData(draftData || INITIAL_DATA);
                             setRoute('editor');
@@ -113,15 +98,12 @@ const App: React.FC = () => {
                     } catch (e: any) {
                         console.error("Auth load error", e);
                         setAuthError("Account initialization failed. " + e.message);
-                        // Important: Stop the auth spinner in the form, and global loader
                         setIsAuthProcessing(false); 
                     }
                 } else {
                     setRoute('home');
                     setIsAuthProcessing(false);
                 }
-                
-                // Always stop loading after auth check resolution
                 setIsLoading(false);
             });
             return () => unsubscribe();
@@ -132,7 +114,6 @@ const App: React.FC = () => {
     initApp();
   }, []);
 
-  // --- Auth Handlers ---
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError('');
@@ -145,7 +126,6 @@ const App: React.FC = () => {
         } else {
             await loginWithEmail(email, password);
         }
-        // Success handled by onAuthStateChanged
     } catch (err: any) {
         setAuthError(err.message.replace('Firebase:', '').trim());
         setIsAuthProcessing(false);
@@ -153,26 +133,19 @@ const App: React.FC = () => {
   };
 
   const handleGoogleAuth = async () => {
-      if (isAuthProcessing) return; // Prevent double clicks
+      if (isAuthProcessing) return;
       setAuthError('');
       setIsAuthProcessing(true);
       try {
           await loginWithGoogle();
-          // We intentionally do NOT setIsAuthProcessing(false) here.
-          // The onAuthStateChanged listener will handle the state transition or error.
       } catch (e: any) { 
-          console.error("Google Auth Failed:", e);
-          
           let msg = e.message;
           if (msg.includes('popup-closed-by-user')) msg = "Login cancelled.";
           if (msg.includes('network-request-failed')) msg = "Network error. Check your connection.";
-          
           setAuthError(msg); 
-          setIsAuthProcessing(false); // Reset loading state so user can retry
+          setIsAuthProcessing(false);
       }
   };
-
-  // --- Editor Actions ---
 
   const handleSaveDraft = async () => {
     if (!dataRef.current || !dataRef.current.uid) return;
@@ -184,7 +157,7 @@ const App: React.FC = () => {
     } catch (e: any) {
       console.error("Save failed: ", e);
       setIsSaving(false);
-      throw e; // Propagate to caller if needed
+      throw e;
     }
   };
 
@@ -200,7 +173,7 @@ const App: React.FC = () => {
     } catch (e: any) {
         console.error("Publish failed: ", e);
         setIsSaving(false);
-        throw e; // Propagate to UI button for error state
+        throw e;
     }
   };
 
@@ -228,19 +201,14 @@ const App: React.FC = () => {
       );
   }
 
-  // PUBLIC VIEW
   if (route === 'public' && data) {
-      // Keying by liveVersion ensures React completely remounts the component 
-      // if the portfolio version has changed, clearing internal image caches and state.
       return <PortfolioView key={data.meta?.publish?.liveVersion || 'latest'} data={data} isPreview={false} />;
   }
 
-  // ONBOARDING VIEW
   if (route === 'onboarding' && data) {
       return <OnboardingFlow data={data} onComplete={handleOnboardingComplete} />;
   }
 
-  // EDITOR VIEW
   if (route === 'editor' && data) {
     if (editorViewMode === 'preview') {
         return (
@@ -263,14 +231,13 @@ const App: React.FC = () => {
         hasUnsavedChanges={hasUnsavedChanges}
         onLogout={handleLogout}
         onDeleteAccount={async () => {
-            if(window.confirm("Permanent Wipe. Are you sure? This cannot be undone.")) {
-                try {
-                    await deletePortfolioFromDB(data.uid!);
-                    await deleteUserAuth();
-                    window.location.reload();
-                } catch(e) {
-                    console.error("Delete failed", e);
-                }
+            // Safety check handled by UI inside EditorPanel now
+            try {
+                await deletePortfolioFromDB(data.uid!);
+                await deleteUserAuth();
+                window.location.reload();
+            } catch(e) {
+                console.error("Delete failed", e);
             }
         }}
         onPreview={() => setEditorViewMode('preview')}
@@ -278,7 +245,6 @@ const App: React.FC = () => {
     );
   }
 
-  // HOME / LOGIN VIEW
   return (
     <div className="min-h-screen bg-black flex items-center justify-center p-6 relative overflow-hidden">
        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(99,102,241,0.15),transparent)] animate-pulse" />
