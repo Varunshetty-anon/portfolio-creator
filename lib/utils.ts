@@ -379,19 +379,23 @@ export const uploadFileToStorage = (file: File, path: string, onProgress?: (prog
     
     const storageRef = ref(storage, path);
     
-    // Determine content type:
-    // 1. Check file extension (most reliable for our naming convention)
-    // 2. Fallback to file.type
-    // 3. Fallback to generic
+    // Determine content type with strict overrides for video files to ensure streaming works
     let contentType = file.type || 'application/octet-stream';
     const lowerPath = path.toLowerCase();
     
+    // Force correct MIME types based on extension to avoid "application/octet-stream"
+    // which causes playback/download issues in some browsers
     if (lowerPath.endsWith('.mp4')) contentType = 'video/mp4';
     else if (lowerPath.endsWith('.webm')) contentType = 'video/webm';
+    else if (lowerPath.endsWith('.mov')) contentType = 'video/quicktime';
+    else if (lowerPath.endsWith('.m4v')) contentType = 'video/mp4';
     else if (lowerPath.endsWith('.jpg') || lowerPath.endsWith('.jpeg')) contentType = 'image/jpeg';
     else if (lowerPath.endsWith('.png')) contentType = 'image/png';
+    else if (lowerPath.endsWith('.webp')) contentType = 'image/webp';
 
     // CRITICAL: Explicitly set content type and cache control for video streaming
+    // cacheControl: public, max-age=31536000 (1 year) allows the browser and CDN to cache the video,
+    // reducing partial content requests and improving seeking performance.
     const metadata = {
         contentType: contentType,
         cacheControl: 'public, max-age=31536000'
