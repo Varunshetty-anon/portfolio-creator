@@ -84,7 +84,11 @@ const App: React.FC = () => {
         }
 
         if (isConfigured && auth) {
-            getRedirectResult(auth).catch(e => console.warn("Redirect check:", e));
+            // Check for redirect result first
+            getRedirectResult(auth).catch(e => {
+                console.warn("Redirect check:", e);
+                // Don't block app load on redirect error, just log it
+            });
 
             unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
                 if (user) {
@@ -111,7 +115,8 @@ const App: React.FC = () => {
                         setFatalError(null);
                     } catch (e: any) {
                         console.error("Auth load error", e);
-                        setFatalError("Failed to load your profile data. Please check your connection.");
+                        // Don't fatal error immediately, allow retry
+                        setFatalError("Failed to load your profile. Please check your connection.");
                         setRoute('error');
                     } finally {
                         setIsAuthProcessing(false); 
@@ -157,12 +162,14 @@ const App: React.FC = () => {
       setIsAuthProcessing(true);
       try {
           await loginWithGoogle();
+          // Auth state change listener will handle the rest
       } catch (e: any) { 
           let msg = e.message;
-          if (msg.includes('popup-closed-by-user') || msg.includes('popup-blocked')) {
-             setAuthError("Popups blocked. Try the Redirect Login button below.");
+          console.error("Google Auth Error:", e);
+          if (msg.includes('popup-closed-by-user') || msg.includes('popup-blocked') || msg.includes('cancelled')) {
+             setAuthError("Sign-in cancelled or popups blocked.");
           } else {
-             setAuthError(msg); 
+             setAuthError("Google Sign-in failed. Please try again or use email."); 
           }
           setIsAuthProcessing(false);
       }
@@ -353,9 +360,8 @@ const App: React.FC = () => {
                     {authError && (
                         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="p-4 rounded-lg bg-red-500/5 border border-red-500/10">
                             <p className="text-red-400 text-xs">{authError}</p>
-                            {authError.includes('Popups blocked') && (
-                                <button type="button" onClick={handleGoogleRedirect} className="mt-2 text-xs underline text-red-300 hover:text-white">Try Redirect Method</button>
-                            )}
+                            {/* Fallback to redirect if popup fails explicitly */}
+                            <button type="button" onClick={handleGoogleRedirect} className="mt-2 text-xs underline text-red-300 hover:text-white">Try Redirect Method</button>
                         </motion.div>
                     )}
                     

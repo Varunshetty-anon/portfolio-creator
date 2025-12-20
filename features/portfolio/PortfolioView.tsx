@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { motion, AnimatePresence, useScroll, useTransform, useSpring, useInView } from 'framer-motion';
-import { Mail, Instagram, Twitter, Linkedin, Youtube, Globe, X, Volume2, VolumeX, Loader2, Play, ExternalLink, ArrowDown, Sparkles } from 'lucide-react';
+import { motion, AnimatePresence, useScroll, useTransform, useInView } from 'framer-motion';
+import { Mail, Instagram, Twitter, Linkedin, Youtube, Globe, X, Volume2, VolumeX, Loader2, Play, ArrowDown, Sparkles } from 'lucide-react';
 import { PortfolioData, Project, INITIAL_DATA } from '../../types';
 import { EDITING_TOOLS_LIST, AI_TOOLS_LIST, trackPortfolioView, getDriveId, getDropboxDirectLink } from '../../lib/utils';
 
@@ -81,12 +81,8 @@ const VideoPlayer: React.FC<{ src: string; thumbnail: string; autoplay?: boolean
                         className="w-full h-full object-cover"
                         loop muted={isMuted} playsInline preload="metadata"
                         onLoadedData={() => setIsReady(true)}
+                        controls={isModal}
                     />
-                    {isModal && (
-                        <button onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }} className="absolute bottom-6 right-6 z-30 p-3 rounded-full bg-black/40 backdrop-blur-md text-white hover:bg-white hover:text-black transition-all">
-                            {isMuted ? <VolumeX size={20}/> : <Volume2 size={20}/>}
-                        </button>
-                    )}
                 </div>
             ) : (
                 <iframe src={getEmbedSrc()} className="w-full h-full" allow="autoplay; fullscreen" onLoad={() => setIsReady(true)} />
@@ -135,14 +131,16 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
     const safeData = useMemo(() => ({ ...INITIAL_DATA, ...data }), [data]);
     const [selectedProject, setSelectedProject] = useState<Project | null>(null);
     const { scrollY } = useScroll();
-    const [isMobile, setIsMobile] = useState(false);
-
-    useEffect(() => {
-        const check = () => setIsMobile(window.innerWidth < 1024);
-        check();
-        window.addEventListener('resize', check);
-        return () => window.removeEventListener('resize', check);
-    }, []);
+    
+    // --- Layout Transforms ---
+    // Desktop: Sidebar transition
+    const desktopLogoScale = useTransform(scrollY, [0, 400], [1, 0.6]);
+    const desktopTextOpacity = useTransform(scrollY, [0, 200], [1, 0]);
+    
+    // Mobile: Header transition
+    const mobileHeaderHeight = useTransform(scrollY, [0, 300], [400, 80]);
+    const mobileLogoScale = useTransform(scrollY, [0, 300], [1, 0.4]);
+    const mobileTextOpacity = useTransform(scrollY, [0, 150], [1, 0]);
 
     useEffect(() => {
         if (!isPreview && safeData.uid) trackPortfolioView(safeData.uid);
@@ -150,193 +148,173 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
         return () => { document.body.style.overflow = 'auto'; }
     }, [selectedProject, safeData.uid, isPreview]);
 
-    // --- Physics Animations ---
-    const springConfig = { stiffness: 100, damping: 20, mass: 1 };
-    
-    // Desktop: Sidebar Width 100% -> 25%
-    const desktopWidth = useSpring(useTransform(scrollY, [0, 600], ["100%", "28%"]), springConfig);
-    const desktopLogoScale = useSpring(useTransform(scrollY, [0, 600], [1, 0.5]), springConfig);
-    const desktopContentOpacity = useSpring(useTransform(scrollY, [0, 400], [1, 0]), springConfig); // Fades out extra bio details on scroll
-    
-    // Mobile: Header Height 100vh -> 80px
-    const mobileHeight = useSpring(useTransform(scrollY, [0, 400], ["100vh", "84px"]), springConfig);
-    const mobileLogoScale = useSpring(useTransform(scrollY, [0, 400], [1.5, 0.4]), springConfig);
-    const mobileContentOpacity = useSpring(useTransform(scrollY, [0, 200], [1, 0]), springConfig);
-
     return (
         <div className="bg-[#050505] min-h-screen w-full relative text-zinc-100 font-sans selection:bg-white/20">
             <AnimatePresence>
                 {selectedProject && <ProjectModal project={selectedProject} onClose={() => setSelectedProject(null)} />}
             </AnimatePresence>
 
-            {/* --- HERO / SIDEBAR CONTAINER --- */}
-            <motion.header
-                className="fixed top-0 left-0 z-40 bg-[#050505] border-b lg:border-b-0 lg:border-r border-zinc-900 shadow-[0_0_50px_rgba(0,0,0,0.5)] overflow-hidden flex flex-col items-center justify-center lg:justify-start lg:pt-0"
-                style={{
-                    width: isMobile ? "100%" : desktopWidth,
-                    height: isMobile ? mobileHeight : "100vh",
-                    justifyContent: isMobile ? 'center' : 'center', // Initially center, logic handled by inner container placement
-                }}
-            >
-                {/* Content Wrapper */}
-                <div className={`relative w-full max-w-lg mx-auto flex flex-col items-center text-center p-6 transition-all duration-500 ${isMobile ? '' : 'lg:h-screen lg:justify-center'}`}>
-                    
-                    {/* Dynamic Profile Image */}
-                    <motion.div 
-                        className="rounded-full overflow-hidden border border-zinc-800 bg-zinc-900 shadow-2xl relative z-10 shrink-0"
-                        style={{
-                            width: 200, height: 200,
-                            scale: isMobile ? mobileLogoScale : desktopLogoScale,
-                            marginBottom: isMobile ? 0 : 30 // Gap managed by scale
-                        }}
-                    >
-                        <img src={safeData.profileImage} className="w-full h-full object-cover" alt={safeData.name} />
-                    </motion.div>
+            {/* --- LAYOUT STRUCTURE --- */}
+            <div className="flex flex-col lg:flex-row min-h-screen">
+                
+                {/* --- SIDEBAR / HEADER (STICKY) --- */}
+                {/* 
+                   Mobile: Sticky Header at Top
+                   Desktop: Sticky Sidebar at Left
+                */}
+                <motion.aside 
+                    className="sticky top-0 z-30 flex flex-col items-center justify-center border-b lg:border-b-0 lg:border-r border-zinc-900 bg-[#050505] overflow-hidden shadow-2xl lg:shadow-none"
+                    style={{
+                        height: mobileHeaderHeight, // Dynamic on Mobile
+                        width: '100%', // Full width on Mobile
+                    }}
+                    // Desktop Override via Tailwind classes for fixed width/height
+                    // Note: Framer Motion style override takes precedence, so we use a media query conditioned logic or css modules.
+                    // Instead, simplified: Let's rely on standard classes for Desktop and use motion for mobile height
+                >
+                    <div className="hidden lg:flex flex-col items-center justify-center w-full h-screen sticky top-0 lg:w-[400px] shrink-0 p-8">
+                         {/* DESKTOP CONTENT */}
+                        <motion.div style={{ scale: desktopLogoScale }} className="relative z-10">
+                            <div className="w-48 h-48 rounded-full border border-zinc-800 bg-zinc-900 overflow-hidden shadow-2xl mb-8 mx-auto">
+                                <img src={safeData.profileImage} className="w-full h-full object-cover" alt={safeData.name} />
+                            </div>
+                            <div className="text-center">
+                                <h1 className="font-display font-bold text-5xl tracking-tighter text-white mb-2">{safeData.name}</h1>
+                                <p className="text-zinc-500 font-medium tracking-[0.2em] text-sm uppercase">{safeData.role}</p>
+                            </div>
+                        </motion.div>
 
-                    {/* Text Content - Fades out on Mobile Header state, shrinks on Desktop Sidebar state */}
-                    <motion.div className="flex flex-col items-center" style={{ scale: isMobile ? mobileLogoScale : desktopLogoScale, originY: 0 }}>
-                        <h1 className="font-display font-bold text-5xl tracking-tighter text-white mt-6 mb-2 leading-none whitespace-nowrap">{safeData.name}</h1>
-                        <p className="text-zinc-500 font-medium tracking-[0.2em] text-sm uppercase">{safeData.role}</p>
-                    </motion.div>
-
-                    {/* Extended Details - Only visible when Hero is expanded or Desktop Sidebar is large */}
-                    <motion.div 
-                        style={{ opacity: isMobile ? mobileContentOpacity : desktopContentOpacity }}
-                        className="flex flex-col items-center gap-8 mt-8 w-full"
-                    >
-                        <div className="w-12 h-px bg-zinc-800"/>
-                        <p className="text-zinc-400 text-base leading-relaxed font-light max-w-xs">{safeData.bio}</p>
-                        
-                        <div className="flex gap-4">
-                            {safeData.socials && Object.entries(safeData.socials).map(([key, val]) => {
-                                if (!val) return null;
-                                const Icon = { instagram: Instagram, twitter: Twitter, youtube: Youtube, linkedin: Linkedin, email: Mail }[key] || Globe;
-                                return <a key={key} href={val as string} target="_blank" className="p-3 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-500 hover:bg-white hover:text-black transition-all"><Icon size={18}/></a>
-                            })}
-                        </div>
-                        
-                        <div className="flex flex-col items-center gap-2 mt-8 animate-bounce opacity-30">
-                             <span className="text-[9px] uppercase tracking-widest text-zinc-500">Scroll</span>
-                             <ArrowDown size={14} className="text-zinc-500" />
-                        </div>
-                    </motion.div>
-                </div>
-            </motion.header>
-
-            {/* --- SCROLL SPACER --- */}
-            {/* Creates the height for the initial scroll effect */}
-            <div style={{ height: '100vh' }} />
-
-            {/* --- MAIN CONTENT --- */}
-            <main 
-                className="relative z-10 p-6 md:p-12 lg:p-24 pb-48 transition-all duration-500"
-                style={{
-                    marginLeft: isMobile ? 0 : '28%', // Align right of sidebar
-                    width: isMobile ? '100%' : '72%',
-                    paddingTop: isMobile ? '120px' : '6rem'
-                }}
-            >
-                {/* 1. Showreel */}
-                {safeData.showreelLink && (
-                    <section className="mb-32">
-                        <div className="flex items-center gap-4 mb-8">
-                            <span className="w-2 h-2 rounded-full bg-indigo-500"/>
-                            <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">Showreel</h2>
-                        </div>
-                        <div className="w-full rounded-2xl overflow-hidden shadow-2xl bg-zinc-900 ring-1 ring-white/5">
-                            <VideoPlayer src={safeData.showreelLink} thumbnail={safeData.showreelThumbnail} autoplay={true} aspectRatio="16:9" />
-                        </div>
-                    </section>
-                )}
-
-                {/* 2. Works - Masonry Grid */}
-                {safeData.projects && safeData.projects.length > 0 && (
-                     <section className="mb-32">
-                        <div className="flex items-center gap-4 mb-8">
-                            <span className="w-2 h-2 rounded-full bg-indigo-500"/>
-                            <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">Selected Works</h2>
-                        </div>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
-                            {safeData.projects.map((project) => (
-                                <div 
-                                    key={project.id}
-                                    onClick={() => setSelectedProject(project)}
-                                    className="group cursor-pointer flex flex-col gap-3"
-                                >
-                                    <div className="relative w-full rounded-xl overflow-hidden bg-zinc-900 ring-1 ring-white/5 transition-transform duration-500 group-hover:-translate-y-1 shadow-lg">
-                                        <div className="w-full" style={{ aspectRatio: project.aspectRatio ? project.aspectRatio.replace(':', '/') : '16/9' }}>
-                                            {project.thumbnail && <img src={project.thumbnail} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />}
-                                        </div>
-                                        <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                                            <div className="w-12 h-12 bg-white/90 backdrop-blur rounded-full flex items-center justify-center shadow-xl transform scale-75 group-hover:scale-100 transition-all duration-300">
-                                                <Play size={16} fill="black" className="ml-0.5 text-black"/>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="px-1">
-                                        <h3 className="font-display font-bold text-lg text-zinc-200 leading-tight group-hover:text-white transition-colors">{project.title}</h3>
-                                        <p className="text-xs text-zinc-500 mt-1 uppercase tracking-wide">{project.contentType}</p>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </section>
-                )}
-
-                {/* 3. Skills */}
-                <section className="mb-32">
-                    <div className="flex items-center gap-4 mb-10">
-                        <span className="w-2 h-2 rounded-full bg-indigo-500"/>
-                        <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">Arsenal</h2>
+                        <motion.div style={{ opacity: desktopTextOpacity }} className="mt-8 flex flex-col items-center gap-6 max-w-xs text-center">
+                             <div className="w-12 h-px bg-zinc-800"/>
+                             <p className="text-zinc-400 text-sm leading-relaxed font-light">{safeData.bio}</p>
+                             <div className="flex gap-4">
+                                {safeData.socials && Object.entries(safeData.socials).map(([key, val]) => {
+                                    if (!val) return null;
+                                    const Icon = { instagram: Instagram, twitter: Twitter, youtube: Youtube, linkedin: Linkedin, email: Mail }[key] || Globe;
+                                    return <a key={key} href={val as string} target="_blank" className="p-3 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-500 hover:bg-white hover:text-black transition-all"><Icon size={16}/></a>
+                                })}
+                            </div>
+                            <div className="mt-8 animate-bounce opacity-30">
+                                <ArrowDown size={16} />
+                            </div>
+                        </motion.div>
                     </div>
 
-                    <div className="space-y-12">
-                        {safeData.primaryTool && (
-                            <div className="bg-zinc-900/30 border border-zinc-800 p-6 rounded-2xl flex items-center gap-6">
-                                <div className="w-14 h-14 bg-zinc-950 border border-zinc-800 rounded-xl flex items-center justify-center shadow-lg">
-                                    <ToolIcon name={safeData.primaryTool} className="w-8 h-8" />
-                                </div>
-                                <div>
-                                    <h4 className="text-lg font-bold text-white">{safeData.primaryTool}</h4>
-                                    <p className="text-[10px] text-zinc-500 uppercase tracking-widest mt-1">Core Workflow</p>
-                                </div>
+                    {/* MOBILE CONTENT (Visible only on small screens via CSS/Height logic) */}
+                    <div className="lg:hidden w-full h-full flex flex-col items-center justify-center p-6 relative">
+                         <motion.div style={{ scale: mobileLogoScale }} className="origin-top">
+                            <div className="w-32 h-32 rounded-full border border-zinc-800 bg-zinc-900 overflow-hidden shadow-lg mx-auto mb-4">
+                                <img src={safeData.profileImage} className="w-full h-full object-cover" alt={safeData.name} />
                             </div>
+                             <div className="text-center">
+                                <h1 className="font-display font-bold text-3xl tracking-tighter text-white">{safeData.name}</h1>
+                            </div>
+                         </motion.div>
+                         
+                         <motion.div style={{ opacity: mobileTextOpacity }} className="text-center mt-4">
+                            <p className="text-zinc-500 text-xs font-medium uppercase tracking-widest mb-4">{safeData.role}</p>
+                            <p className="text-zinc-400 text-sm max-w-xs mx-auto line-clamp-3">{safeData.bio}</p>
+                         </motion.div>
+                    </div>
+                </motion.aside>
+
+                {/* --- MAIN SCROLLABLE CONTENT --- */}
+                <main className="flex-1 bg-[#050505] relative z-10 w-full">
+                    {/* Spacer for Desktop to allow Hero to shine initially */}
+                    <div className="hidden lg:block h-[40vh]" /> 
+
+                    <div className="p-6 md:p-12 lg:p-20 pb-48 max-w-5xl mx-auto space-y-32">
+                        
+                        {/* 1. Showreel */}
+                        {safeData.showreelLink && (
+                            <section>
+                                <div className="flex items-center gap-4 mb-8">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"/>
+                                    <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">Showreel</h2>
+                                </div>
+                                <div className="w-full rounded-2xl overflow-hidden shadow-2xl bg-zinc-900 ring-1 ring-white/5">
+                                    <VideoPlayer src={safeData.showreelLink} thumbnail={safeData.showreelThumbnail} autoplay={true} aspectRatio="16:9" />
+                                </div>
+                            </section>
                         )}
 
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                            {safeData.tools?.filter(t => t !== safeData.primaryTool).map(tool => (
-                                <div key={tool} className="p-4 bg-zinc-900/30 border border-zinc-800 rounded-xl flex items-center gap-3 hover:bg-zinc-800 transition-colors">
-                                    <ToolIcon name={tool} />
-                                    <span className="text-xs font-medium text-zinc-400">{tool}</span>
+                        {/* 2. Works */}
+                        {safeData.projects && safeData.projects.length > 0 && (
+                            <section>
+                                <div className="flex items-center gap-4 mb-8">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"/>
+                                    <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">Selected Works</h2>
                                 </div>
-                            ))}
-                        </div>
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    {safeData.projects.map((project) => (
+                                        <div 
+                                            key={project.id}
+                                            onClick={() => setSelectedProject(project)}
+                                            className="group cursor-pointer flex flex-col gap-4"
+                                        >
+                                            <div className="relative w-full rounded-xl overflow-hidden bg-zinc-900 ring-1 ring-white/5 transition-transform duration-300 group-hover:-translate-y-1 shadow-lg">
+                                                <div className="w-full" style={{ aspectRatio: project.aspectRatio ? project.aspectRatio.replace(':', '/') : '16/9' }}>
+                                                    {project.thumbnail && <img src={project.thumbnail} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />}
+                                                </div>
+                                                <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                                                    <div className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center border border-white/20 opacity-0 group-hover:opacity-100 transition-all duration-300 transform scale-75 group-hover:scale-100">
+                                                        <Play size={16} fill="white" className="ml-0.5 text-white"/>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="px-1">
+                                                <h3 className="font-display font-bold text-lg text-zinc-200 leading-tight group-hover:text-white transition-colors">{project.title}</h3>
+                                                <p className="text-xs text-zinc-500 mt-1 uppercase tracking-wide">{project.contentType}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </section>
+                        )}
 
-                         {safeData.aiTools && safeData.aiTools.length > 0 && (
-                            <div>
-                                <h4 className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest mb-4 flex items-center gap-2"><Sparkles size={10} /> AI Enhanced</h4>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                                    {safeData.aiTools.map(tool => (
-                                        <div key={tool} className="p-4 bg-indigo-500/5 border border-indigo-500/10 rounded-xl flex items-center gap-3">
+                        {/* 3. Skills */}
+                        <section>
+                            <div className="flex items-center gap-4 mb-10">
+                                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"/>
+                                <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-zinc-500">Arsenal</h2>
+                            </div>
+
+                            <div className="space-y-12">
+                                {safeData.primaryTool && (
+                                    <div className="bg-zinc-900/30 border border-zinc-800 p-6 rounded-2xl flex items-center gap-6">
+                                        <div className="w-14 h-14 bg-zinc-950 border border-zinc-800 rounded-xl flex items-center justify-center shadow-lg shrink-0">
+                                            <ToolIcon name={safeData.primaryTool} className="w-8 h-8" />
+                                        </div>
+                                        <div>
+                                            <h4 className="text-lg font-bold text-white">{safeData.primaryTool}</h4>
+                                            <p className="text-[10px] text-zinc-500 uppercase tracking-widest mt-1">Core Workflow</p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                                    {safeData.tools?.filter(t => t !== safeData.primaryTool).map(tool => (
+                                        <div key={tool} className="p-4 bg-zinc-900/30 border border-zinc-800 rounded-xl flex items-center gap-3 hover:bg-zinc-800 transition-colors">
                                             <ToolIcon name={tool} />
-                                            <span className="text-xs font-medium text-indigo-200">{tool}</span>
+                                            <span className="text-xs font-medium text-zinc-400">{tool}</span>
                                         </div>
                                     ))}
                                 </div>
                             </div>
-                        )}
-                    </div>
-                </section>
+                        </section>
 
-                {/* 4. Contact CTA */}
-                <section className="border-t border-zinc-900 pt-16">
-                    <h2 className="text-4xl md:text-5xl font-display font-bold text-white mb-8 tracking-tight">Let's create together.</h2>
-                    <a href={`mailto:${safeData.contactEmail}`} className="text-xl md:text-2xl text-zinc-500 hover:text-white transition-colors border-b border-zinc-800 pb-1 hover:border-white">
-                        {safeData.contactEmail}
-                    </a>
-                </section>
-            </main>
+                        {/* 4. Contact CTA */}
+                        <section className="border-t border-zinc-900 pt-16">
+                            <h2 className="text-3xl md:text-5xl font-display font-bold text-white mb-8 tracking-tight">Let's create together.</h2>
+                            <a href={`mailto:${safeData.contactEmail}`} className="text-xl md:text-2xl text-zinc-500 hover:text-white transition-colors border-b border-zinc-800 pb-1 hover:border-white break-all">
+                                {safeData.contactEmail}
+                            </a>
+                        </section>
+
+                    </div>
+                </main>
+            </div>
         </div>
     );
 };
