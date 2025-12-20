@@ -255,25 +255,33 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({ data, onChange, onSave
     setIsShortening(true);
     setShortUrl('');
     try {
-        // Use a proxy to bypass potential CORS on some shortener APIs, or just try tinyurl directly.
-        // TinyURL API (simple) usually works, but can be strict.
-        // Using a public CORS proxy is a common workaround for client-side only apps.
+        // Construct the TinyURL API URL
         const apiUrl = `https://tinyurl.com/api-create.php?url=${encodeURIComponent(publicUrl)}`;
-        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`;
+        
+        // Try using allorigins.win as a proxy (often more reliable for text responses than corsproxy.io)
+        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(apiUrl)}`;
         
         const response = await fetch(proxyUrl);
-        if (!response.ok) throw new Error("Failed to shorten");
+        if (!response.ok) throw new Error("Network response was not ok");
         
         const short = await response.text();
         if (short.trim().startsWith('http')) {
              setShortUrl(short);
         } else {
+             // Fallback attempt: Try unproxied just in case (rarely works but worth a shot if proxy fails)
+             const directRes = await fetch(apiUrl, { mode: 'cors' }); 
+             if (directRes.ok) {
+                 const directShort = await directRes.text();
+                 if (directShort.trim().startsWith('http')) {
+                     setShortUrl(directShort);
+                     return;
+                 }
+             }
              throw new Error("Invalid response");
         }
     } catch (e) {
         console.error("Shortening failed", e);
-        // Fallback: Just let them know
-        setShortUrl("Could not generate. Copy the main link instead.");
+        setShortUrl("Error. Please copy the main link.");
     } finally {
         setIsShortening(false);
     }
