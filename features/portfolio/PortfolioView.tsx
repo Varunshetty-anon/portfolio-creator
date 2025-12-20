@@ -89,16 +89,11 @@ const VideoPlayer: React.FC<{
     const normalizedSrc = useMemo(() => getDirectVideoUrl(src), [src]);
     const isNative = useMemo(() => isNativeVideo(normalizedSrc), [normalizedSrc]);
 
-    // Force failure if it's a showreel but not native (enforce "Local Upload Only" behavior)
     useEffect(() => {
-        if (isShowreel && !isNative && src) {
-            setHasError(true);
-        } else {
-            setHasError(false);
-        }
         setIsLoaded(false);
         setDetectedRatio(null);
-    }, [src, isShowreel, isNative]);
+        setHasError(false);
+    }, [src]);
 
     // Fix for autoplay policy: Sync defaultMuted via ref since React prop isn't fully supported in all TS definitions
     useEffect(() => {
@@ -147,6 +142,13 @@ const VideoPlayer: React.FC<{
         const video = videoRef.current;
         if (!video || !autoplay || !isNative || hasError) return;
 
+        // If we are in the Modal (controls=true), we play immediately on mount if autoplay is requested
+        if (controls && autoplay) {
+            video.muted = muted;
+            video.play().catch(e => console.warn("Modal autoplay blocked:", e));
+            return;
+        }
+
         const observer = new IntersectionObserver(
             (entries) => {
                 entries.forEach((entry) => {
@@ -165,7 +167,7 @@ const VideoPlayer: React.FC<{
 
         observer.observe(video);
         return () => observer.disconnect();
-    }, [autoplay, isNative, normalizedSrc, muted, hasError]);
+    }, [autoplay, isNative, normalizedSrc, muted, hasError, controls]);
 
     const getEmbedSrc = () => {
         const auto = autoplay ? 1 : 0;
@@ -252,6 +254,7 @@ const VideoPlayer: React.FC<{
                         controls={controls}
                         onLoadedMetadata={handleLoadedMetadata}
                         onError={handleError}
+                        crossOrigin="anonymous"
                     />
                 )}
                 
@@ -280,21 +283,7 @@ const VideoPlayer: React.FC<{
         )
     }
 
-    // --- IFRAME RENDER ---
-    if (isShowreel) {
-        return (
-             <div 
-                className={`relative bg-[#050505] rounded-2xl overflow-hidden ${className}`} 
-                style={{ aspectRatio: cssAspectRatio }}
-            >
-                <img src={thumbnail} className="w-full h-full object-cover opacity-60" alt="Thumbnail" />
-                <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-xs text-red-400 bg-red-900/20 border border-red-900/50 px-3 py-1.5 rounded">Invalid Showreel Format</span>
-                </div>
-            </div>
-        );
-    }
-
+    // --- IFRAME RENDER (Default for non-native, including Drive Preview) ---
     return (
         <div 
             className={`
@@ -522,17 +511,18 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                             className="w-full max-w-7xl max-h-[90vh] flex flex-col lg:flex-row bg-[#09090b] rounded-3xl overflow-hidden border border-zinc-800 shadow-2xl" 
                             onClick={e => e.stopPropagation()}
                         >
-                            {/* Video Section - Fixed flex layout to allow natural aspect ratio scaling */}
-                            <div className="flex-1 bg-black relative flex items-center justify-center min-h-[40vh] lg:min-h-0 overflow-hidden p-4">
-                                <div className="relative w-auto h-auto max-w-full max-h-full flex items-center justify-center">
+                            {/* Video Section - Improved Logic for 16:9 and 9:16 sizing */}
+                            <div className="flex-1 bg-black relative flex items-center justify-center min-h-[40vh] lg:min-h-0 overflow-hidden p-0 lg:p-4 self-stretch">
+                                <div className="relative w-full h-full flex items-center justify-center">
                                      <VideoPlayer 
                                         src={selectedProject.link} 
                                         thumbnail={selectedProject.thumbnail} 
-                                        autoplay={false} // CHANGED: Disabled autoplay for projects
+                                        autoplay={true} // FIX: Enable autoplay in modal
                                         muted={false} 
                                         controls={true}
                                         aspectRatio={selectedProject.aspectRatio}
-                                        className="max-h-[80vh] w-auto h-auto mx-auto"
+                                        // FIX: Use w-full h-full constrained by max height to allow 16:9 to stretch and 9:16 to contain
+                                        className="w-full h-full max-h-[85vh] object-contain mx-auto"
                                     />
                                 </div>
                             </div>

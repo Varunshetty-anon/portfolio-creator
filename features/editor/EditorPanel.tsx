@@ -93,7 +93,8 @@ const ProjectCardEditor: React.FC<{ project: Project; albums: Album[]; onChange:
     return (
         <div className={`bg-zinc-900/50 border rounded-xl overflow-visible transition-all duration-300 ${isExpanded ? 'border-zinc-700 bg-zinc-900' : 'border-zinc-800 hover:border-zinc-700'}`}>
              <div className="p-4 flex gap-4 items-start cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
-                 <div className="w-24 aspect-video bg-black rounded-lg border border-zinc-800 overflow-hidden shrink-0 flex items-center justify-center relative group">
+                 {/* Increased size from w-24 to w-40 for better visibility */}
+                 <div className="w-40 aspect-video bg-black rounded-lg border border-zinc-800 overflow-hidden shrink-0 flex items-center justify-center relative group">
                     {project.thumbnail ? <img src={project.thumbnail} className="w-full h-full object-cover"/> : <Video size={16} className="text-zinc-700"/>}
                     {linkStatus === 'validating' && <div className="absolute inset-0 bg-black/50 flex items-center justify-center"><Loader2 size={12} className="animate-spin text-white"/></div>}
                 </div>

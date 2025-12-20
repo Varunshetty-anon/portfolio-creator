@@ -126,11 +126,11 @@ export const getDirectVideoUrl = (url: string): string => {
   }
 
   // Google Drive
-  // Convert /file/d/ID/view to /uc?export=download&id=ID
+  // Return the preview URL for iframe embedding instead of the download URL which causes CORS issues in video tags
   if (url.includes('drive.google.com')) {
     const idMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
     if (idMatch && idMatch[1]) {
-      return `https://drive.google.com/uc?export=download&id=${idMatch[1]}`;
+      return `https://drive.google.com/file/d/${idMatch[1]}/preview`;
     }
   }
 
@@ -144,7 +144,8 @@ export const isNativeVideo = (url: string): boolean => {
   return (
     u.includes('firebasestorage') ||
     u.includes('dl.dropboxusercontent.com') ||
-    u.includes('drive.google.com/uc') ||
+    // NOTE: drive.google.com URLs are no longer treated as native because they fail CORS in <video> tags.
+    // They will now fall through to the iframe player which uses the preview URL.
     u.endsWith('.mp4') ||
     u.endsWith('.webm') ||
     u.endsWith('.mov')
