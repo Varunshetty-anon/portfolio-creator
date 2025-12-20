@@ -99,6 +99,13 @@ const VideoPlayer: React.FC<{
     const effectiveAspectRatio = detectedRatio || aspectRatio || '16:9';
     const cssAspectRatio = useMemo(() => effectiveAspectRatio.replace(':', '/'), [effectiveAspectRatio]);
     
+    // --- Sync Muted State ---
+    useEffect(() => {
+        if (videoRef.current) {
+            videoRef.current.muted = muted;
+        }
+    }, [muted]);
+
     // --- Ambience Sync Logic (Dual Video Strategy) ---
     useEffect(() => {
         if (!ambience || !isNative || !videoRef.current || !ambienceRef.current || hasError) return;
@@ -134,44 +141,44 @@ const VideoPlayer: React.FC<{
         const video = videoRef.current;
         if (!video || !isNative || hasError) return;
 
-        // Modal Autoplay Strategy: Try Unmuted -> Fail -> Try Muted
-        if (controls && autoplay) {
-            const playVideo = async () => {
-                try {
-                    // Try playing unmuted first (if user intent allows)
-                    video.muted = false;
-                    await video.play();
-                } catch (err) {
-                    // If that fails (autoplay policy), fallback to muted
-                    video.muted = true;
+        if (autoplay) {
+            if (controls) {
+                // Modal Strategy: Try Unmuted -> Fallback Muted
+                const playVideo = async () => {
                     try {
+                        video.muted = false; // Try unmuted first
                         await video.play();
-                    } catch (e) {
-                        console.warn("Autoplay blocked completely:", e);
+                    } catch (err) {
+                        video.muted = true; // Fallback
+                        await video.play().catch(e => console.warn("Play failed", e));
                     }
-                }
-            };
-            playVideo();
-            return;
-        }
-
-        // Standard Scroll-based Autoplay (Always Muted)
-        if (autoplay && !controls) {
-            video.muted = true; // Always muted for scroll autoplay
-            const observer = new IntersectionObserver(
-                (entries) => {
-                    entries.forEach((entry) => {
+                };
+                playVideo();
+            } else {
+                // Scroll/Showreel Strategy
+                // Note: We do NOT force mute here. We respect the 'muted' prop via the sync effect.
+                // However, we handle the failure case if unmuted autoplay is blocked.
+                const observer = new IntersectionObserver(
+                    (entries) => {
+                        const entry = entries[0];
                         if (entry.isIntersecting) {
-                            video.play().catch(() => {});
+                            video.play().catch((e) => {
+                                console.warn("Autoplay blocked, attempting mute fallback", e);
+                                // Only mute if it wasn't already muted, to try and recover playback
+                                if (!video.muted) {
+                                     video.muted = true;
+                                     video.play().catch(() => {});
+                                }
+                            });
                         } else {
                             video.pause();
                         }
-                    });
-                },
-                { threshold: 0.5 }
-            );
-            observer.observe(video);
-            return () => observer.disconnect();
+                    },
+                    { threshold: 0.2 } // Reduced threshold for earlier playback
+                );
+                observer.observe(video);
+                return () => observer.disconnect();
+            }
         }
     }, [autoplay, isNative, normalizedSrc, hasError, controls]);
 
@@ -252,7 +259,7 @@ const VideoPlayer: React.FC<{
                         src={normalizedSrc}
                         className={`relative w-full h-full object-${objectFit} z-10 rounded-2xl bg-black`} 
                         loop 
-                        // AutoPlay is handled via useEffect for better control
+                        muted={muted} // Explicitly pass muted prop for initial render hydration
                         playsInline 
                         preload="auto"
                         controls={controls}
@@ -309,13 +316,20 @@ const VideoPlayer: React.FC<{
 
             <iframe 
                 src={getEmbedSrc()} 
-                className="w-full h-full pointer-events-none"
-                style={{ pointerEvents: controls ? 'auto' : 'none' }}
+                className="w-full h-full"
+                // Allow pointer events if controls are enabled OR it's the showreel (to allow unmuting/playing manually)
+                style={{ pointerEvents: controls || isShowreel ? 'auto' : 'none' }}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                 referrerPolicy="strict-origin-when-cross-origin"
                 allowFullScreen 
                 onLoad={() => setIsLoaded(true)} 
             />
+            
+            {/* If it's a showreel using Iframe, we might still want a custom mute button if the iframe API isn't usable, 
+                but usually user clicks iframe controls. 
+                However, for consistency, if we provided a custom mute toggle for iframe, we'd need postMessage API which is complex.
+                We assume standard controls for Iframe showreel interaction if needed. 
+            */}
         </div>
     );
 };
