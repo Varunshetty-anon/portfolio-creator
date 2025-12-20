@@ -50,12 +50,24 @@ const App: React.FC = () => {
   useEffect(() => { dataRef.current = data; }, [data]);
 
   useEffect(() => {
+    let unsubscribe: () => void;
+    
     const initApp = async () => {
         setIsLoading(true);
+
+        // Safety timeout: If Firebase hangs for 10s, force stop loading to show UI/Error
+        const safetyTimer = setTimeout(() => {
+            if (isLoading) {
+                console.warn("Auth check timed out, forcing UI render");
+                setIsLoading(false);
+            }
+        }, 10000);
+
         const path = window.location.pathname;
         const hash = window.location.hash.replace('#', '');
         let slug = null;
         
+        // Check for public URL patterns
         const pathMatch = path.match(/^\/v\/([^/]+)/);
         if (pathMatch) {
             slug = pathMatch[1];
@@ -63,33 +75,42 @@ const App: React.FC = () => {
             slug = hash;
         }
 
+        // If public slug detected, try loading it
         if (slug) {
             console.log("Detected public slug:", slug);
-            const publicData = await loadPublicPortfolio(slug);
-            if (publicData) {
-                setData(publicData);
-                setRoute('public');
-                setIsLoading(false);
-                return;
+            try {
+                const publicData = await loadPublicPortfolio(slug);
+                if (publicData) {
+                    setData(publicData);
+                    setRoute('public');
+                    setIsLoading(false);
+                    clearTimeout(safetyTimer);
+                    return;
+                }
+            } catch (e) {
+                console.error("Failed to load public portfolio", e);
             }
         }
 
         if (isConfigured && auth) {
-            // Check for redirect result first
+            // Handle Redirect Result (Mobile Auth flow)
             try {
                 const redirectResult = await getRedirectResult(auth);
-                if (redirectResult && redirectResult.user) {
-                    console.log("Recovered from redirect login");
-                    // User state will be handled by onAuthStateChanged
+                if (redirectResult) {
+                    console.log("Redirect login successful");
                 }
             } catch (e: any) {
                 console.error("Redirect login error:", e);
-                setAuthError(e.message);
+                setAuthError(e.message || "Login failed");
             }
 
-            const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
+            // Auth State Listener
+            unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
+                clearTimeout(safetyTimer); // Auth responded, clear safety timer
+                
                 if (user) {
                     try {
+                        // Ensure user profile exists in DB
                         const userProfile = await ensureUserProfile(user);
                         
                         if (!userProfile.onboarded) {
@@ -111,20 +132,28 @@ const App: React.FC = () => {
                     } catch (e: any) {
                         console.error("Auth load error", e);
                         setAuthError("Account initialization failed. " + e.message);
+                        // Even if data load fails, we stop loading to show error or home
+                    } finally {
                         setIsAuthProcessing(false); 
+                        setIsLoading(false);
                     }
                 } else {
                     setRoute('home');
                     setIsAuthProcessing(false);
+                    setIsLoading(false);
                 }
-                setIsLoading(false);
             });
-            return () => unsubscribe();
         } else {
             setIsLoading(false);
+            clearTimeout(safetyTimer);
         }
     };
+
     initApp();
+
+    return () => {
+        if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   const handleEmailAuth = async (e: React.FormEvent) => {
@@ -154,12 +183,7 @@ const App: React.FC = () => {
       } catch (e: any) { 
           let msg = e.message;
           if (msg.includes('popup-closed-by-user') || msg.includes('popup-blocked')) {
-             msg = "Popup blocked. Try the Redirect method.";
-             // Automatically try redirect if popup fails? No, let user decide or show error.
              setAuthError("Popups blocked. Click 'Use Redirect Login' below.");
-          } else if (msg.includes('network-request-failed')) {
-             msg = "Network error. Check your connection.";
-             setAuthError(msg); 
           } else {
              setAuthError(msg); 
           }
@@ -170,7 +194,7 @@ const App: React.FC = () => {
   const handleGoogleRedirect = async () => {
       if (isAuthProcessing) return;
       setAuthError('');
-      setIsAuthProcessing(true);
+      setIsAuthProcessing(true); // Will be reset on page reload/redirect
       try {
           await loginWithGoogleRedirect();
       } catch (e: any) {
@@ -263,7 +287,6 @@ const App: React.FC = () => {
         hasUnsavedChanges={hasUnsavedChanges}
         onLogout={handleLogout}
         onDeleteAccount={async () => {
-            // Safety check handled by UI inside EditorPanel now
             try {
                 await deletePortfolioFromDB(data.uid!);
                 await deleteUserAuth();

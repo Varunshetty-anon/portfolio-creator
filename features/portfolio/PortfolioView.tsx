@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence, useScroll, useTransform, useInView } from 'framer-motion';
 import { Mail, Instagram, Twitter, Linkedin, Youtube, Globe, X, Volume2, VolumeX, Loader2, Play, ExternalLink, ArrowDown, Sparkles, CheckCircle2 } from 'lucide-react';
@@ -48,16 +47,13 @@ const VideoPlayer: React.FC<{ src: string; thumbnail: string; autoplay?: boolean
 
     const directSrc = type === 'dropbox' ? getDropboxDirectLink(src) || src : src;
 
-    // Handle Autoplay for Direct/Dropbox
     useEffect(() => {
         if ((type !== 'direct' && type !== 'dropbox') || !videoRef.current) return;
         
         if (autoplay && isInView) {
             const playPromise = videoRef.current.play();
             if (playPromise !== undefined) {
-                playPromise.catch(() => {
-                    setIsMuted(true);
-                });
+                playPromise.catch(() => setIsMuted(true));
             }
         } else if (!isModal) {
             videoRef.current.pause();
@@ -65,7 +61,6 @@ const VideoPlayer: React.FC<{ src: string; thumbnail: string; autoplay?: boolean
     }, [isInView, type, autoplay, isModal]);
 
     const getEmbedSrc = () => {
-        const base = src.toLowerCase();
         if (type === 'youtube') {
             const ytId = src.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/)?.[2];
             return `https://www.youtube.com/embed/${ytId}?autoplay=${autoplay && isInView ? 1 : 0}&mute=1&controls=${isModal ? 1 : 0}&loop=1&playlist=${ytId}&playsinline=1&rel=0&modestbranding=1&iv_load_policy=3`;
@@ -214,35 +209,30 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
         return () => window.removeEventListener('resize', checkMobile);
     }, []);
 
-    const SCROLL_THRESHOLD = isMobile ? 300 : 500;
-
-    // Header/Sidebar Transforms
-    const headerBg = useTransform(scrollY, [SCROLL_THRESHOLD - 100, SCROLL_THRESHOLD], ["rgba(5,5,5,0)", "rgba(5,5,5,0.95)"]);
-    const headerBlur = useTransform(scrollY, [SCROLL_THRESHOLD - 100, SCROLL_THRESHOLD], ["blur(0px)", "blur(16px)"]);
-    const headerBorder = useTransform(scrollY, [SCROLL_THRESHOLD - 50, SCROLL_THRESHOLD], ["1px solid transparent", "1px solid #1a1a1e"]);
-
-    const dWidth = useTransform(scrollY, [0, SCROLL_THRESHOLD], ["100%", "30%"]);
-    const dAvatarSize = useTransform(scrollY, [0, SCROLL_THRESHOLD], [240, 80]);
-    const dNameSize = useTransform(scrollY, [0, SCROLL_THRESHOLD], ["6rem", "2rem"]);
-    
-    const mHeight = useTransform(scrollY, [0, SCROLL_THRESHOLD], ["100dvh", "80px"]);
-    const mAvatarSize = useTransform(scrollY, [0, SCROLL_THRESHOLD], [140, 40]);
-    const mNameSize = useTransform(scrollY, [0, SCROLL_THRESHOLD], ["2.5rem", "1.1rem"]);
-    
-    // Details Opacity: Explicitly visible at start
-    const detailsOpacity = useTransform(scrollY, [0, SCROLL_THRESHOLD * 0.5], [1, 0]);
-
-    // Main Content Transforms: 
-    // REMOVED Opacity transition from 0 to 1 on load. Now it starts at 1 but pushed down.
-    // This fixes "Blank Page" issues if scroll logic fails.
-    const mainY = useTransform(scrollY, [SCROLL_THRESHOLD * 0.8, SCROLL_THRESHOLD + 100], [50, 0]);
-    const mainOpacity = useTransform(scrollY, [SCROLL_THRESHOLD * 0.5, SCROLL_THRESHOLD], [0.5, 1]);
-
     useEffect(() => {
         if (!isPreview && data.uid) trackPortfolioView(data.uid);
         document.body.style.overflow = selectedProject ? 'hidden' : 'auto';
         return () => { document.body.style.overflow = 'auto'; }
     }, [data.uid, isPreview, selectedProject]);
+
+    const SCROLL_THRESHOLD = isMobile ? 300 : 500;
+
+    // --- Transforms ---
+    // Header background fade
+    const headerBg = useTransform(scrollY, [SCROLL_THRESHOLD - 100, SCROLL_THRESHOLD], ["rgba(5,5,5,0)", "rgba(5,5,5,0.95)"]);
+    const headerBlur = useTransform(scrollY, [SCROLL_THRESHOLD - 100, SCROLL_THRESHOLD], ["blur(0px)", "blur(16px)"]);
+    const headerBorder = useTransform(scrollY, [SCROLL_THRESHOLD - 50, SCROLL_THRESHOLD], ["1px solid transparent", "1px solid #1a1a1e"]);
+
+    // Desktop: Sidebar shrinks to top left
+    const dWidth = useTransform(scrollY, [0, SCROLL_THRESHOLD], ["100%", "30%"]);
+    const dAvatarSize = useTransform(scrollY, [0, SCROLL_THRESHOLD], [240, 80]);
+    const dNameSize = useTransform(scrollY, [0, SCROLL_THRESHOLD], ["6rem", "2rem"]);
+    
+    // Mobile: Header shrinks from full screen to top bar
+    const mHeight = useTransform(scrollY, [0, SCROLL_THRESHOLD], ["90vh", "80px"]); // Reduced from 100vh to 90vh to show hint of content
+    const mAvatarSize = useTransform(scrollY, [0, SCROLL_THRESHOLD], [120, 40]);
+    const mNameSize = useTransform(scrollY, [0, SCROLL_THRESHOLD], ["2.5rem", "1.1rem"]);
+    const mDetailsOpacity = useTransform(scrollY, [0, SCROLL_THRESHOLD / 2], [1, 0]);
 
     if (!mounted) return <div className="min-h-screen bg-[#050505]" />;
 
@@ -254,7 +244,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                 {selectedProject && <ProjectLightbox project={selectedProject} onClose={() => setSelectedProject(null)} />}
             </AnimatePresence>
 
-            {/* FIXED HEADER / INTRO SECTION */}
+            {/* FIXED HEADER / HERO SECTION */}
             <motion.div 
                 className="fixed top-0 left-0 z-[50] flex flex-col overflow-hidden"
                 style={{
@@ -265,14 +255,13 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                     borderBottom: isMobile ? headerBorder : 'none',
                     borderRight: !isMobile ? headerBorder : 'none',
                     padding: isMobile ? (scrollY.get() > SCROLL_THRESHOLD ? '1rem' : '2rem') : (scrollY.get() > SCROLL_THRESHOLD ? '3rem' : '0rem'),
-                    // Dynamic alignment logic
                     alignItems: isMobile ? 'center' : (scrollY.get() > SCROLL_THRESHOLD ? 'flex-start' : 'center'),
                     justifyContent: isMobile ? (scrollY.get() > SCROLL_THRESHOLD ? 'flex-start' : 'center') : 'center',
                     flexDirection: isMobile && scrollY.get() > SCROLL_THRESHOLD ? 'row' : 'col'
                 }}
             >
                 <motion.div 
-                    className={`flex ${isMobile && scrollY.get() > SCROLL_THRESHOLD ? 'flex-row items-center gap-4 w-full' : 'flex-col items-center md:items-start gap-6 md:gap-10'} max-w-2xl transition-all`}
+                    className={`flex ${isMobile && scrollY.get() > SCROLL_THRESHOLD ? 'flex-row items-center gap-3 w-full' : 'flex-col items-center md:items-start gap-6 md:gap-10'} max-w-2xl transition-all duration-300`}
                 >
                     <motion.div 
                         style={{ width: isMobile ? mAvatarSize : dAvatarSize, height: isMobile ? mAvatarSize : dAvatarSize }} 
@@ -291,7 +280,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
 
                         <motion.div 
                             style={{ 
-                                opacity: isMobile ? detailsOpacity : 1,
+                                opacity: isMobile ? mDetailsOpacity : 1,
                                 height: isMobile && scrollY.get() > SCROLL_THRESHOLD ? 0 : 'auto',
                                 overflow: 'hidden'
                             }}
@@ -314,7 +303,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                                     </div>
                                 </>
                             )}
-                            {isMobile && (
+                             {isMobile && (
                                  <div className="flex gap-6 justify-center mt-6">
                                      {Object.entries(data.socials).map(([key, val]) => {
                                         if (!val) return null;
@@ -336,17 +325,14 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                 </motion.div>
             </motion.div>
 
-            {/* SPACER to push content below fold */}
-            <div style={{ height: SCROLL_THRESHOLD + (isMobile ? 100 : 0) }} className="w-full pointer-events-none" />
+            {/* SPACER to push content below the scroll threshold */}
+            <div style={{ height: SCROLL_THRESHOLD + (isMobile ? 0 : 0) }} className="w-full pointer-events-none" />
 
             {/* MAIN CONTENT */}
-            <motion.main 
+            <main 
                 className={`container mx-auto px-6 md:px-12 pb-48 relative z-10 ${isMobile ? 'pt-12' : 'lg:ml-[30%] lg:w-[70%]'}`}
-                style={{ 
-                    // Use a simpler opacity transform that doesn't completely hide content if logic breaks
-                    opacity: mainOpacity, 
-                    y: mainY 
-                }}
+                // REMOVED: Opacity/Y transform dependency on scroll for mobile to prevent "blank screen" issues.
+                // We use standard flow for content visibility.
             >
                 {/* 1. SHOWREEL */}
                 {data.showreelLink && (
@@ -374,9 +360,8 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                         
                         <div className="columns-1 md:columns-2 gap-6 space-y-6">
                             {data.projects.map((project) => (
-                                <motion.div 
+                                <div 
                                     key={project.id}
-                                    initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-50px" }}
                                     className="break-inside-avoid relative group cursor-pointer rounded-2xl overflow-hidden border border-zinc-900 bg-zinc-950 shadow-lg hover:border-zinc-700 transition-colors"
                                     onClick={() => setSelectedProject(project)}
                                 >
@@ -397,12 +382,11 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                                         </div>
                                         <h3 className="text-lg font-display font-bold text-white leading-tight">{project.title}</h3>
                                     </div>
-                                </motion.div>
+                                </div>
                             ))}
                         </div>
                     </section>
                 ) : (
-                    // Fallback for empty projects to prevent "Blank Page" confusion
                     <section className="mb-32 opacity-50 text-center py-20 border border-dashed border-zinc-800 rounded-3xl">
                         <p className="text-zinc-600 text-sm uppercase tracking-widest">No projects added yet.</p>
                     </section>
@@ -486,7 +470,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                     </div>
                 </section>
 
-            </motion.main>
+            </main>
         </div>
     );
 };
