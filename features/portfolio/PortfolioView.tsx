@@ -86,11 +86,9 @@ const VideoPlayer: React.FC<{
     }, [muted]);
 
     // SHOWREEL SPECIFIC LOGIC
-    // Enforces strict native playback for showreels with silent error handling
     if (isShowreel) {
         return (
             <div className={`relative bg-[#050505] overflow-hidden rounded-2xl ${className}`} style={{ aspectRatio: cssAspectRatio }}>
-                {/* Ambience / Glow Layer */}
                 {ambience && !hasError && (
                     <video
                         ref={ambienceRef}
@@ -102,7 +100,6 @@ const VideoPlayer: React.FC<{
                     />
                 )}
 
-                {/* Poster / Loading State */}
                 <AnimatePresence>
                     {!isLoaded && (
                         <motion.div initial={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 1 }} className="absolute inset-0 z-10 bg-[#09090b]">
@@ -111,7 +108,6 @@ const VideoPlayer: React.FC<{
                     )}
                 </AnimatePresence>
 
-                {/* Main Native Video Player */}
                 <video 
                     ref={videoRef}
                     src={normalizedSrc}
@@ -123,11 +119,9 @@ const VideoPlayer: React.FC<{
                     preload="auto"
                     onLoadedMetadata={() => setIsLoaded(true)}
                     onError={() => setHasError(true)}
-                    // Attempt to recover autoplay on suspend
                     onSuspend={(e) => { if(autoplay) e.currentTarget.play().catch(() => {}) }}
                 />
 
-                {/* Silent Fallback for Mobile Autoplay Failures */}
                 {hasError && (
                      <div className="absolute inset-0 flex items-center justify-center bg-black z-20">
                          {thumbnail && <img src={thumbnail} className="w-full h-full object-cover opacity-60" alt="Static Fallback" />}
@@ -139,7 +133,6 @@ const VideoPlayer: React.FC<{
                      </div>
                 )}
 
-                {/* Mute Toggle */}
                  {onToggleMute && !hasError && (
                     <motion.button 
                         whileHover={{ scale: 1.1 }}
@@ -256,7 +249,7 @@ const VideoPlayer: React.FC<{
                         autoPlay={autoplay}
                         muted={muted}
                         playsInline 
-                        preload="auto"
+                        preload={autoplay ? "auto" : "metadata"}
                         controls={controls}
                         onLoadedMetadata={handleLoadedMetadata}
                         onError={() => { setHasError(true); setIsLoaded(true); }}
@@ -276,9 +269,8 @@ const VideoPlayer: React.FC<{
                 {hasError && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center z-20 bg-zinc-900 rounded-2xl overflow-hidden" style={{ aspectRatio: cssAspectRatio }}>
                         {thumbnail && <img src={thumbnail} className="absolute inset-0 w-full h-full object-cover opacity-20 grayscale" alt="Fallback" />}
-                        <div className="relative z-10 bg-black/80 p-4 rounded-xl backdrop-blur-sm border border-red-500/30 flex flex-col items-center gap-2">
-                            <AlertTriangle size={24} className="text-red-500" />
-                            <span className="text-red-500 font-bold text-[10px] tracking-widest uppercase text-center leading-relaxed">Video Unavailable</span>
+                        <div className="relative z-10 bg-black/80 p-4 rounded-xl backdrop-blur-sm border border-zinc-700/30 flex flex-col items-center gap-2">
+                             <span className="text-zinc-400 font-bold text-[10px] tracking-widest uppercase text-center leading-relaxed">Video unavailable.<br/>Please check link access.</span>
                         </div>
                     </div>
                 )}

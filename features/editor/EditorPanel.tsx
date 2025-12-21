@@ -7,7 +7,7 @@ import { Button } from '../../components/ui/Button';
 import { ToolSelector } from '../../components/ToolSelector';
 import { ImageCropper } from '../../components/ImageCropper';
 import { Plus, Trash2, Video, Upload, ChevronDown, Loader2, CheckCircle2, AlertTriangle, Eye, Settings, LogOut, Wrench, LayoutDashboard, User, X, Link, Youtube, HardDrive, Database, Globe, ExternalLink, QrCode, Download, Copy, Link2, Check, Play, GripVertical, FolderPlus, Folder, FileVideo, Instagram, Twitter, Linkedin } from 'lucide-react';
-import { uploadFileToStorage, getVideoMetadata, getPortfolioStats, PROJECT_CONTENT_TYPES, EDITING_TOOLS_LIST, downloadQrCode, generateThumbnailFromVideo } from '../../lib/utils';
+import { uploadFileToStorage, getVideoMetadata, getPortfolioStats, PROJECT_CONTENT_TYPES, EDITING_TOOLS_LIST, downloadQrCode, generateThumbnailFromVideo, getDirectVideoUrl } from '../../lib/utils';
 
 interface EditorPanelProps {
   data: PortfolioData;
@@ -52,17 +52,20 @@ const ProjectCardEditor: React.FC<{ project: Project; albums: Album[]; onChange:
 
     // Link Validation & Auto-Save Logic
     const handleLinkChange = async (val: string) => {
+        // Auto-transform Google Drive links to direct download URLs
+        const directUrl = getDirectVideoUrl(val);
+        
         // Immediate update to UI
-        onChange({ link: val });
+        onChange({ link: directUrl });
         
         // Reset status if empty
-        if (!val) {
+        if (!directUrl) {
             setLinkStatus('idle');
             return;
         }
 
         // Basic length check before validating
-        if (val.length < 8) {
+        if (directUrl.length < 8) {
              setLinkStatus('invalid');
              return;
         }
@@ -72,15 +75,18 @@ const ProjectCardEditor: React.FC<{ project: Project; albums: Album[]; onChange:
         // Debounce the metadata fetch slightly to avoid slamming API while typing
         const timer = setTimeout(async () => {
             try {
-                const m = await getVideoMetadata(val);
+                const m = await getVideoMetadata(directUrl);
                 if (m.thumbnail) {
                     // Success!
-                    onChange({ link: val, thumbnail: m.thumbnail, aspectRatio: m.aspectRatio });
+                    onChange({ link: directUrl, thumbnail: m.thumbnail, aspectRatio: m.aspectRatio });
                     setLinkStatus('valid');
                     // TRIGGER AUTO SAVE
                     onAutoSave();
                 } else {
-                    setLinkStatus('invalid');
+                    // If no thumbnail, we still mark valid if it's a native link format we trust,
+                    // but visual feedback might stay 'idle' or 'valid' based on use case.
+                    // For now, let's assume valid if metadata check didn't throw.
+                    setLinkStatus('valid');
                 }
             } catch (e) {
                 setLinkStatus('invalid');

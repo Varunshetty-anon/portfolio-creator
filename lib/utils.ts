@@ -116,12 +116,32 @@ export const getYouTubeThumbnail = (url: string): string | null => {
   return (match && match[2].length === 11) ? `https://img.youtube.com/vi/${match[2]}/maxresdefault.jpg` : null;
 };
 
+export const extractGoogleDriveId = (url: string): string | null => {
+  const patterns = [
+    /\/file\/d\/([a-zA-Z0-9_-]+)/,
+    /id=([a-zA-Z0-9_-]+)/,
+    /\/open\?id=([a-zA-Z0-9_-]+)/
+  ];
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match && match[1]) return match[1];
+  }
+  return null;
+};
+
 // Convert storage URLs to direct streams
 export const getDirectVideoUrl = (url: string): string => {
   if (!url) return '';
   // Dropbox
   if (url.includes('dropbox.com')) {
     return url.replace('www.dropbox.com', 'dl.dropboxusercontent.com').replace('?dl=0', '');
+  }
+  // Google Drive
+  if (url.includes('drive.google.com')) {
+    const id = extractGoogleDriveId(url);
+    if (id) {
+      return `https://drive.google.com/uc?export=download&id=${id}`;
+    }
   }
   return url;
 };
@@ -133,6 +153,7 @@ export const isNativeVideo = (url: string): boolean => {
   return (
     u.includes('firebasestorage') ||
     u.includes('dl.dropboxusercontent.com') ||
+    u.includes('drive.google.com/uc?export=download') ||
     u.endsWith('.mp4') ||
     u.endsWith('.webm') ||
     u.endsWith('.mov')
@@ -140,16 +161,7 @@ export const isNativeVideo = (url: string): boolean => {
 };
 
 export const getDriveThumbnail = (url: string): string | null => {
-  // Extract ID
-  const patterns = [/\/file\/d\/([a-zA-Z0-9_-]+)/, /id=([a-zA-Z0-9_-]+)/, /\/open\?id=([a-zA-Z0-9_-]+)/];
-  let id = null;
-  for (const pattern of patterns) {
-    const match = url.match(pattern);
-    if (match && match[1]) {
-        id = match[1];
-        break;
-    }
-  }
+  const id = extractGoogleDriveId(url);
   return id ? `https://lh3.googleusercontent.com/d/${id}=w1000` : null;
 };
 
@@ -588,11 +600,9 @@ export const generateAiThumbnail = async (title: string, category: string): Prom
       contents: { parts: [{ text: `Cinematic professional video project thumbnail for "${title}" in category "${category}". High contrast, dramatic lighting, 4k.` }] }
     });
     for (const cand of response.candidates || []) {
-      for (const cand of response.candidates || []) {
       for (const part of cand.content.parts) {
         if (part.inlineData) return `data:image/png;base64,${part.inlineData.data}`;
       }
-    }
     }
     return '';
   } catch (e) { return ''; }
