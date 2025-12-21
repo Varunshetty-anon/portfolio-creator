@@ -119,21 +119,10 @@ export const getYouTubeThumbnail = (url: string): string | null => {
 // Convert storage URLs to direct streams
 export const getDirectVideoUrl = (url: string): string => {
   if (!url) return '';
-  
   // Dropbox
   if (url.includes('dropbox.com')) {
     return url.replace('www.dropbox.com', 'dl.dropboxusercontent.com').replace('?dl=0', '');
   }
-
-  // Google Drive
-  // Return the preview URL for iframe embedding instead of the download URL which causes CORS issues in video tags
-  if (url.includes('drive.google.com')) {
-    const idMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-    if (idMatch && idMatch[1]) {
-      return `https://drive.google.com/file/d/${idMatch[1]}/preview`;
-    }
-  }
-
   return url;
 };
 
@@ -144,8 +133,6 @@ export const isNativeVideo = (url: string): boolean => {
   return (
     u.includes('firebasestorage') ||
     u.includes('dl.dropboxusercontent.com') ||
-    // NOTE: drive.google.com URLs are no longer treated as native because they fail CORS in <video> tags.
-    // They will now fall through to the iframe player which uses the preview URL.
     u.endsWith('.mp4') ||
     u.endsWith('.webm') ||
     u.endsWith('.mov')
@@ -181,8 +168,7 @@ export const getStoragePathFromUrl = (url: string): string | null => {
 export const getVideoMetadata = async (url: string): Promise<{ thumbnail: string | null, aspectRatio: '16:9' | '9:16' | '4:3' | '1:1' }> => {
     let thumbnail = null;
     let aspectRatio: '16:9' | '9:16' | '4:3' | '1:1' = '16:9';
-    const directUrl = getDirectVideoUrl(url);
-
+    
     try {
         if (url.includes('youtube.com') || url.includes('youtu.be')) {
             thumbnail = getYouTubeThumbnail(url);
@@ -229,11 +215,6 @@ export const getVideoMetadata = async (url: string): Promise<{ thumbnail: string
 
     return { thumbnail, aspectRatio };
 }
-
-// Deprecated: Use getDirectVideoUrl instead
-export const getDropboxDirectLink = (url: string): string | null => {
-    return getDirectVideoUrl(url);
-};
 
 // --- Core Database Logic ---
 
@@ -471,13 +452,19 @@ export const uploadFileToStorage = (file: File, path: string, onProgress?: (prog
     if (lowerPath.endsWith('.jpg') || lowerPath.endsWith('.jpeg')) contentType = 'image/jpeg';
     else if (lowerPath.endsWith('.png')) contentType = 'image/png';
     else if (lowerPath.endsWith('.webp')) contentType = 'image/webp';
-    else if (lowerPath.endsWith('.mp4')) contentType = 'video/mp4';
+    else if (lowerPath.endsWith('.mp4') || file.type === 'video/mp4') contentType = 'video/mp4';
     else if (lowerPath.endsWith('.mov')) contentType = 'video/quicktime';
 
-    const metadata = {
+    const metadata: any = {
         contentType: contentType,
-        cacheControl: 'public, max-age=31536000'
     };
+
+    // CRITICAL: Force MP4 Metadata for showreels and video files
+    if (contentType === 'video/mp4') {
+        metadata.cacheControl = 'public,max-age=31536000';
+    } else {
+        metadata.cacheControl = 'public, max-age=31536000';
+    }
 
     const uploadTask = uploadBytesResumable(storageRef, file, metadata);
 

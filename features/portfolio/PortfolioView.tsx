@@ -17,43 +17,22 @@ interface PortfolioViewProps {
 const ensureUrl = (url: string, key?: string): string => {
     if (!url) return '';
     let processed = url.trim();
-    
-    // 1. If it has protocol, return as is.
     if (processed.match(/^[a-zA-Z]+:\/\//)) return processed;
-
-    // 2. Email
-    if (key === 'email' || (processed.includes('@') && !processed.includes('/') && !key)) {
-        return `mailto:${processed}`;
-    }
-
-    // 3. Platform specific logic
+    if (key === 'email' || (processed.includes('@') && !processed.includes('/') && !key)) return `mailto:${processed}`;
     if (key) {
         const k = key.toLowerCase();
-        // Remove @ if present
         const cleanHandle = processed.startsWith('@') ? processed.substring(1) : processed;
-        // Remove protocol for cleaner parsing inside platform blocks
         const noProtocol = processed.replace(/^https?:\/\//, '');
-
         if (k === 'instagram' && !processed.includes('instagram.com')) return `https://instagram.com/${cleanHandle}`;
         if (k === 'twitter' && !processed.includes('twitter.com') && !processed.includes('x.com')) return `https://twitter.com/${cleanHandle}`;
         if (k === 'linkedin' && !processed.includes('linkedin.com')) return `https://linkedin.com/in/${cleanHandle}`;
         if (k === 'youtube' && !processed.includes('youtube.com') && !processed.includes('youtu.be')) return `https://youtube.com/${cleanHandle}`;
-        
         if (k === 'discord') {
-             // If it's already a link
-             if (processed.includes('discord.com') || processed.includes('discord.gg')) {
-                 return `https://${noProtocol}`;
-             }
-             // If it's a numeric ID (User ID) -> Link to profile
-             if (/^\d+$/.test(cleanHandle)) {
-                 return `https://discord.com/users/${cleanHandle}`;
-             }
-             // Otherwise assume it's an invite code
+             if (processed.includes('discord.com') || processed.includes('discord.gg')) return `https://${noProtocol}`;
+             if (/^\d+$/.test(cleanHandle)) return `https://discord.com/users/${cleanHandle}`;
              return `https://discord.gg/${cleanHandle}`;
         }
     }
-
-    // 4. Generic fallback for domains
     return `https://${processed}`;
 };
 
@@ -62,7 +41,6 @@ const ensureUrl = (url: string, key?: string): string => {
 const ToolIcon = React.memo(({ name, className = "w-5 h-5" }: { name: string; className?: string }) => {
     const tool = [...EDITING_TOOLS_LIST, ...AI_TOOLS_LIST].find(t => t.name === name);
     const [imgSrc, setImgSrc] = useState(tool ? `https://cdn.simpleicons.org/${tool.slug}/white` : '');
-    
     if (!tool) return <span className={`flex items-center justify-center font-bold text-zinc-600 text-[10px] uppercase border border-zinc-800 rounded bg-zinc-900 ${className}`}>{name ? name.charAt(0) : '?'}</span>;
     return <img src={imgSrc} alt={name} className={`${className} object-contain opacity-70 group-hover:opacity-100 transition-opacity`} onError={(e) => (e.currentTarget.style.display = 'none')} />;
 });
@@ -86,12 +64,10 @@ const VideoPlayer: React.FC<{
     const [detectedRatio, setDetectedRatio] = useState<string | null>(null);
     const [hasError, setHasError] = useState(false);
 
-    // Normalize URL
     const normalizedSrc = useMemo(() => getDirectVideoUrl(src), [src]);
     const isNative = useMemo(() => isNativeVideo(normalizedSrc), [normalizedSrc]);
 
-    // Force failure if it's a showreel but not native (enforce "Local Upload Only" behavior or specific formatting)
-    // Actually, for this specific request, we just want to catch errors.
+    // Force failure resets
     useEffect(() => {
         setHasError(false);
         setIsLoaded(false);
@@ -101,7 +77,7 @@ const VideoPlayer: React.FC<{
     const effectiveAspectRatio = detectedRatio || aspectRatio || '16:9';
     const cssAspectRatio = useMemo(() => effectiveAspectRatio.replace(':', '/'), [effectiveAspectRatio]);
     
-    // --- Sync Muted State & DefaultMuted ---
+    // Sync Muted
     useEffect(() => {
         if (videoRef.current) {
             videoRef.current.muted = muted;
@@ -109,55 +85,93 @@ const VideoPlayer: React.FC<{
         }
     }, [muted]);
 
-    // --- Ambience Sync Logic (Dual Video Strategy) ---
-    useEffect(() => {
-        if (!ambience || !isNative || !videoRef.current || !ambienceRef.current || hasError) return;
+    // SHOWREEL SPECIFIC LOGIC
+    // Enforces strict native playback for showreels with silent error handling
+    if (isShowreel) {
+        return (
+            <div className={`relative bg-[#050505] overflow-hidden rounded-2xl ${className}`} style={{ aspectRatio: cssAspectRatio }}>
+                {/* Ambience / Glow Layer */}
+                {ambience && !hasError && (
+                    <video
+                        ref={ambienceRef}
+                        src={normalizedSrc}
+                        className="absolute inset-0 w-full h-full object-cover blur-[60px] opacity-50 scale-110 pointer-events-none -z-10"
+                        muted
+                        loop
+                        playsInline
+                    />
+                )}
 
-        const main = videoRef.current;
-        const amb = ambienceRef.current;
+                {/* Poster / Loading State */}
+                <AnimatePresence>
+                    {!isLoaded && (
+                        <motion.div initial={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 1 }} className="absolute inset-0 z-10 bg-[#09090b]">
+                            {thumbnail && <img src={thumbnail} className="w-full h-full object-cover opacity-80" alt="Poster" />}
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
-        const syncPlay = () => {
-            amb.play().catch(() => {});
-        };
-        const syncPause = () => amb.pause();
-        const syncSeek = () => { if(amb.readyState > 0) amb.currentTime = main.currentTime; };
-        
-        main.addEventListener('play', syncPlay);
-        main.addEventListener('pause', syncPause);
-        main.addEventListener('seeking', syncSeek);
-        main.addEventListener('seeked', syncSeek);
-        main.addEventListener('waiting', syncPause);
-        main.addEventListener('playing', syncPlay);
+                {/* Main Native Video Player */}
+                <video 
+                    ref={videoRef}
+                    src={normalizedSrc}
+                    className="w-full h-full object-cover relative z-0"
+                    loop 
+                    muted={muted}
+                    playsInline 
+                    autoPlay={autoplay}
+                    preload="auto"
+                    onLoadedMetadata={() => setIsLoaded(true)}
+                    onError={() => setHasError(true)}
+                    // Attempt to recover autoplay on suspend
+                    onSuspend={(e) => { if(autoplay) e.currentTarget.play().catch(() => {}) }}
+                />
 
-        return () => {
-            main.removeEventListener('play', syncPlay);
-            main.removeEventListener('pause', syncPause);
-            main.removeEventListener('seeking', syncSeek);
-            main.removeEventListener('seeked', syncSeek);
-            main.removeEventListener('waiting', syncPause);
-            main.removeEventListener('playing', syncPlay);
-        };
-    }, [ambience, isNative, hasError, src]); 
+                {/* Silent Fallback for Mobile Autoplay Failures */}
+                {hasError && (
+                     <div className="absolute inset-0 flex items-center justify-center bg-black z-20">
+                         {thumbnail && <img src={thumbnail} className="w-full h-full object-cover opacity-60" alt="Static Fallback" />}
+                         <div className="absolute inset-0 flex items-center justify-center">
+                             <div className="p-4 rounded-full bg-white/10 backdrop-blur-md border border-white/20">
+                                 <Play size={32} className="text-white fill-white" />
+                             </div>
+                         </div>
+                     </div>
+                )}
 
+                {/* Mute Toggle */}
+                 {onToggleMute && !hasError && (
+                    <motion.button 
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                        onClick={(e) => { e.stopPropagation(); onToggleMute(); }}
+                        className="absolute bottom-6 right-6 z-30 p-3 rounded-full bg-black/40 backdrop-blur-md text-white hover:bg-white hover:text-black transition-all border border-white/10"
+                    >
+                        {muted ? <VolumeX size={20}/> : <Volume2 size={20}/>}
+                    </motion.button>
+                )}
+            </div>
+        )
+    }
+
+    // --- STANDARD PROJECT PLAYER (Previous Logic) ---
+    
     // --- Autoplay Logic ---
     useEffect(() => {
         const video = videoRef.current;
-        if (!video || !autoplay || !isNative || hasError) return;
+        if (!video || !autoplay || !isNative || hasError || isShowreel) return;
 
         const observer = new IntersectionObserver(
             (entries) => {
                 entries.forEach((entry) => {
                     if (entry.isIntersecting) {
-                        video.muted = muted; // Ensure muted setting is applied before play
-                        // Attempt play
+                        video.muted = muted;
                         const playPromise = video.play();
                         if (playPromise !== undefined) {
                             playPromise.catch((e) => { 
-                                 console.warn("Autoplay blocked", e);
-                                 // If failed, ensure muted is strictly true and try again
                                  if (!video.muted) {
                                      video.muted = true;
-                                     video.play().catch(e => console.error("Retry play failed", e));
+                                     video.play().catch(e => {});
                                  }
                             });
                         }
@@ -171,7 +185,7 @@ const VideoPlayer: React.FC<{
 
         observer.observe(video);
         return () => observer.disconnect();
-    }, [autoplay, isNative, normalizedSrc, muted, hasError]);
+    }, [autoplay, isNative, normalizedSrc, muted, hasError, isShowreel]);
 
     const getEmbedSrc = () => {
         const auto = autoplay ? 1 : 0;
@@ -208,19 +222,12 @@ const VideoPlayer: React.FC<{
         setIsLoaded(true);
     };
 
-    const handleError = () => {
-        setHasError(true);
-        setIsLoaded(true); 
-    };
-
-    // --- NATIVE VIDEO RENDER ---
     if (isNative) {
         return (
              <div 
                 className={`relative bg-[#050505] ${className} ${hasError ? 'border border-red-900/50 rounded-2xl' : ''}`} 
-                style={controls ? {} : { aspectRatio: cssAspectRatio }} // Only enforce aspect ratio on container if NOT using controls (fullscreen modal handles its own)
+                style={controls ? {} : { aspectRatio: cssAspectRatio }}
             >
-                {/* Ambience Glow (Dual Video) */}
                 {ambience && !hasError && (
                     <video
                         ref={ambienceRef}
@@ -232,8 +239,6 @@ const VideoPlayer: React.FC<{
                         aria-hidden="true"
                     />
                 )}
-
-                {/* Loading / Poster State */}
                 <AnimatePresence>
                     {!isLoaded && !hasError && (
                         <motion.div initial={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.8 }} className="absolute inset-0 z-10 bg-[#09090b] flex items-center justify-center rounded-2xl overflow-hidden">
@@ -241,8 +246,6 @@ const VideoPlayer: React.FC<{
                         </motion.div>
                     )}
                 </AnimatePresence>
-
-                {/* Main Video */}
                 {!hasError && (
                     <video 
                         key={normalizedSrc}
@@ -256,12 +259,10 @@ const VideoPlayer: React.FC<{
                         preload="auto"
                         controls={controls}
                         onLoadedMetadata={handleLoadedMetadata}
-                        onError={handleError}
+                        onError={() => { setHasError(true); setIsLoaded(true); }}
                         crossOrigin="anonymous"
                     />
                 )}
-                
-                 {/* Mute Toggle */}
                  {onToggleMute && !hasError && !controls && (
                     <motion.button 
                         whileHover={{ scale: 1.1 }}
@@ -272,14 +273,12 @@ const VideoPlayer: React.FC<{
                         {muted ? <VolumeX size={18}/> : <Volume2 size={18}/>}
                     </motion.button>
                 )}
-
-                {/* Fallback for Errors */}
                 {hasError && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center z-20 bg-zinc-900 rounded-2xl overflow-hidden" style={{ aspectRatio: cssAspectRatio }}>
                         {thumbnail && <img src={thumbnail} className="absolute inset-0 w-full h-full object-cover opacity-20 grayscale" alt="Fallback" />}
                         <div className="relative z-10 bg-black/80 p-4 rounded-xl backdrop-blur-sm border border-red-500/30 flex flex-col items-center gap-2">
                             <AlertTriangle size={24} className="text-red-500" />
-                            <span className="text-red-500 font-bold text-[10px] tracking-widest uppercase text-center leading-relaxed">Showreel Unable<br/>to Play</span>
+                            <span className="text-red-500 font-bold text-[10px] tracking-widest uppercase text-center leading-relaxed">Video Unavailable</span>
                         </div>
                     </div>
                 )}
@@ -287,29 +286,9 @@ const VideoPlayer: React.FC<{
         )
     }
 
-    // --- IFRAME RENDER ---
-    // If we're here and it's a showreel that failed validation or is just an iframe
-    if (isShowreel && hasError) {
-        return (
-             <div 
-                className={`relative bg-[#050505] rounded-2xl overflow-hidden ${className} border border-red-900/50`} 
-                style={{ aspectRatio: cssAspectRatio }}
-            >
-                <img src={thumbnail} className="w-full h-full object-cover opacity-20" alt="Thumbnail" />
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50">
-                     <AlertTriangle size={24} className="text-red-500 mb-2" />
-                     <span className="text-red-500 font-bold text-[10px] tracking-widest uppercase">Showreel Unable to Play</span>
-                </div>
-            </div>
-        );
-    }
-
     return (
         <div 
-            className={`
-                relative bg-[#050505] overflow-hidden rounded-2xl
-                ${className}
-            `} 
+            className={`relative bg-[#050505] overflow-hidden rounded-2xl ${className}`} 
             style={{ aspectRatio: cssAspectRatio }}
         >
             <AnimatePresence>
@@ -412,7 +391,6 @@ const IntroOverlay: React.FC<{ data: PortfolioData; onComplete: () => void; isIm
 
 const ProjectCard: React.FC<{ project: Project; index: number; onClick: () => void; className?: string }> = ({ project, index, onClick, className = '' }) => {
     const displayAspectRatio = useMemo(() => {
-        // CHANGED: Use true aspect ratio for vertical videos to prevent black bars/cropping issues
         if (project.aspectRatio === '9:16') return '9/16'; 
         return project.aspectRatio ? project.aspectRatio.replace(':', '/') : '16/9';
     }, [project.aspectRatio]);
@@ -426,7 +404,6 @@ const ProjectCard: React.FC<{ project: Project; index: number; onClick: () => vo
             className={`group cursor-pointer relative rounded-lg overflow-hidden bg-zinc-900 border border-zinc-800 shadow-lg ${className}`}
             style={{ aspectRatio: displayAspectRatio }}
         >
-            {/* Big Index Number - Background */}
             <div className="absolute top-0 left-0 p-4 text-7xl font-black text-white/5 select-none pointer-events-none z-0 leading-none">
                 {String(index + 1).padStart(2, '0')}
             </div>
@@ -438,7 +415,6 @@ const ProjectCard: React.FC<{ project: Project; index: number; onClick: () => vo
                 loading="lazy"
             />
             
-            {/* Permanent Title Overlay (Bottom Gradient) */}
             <div className="absolute inset-x-0 bottom-0 p-5 bg-gradient-to-t from-black/90 via-black/50 to-transparent z-20 flex flex-col justify-end min-h-[40%]">
                  <h3 className="font-display font-bold text-lg text-white leading-tight truncate drop-shadow-md">{project.title}</h3>
                  <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mt-1 opacity-80 border border-zinc-700/50 self-start px-2 py-0.5 rounded-full bg-black/40 backdrop-blur-sm">
@@ -446,7 +422,6 @@ const ProjectCard: React.FC<{ project: Project; index: number; onClick: () => vo
                  </span>
             </div>
 
-            {/* Hover State - Play Button */}
             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center z-30 backdrop-blur-[1px]">
                  <div className="w-14 h-14 rounded-full bg-white text-black flex items-center justify-center shadow-2xl transform scale-90 group-hover:scale-100 transition-transform">
                      <Play size={24} fill="currentColor" className="ml-1" />
@@ -465,7 +440,6 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
     const [selectedProject, setSelectedProject] = useState<Project | null>(null);
     const [isShowreelMuted, setIsShowreelMuted] = useState(true);
     
-    // Preload Profile Image for Seamless Intro
     useEffect(() => {
         if (safeData.profileImage) {
             const img = new Image();
@@ -477,7 +451,6 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
         }
     }, [safeData.profileImage]);
 
-    // Categorized Data Logic
     const categorizedProjects = useMemo(() => {
         const projects = safeData.projects || [];
         const albums = safeData.albums || [];
@@ -511,15 +484,12 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
 
     return (
         <div className="bg-[#050505] min-h-screen w-full relative text-zinc-100 font-sans selection:bg-white/20 selection:text-white">
-            
-            {/* Intro */}
             <AnimatePresence>
                 {!introComplete && (
                     <IntroOverlay data={safeData} isImageLoaded={isImageLoaded} onComplete={() => setIntroComplete(true)} />
                 )}
             </AnimatePresence>
 
-            {/* Project Modal */}
             <AnimatePresence>
                 {selectedProject && (
                     <motion.div 
@@ -540,23 +510,21 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                             className="w-full max-w-7xl max-h-[90vh] flex flex-col lg:flex-row bg-[#09090b] rounded-3xl overflow-hidden border border-zinc-800 shadow-2xl" 
                             onClick={e => e.stopPropagation()}
                         >
-                            {/* Video Section - Fixed flex layout to allow natural aspect ratio scaling */}
                             <div className="flex-1 bg-black relative flex items-center justify-center min-h-[40vh] lg:min-h-0 overflow-hidden p-0 lg:p-4 self-stretch">
                                 <div className="relative w-full h-full flex items-center justify-center">
                                      <VideoPlayer 
                                         src={selectedProject.link} 
                                         thumbnail={selectedProject.thumbnail} 
-                                        autoplay={false} // CHANGED: Disabled autoplay for projects
+                                        autoplay={false}
                                         muted={false} 
                                         controls={true}
                                         aspectRatio={selectedProject.aspectRatio}
-                                        objectFit="contain" // Fix cropping for vertical videos
+                                        objectFit="contain"
                                         className="w-full h-full mx-auto"
                                     />
                                 </div>
                             </div>
                             
-                            {/* Details Section */}
                             <div className="w-full lg:w-[400px] p-8 lg:p-10 border-t lg:border-t-0 lg:border-l border-zinc-800 overflow-y-auto bg-[#09090b] shrink-0">
                                 <h2 className="text-3xl md:text-4xl font-display font-bold text-white mb-4 leading-tight">{selectedProject.title}</h2>
                                 <div className="flex flex-wrap gap-2 mb-8">
@@ -572,15 +540,12 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                 )}
             </AnimatePresence>
 
-            {/* --- MAIN LAYOUT --- */}
             <motion.div 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: introComplete ? 1 : 0 }}
                 transition={{ duration: 0.8 }}
                 className="flex flex-col lg:block min-h-screen"
             >
-                {/* --- SIDEBAR --- */}
-                {/* Fixed sidebar on desktop for strictly static behavior */}
                 <aside className="
                     w-full lg:w-[35%] xl:w-[32%] 
                     lg:fixed lg:top-0 lg:left-0 lg:bottom-0 
@@ -655,18 +620,14 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                     </div>
                 </aside>
 
-                {/* --- CONTENT AREA --- */}
-                {/* Margin offset to clear fixed sidebar on desktop */}
                 <main className="w-full lg:ml-[35%] xl:ml-[32%] lg:w-auto relative z-10 bg-[#050505]">
                     
-                    {/* 1. Showreel Section */}
                     {safeData.showreelLink && (
                         <section className="p-6 md:p-12 xl:p-16 border-b border-zinc-900/50">
                             <div className="flex items-center gap-3 mb-6 max-w-2xl mx-auto">
                                 <h2 className="text-3xl font-display font-bold text-white tracking-tight">Showreel</h2>
                             </div>
                             
-                            {/* Decreased width to max-w-2xl and allow overflow for ambience */}
                             <div className="max-w-2xl mx-auto w-full aspect-video md:aspect-[2.35/1] relative group overflow-visible">
                                 <VideoPlayer 
                                     src={safeData.showreelLink} 
@@ -682,7 +643,6 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                         </section>
                     )}
 
-                    {/* 2. Work Sections (Iterate Categories) */}
                     <div className="p-5 md:p-10 xl:p-14 pb-24">
                         {categorizedProjects.length > 0 && categorizedProjects.map((section, idx) => (
                             <section key={idx} className="mb-16 last:mb-0">
@@ -710,7 +670,6 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                             </div>
                         )}
 
-                        {/* 3. Dedicated Skills Section */}
                         <section className="space-y-12 border-t border-zinc-900 pt-16 mt-16">
                              <div className="flex items-end gap-6 mb-8">
                                 <h2 className="text-4xl font-display font-black text-white tracking-tight uppercase">Skills & Tools</h2>
