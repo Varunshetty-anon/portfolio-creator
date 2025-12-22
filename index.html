@@ -3,43 +3,35 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https: data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https: blob:; style-src 'self' 'unsafe-inline' https: blob: data:; font-src 'self' https: data:; img-src 'self' https: data: blob:; media-src 'self' https: data: blob:; connect-src 'self' https: wss: blob: data:; frame-src 'self' https: blob: data:;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https: data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https: blob: data:; style-src 'self' 'unsafe-inline' https: blob: data:; font-src 'self' https: data:; img-src 'self' https: data: blob:; media-src 'self' https: data: blob:; connect-src 'self' https: wss: blob: data:; frame-src 'self' https: blob: data:;">
     <base href="/" />
     <title>Frames Studio - Premium Portfolio</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script>
-      // Robust Service Worker cleanup for the global context
+      // CRITICAL: Aggressive Service Worker Unregistration
+      // This runs before anything else to ensure no SW intercepts requests.
       if ('serviceWorker' in navigator) {
-        try {
-          navigator.serviceWorker.getRegistrations().then(function(regs) {
-            for(var r of regs) r.unregister();
-          }).catch(function(){});
-        } catch(e){}
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for(let registration of registrations) {
+            registration.unregister().then(function(success) {
+               if (success) console.log('Service Worker successfully unregistered.');
+            });
+          }
+        }).catch(function(err) {
+          console.error('Service Worker unregistration failed:', err);
+        });
       }
-      
-      // Error suppression for known browser extension issues
+
+      // Error suppression
       window.addEventListener('error', function(e) {
-        // Suppress 'rangeCount' and 'selection' errors often caused by extensions like RotateCookies or ContextMenuHelper
-        if (e.message && (e.message.includes('rangeCount') || e.message.includes('selection') || e.message.includes('contextmenuhlpr'))) {
+        if (e.message && (e.message.includes('rangeCount') || e.message.includes('selection') || e.message.includes('contextmenuhlpr') || e.message.includes('Script error'))) {
           e.preventDefault();
           e.stopPropagation();
           return true;
         }
-        // Suppress Google Drive/Play logging CORS noise
-        if (e.message && e.message.includes('Script error')) {
-           // Generic script errors from cross-origin iframes are meaningless to us
-           return true;
-        }
       }, true);
-
-      // Handle unhandled rejections as well
-      window.addEventListener('unhandledrejection', function(e) {
-        if (e.reason && e.reason.message && (e.reason.message.includes('rangeCount') || e.reason.message.includes('selection'))) {
-            e.preventDefault();
-        }
-      });
       
       tailwind.config = {
         darkMode: 'class',
@@ -102,6 +94,6 @@
 </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
+    <script type="module" src="/index.tsx?v=2"></script>
   </body>
 </html>

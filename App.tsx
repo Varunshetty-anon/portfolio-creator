@@ -51,14 +51,16 @@ const App: React.FC = () => {
   useEffect(() => { dataRef.current = data; }, [data]);
 
   useEffect(() => {
-    // 1. PUBLIC ROUTING CHECK
-    // Check if we are on a public portfolio route (e.g., /v/username)
+    // 1. PUBLIC ROUTING CHECK (CRITICAL)
+    // We check this FIRST. If it matches, we subscribe and RETURN immediately.
+    // This ensures no Auth logic runs for public viewers.
     const path = window.location.pathname;
     const match = path.match(/^\/v\/([^/]+)/);
     
     if (match) {
         const slug = match[1];
         setLoadingMessage('Loading Portfolio...');
+        // We set loading true here to prevent any flash of Home/Login
         setIsLoading(true);
 
         // Subscribe to real-time updates for the public portfolio
@@ -78,7 +80,7 @@ const App: React.FC = () => {
     }
 
     // 2. AUTH & EDITOR ROUTING
-    // If not a public route, proceed with standard Auth check
+    // Only runs if NOT on a public route.
     let unsubscribeAuth: () => void;
 
     if (isConfigured && auth) {
