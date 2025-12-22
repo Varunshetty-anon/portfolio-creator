@@ -52,39 +52,51 @@ const App: React.FC = () => {
 
   useEffect(() => {
     // 1. PUBLIC ROUTING CHECK (CRITICAL)
-    // We check this FIRST. If it matches, we subscribe and RETURN immediately.
-    // This ensures no Auth logic runs for public viewers.
-    const path = window.location.pathname;
-    const match = path.match(/^\/v\/([^/]+)/);
-    
-    if (match) {
-        const slug = match[1];
-        setLoadingMessage('Loading Portfolio...');
-        // We set loading true here to prevent any flash of Home/Login
-        setIsLoading(true);
+    // Supports both /v/slug and /#/v/slug (Hash fallback for strict servers)
+    const checkPublicRoute = () => {
+        const path = window.location.pathname;
+        const hash = window.location.hash;
+        
+        let slug = null;
+        
+        // Check Path
+        const pathMatch = path.match(/^\/v\/([^/]+)/);
+        if (pathMatch) slug = pathMatch[1];
+        
+        // Check Hash if no path match
+        if (!slug) {
+            const hashMatch = hash.match(/^#\/v\/([^/]+)/);
+            if (hashMatch) slug = hashMatch[1];
+        }
 
-        // Subscribe to real-time updates for the public portfolio
-        const unsubscribe = subscribeToPublicPortfolio(slug, (publicData) => {
-             if (publicData) {
-                 setData(publicData);
-                 setRoute('public');
-             } else {
-                 setFatalError("Portfolio not found or is not published yet.");
-                 setRoute('error');
-             }
-             setIsLoading(false);
-        });
+        if (slug) {
+            setLoadingMessage('Loading Portfolio...');
+            setIsLoading(true);
 
-        // Cleanup subscription on unmount
-        return () => unsubscribe();
-    }
+            // Subscribe to real-time updates for the public portfolio
+            const unsubscribe = subscribeToPublicPortfolio(slug, (publicData) => {
+                 if (publicData) {
+                     setData(publicData);
+                     setRoute('public');
+                 } else {
+                     setFatalError("Portfolio not found or is not published yet.");
+                     setRoute('error');
+                 }
+                 setIsLoading(false);
+            });
+            return unsubscribe;
+        }
+        return null;
+    };
+
+    const unsubscribePublic = checkPublicRoute();
+    if (unsubscribePublic) return () => unsubscribePublic();
 
     // 2. AUTH & EDITOR ROUTING
     // Only runs if NOT on a public route.
     let unsubscribeAuth: () => void;
 
     if (isConfigured && auth) {
-        // Handle Redirect Results (for Google Login)
         getRedirectResult(auth).catch(e => console.warn("Redirect check:", e));
 
         unsubscribeAuth = onAuthStateChanged(auth, async (user: User | null) => {
@@ -156,7 +168,6 @@ const App: React.FC = () => {
       setIsAuthProcessing(true);
       try {
           await loginWithGoogle();
-          // Auth state change listener will handle the rest
       } catch (e: any) { 
           let msg = e.message;
           console.error("Google Auth Error:", e);
@@ -300,11 +311,8 @@ const App: React.FC = () => {
     );
   }
 
-  // DEFAULT: HOME / LOGIN
   return (
     <div className="min-h-screen bg-[#050505] flex flex-col md:flex-row relative overflow-hidden font-sans selection:bg-white/20">
-       
-       {/* Left Side - Brand */}
        <div className="flex-1 flex flex-col justify-between p-8 md:p-12 lg:p-16 relative z-10 border-b md:border-b-0 md:border-r border-zinc-900/50">
            <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center">
                <span className="font-display font-black text-black text-lg">F</span>
@@ -326,7 +334,6 @@ const App: React.FC = () => {
            </div>
        </div>
 
-       {/* Right Side - Auth */}
        <div className="flex-1 flex items-center justify-center p-8 bg-zinc-950/30">
            <div className="w-full max-w-sm">
                 <div className="mb-8 flex gap-4 border-b border-zinc-800 pb-1">
@@ -353,7 +360,6 @@ const App: React.FC = () => {
                     {authError && (
                         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="p-4 rounded-lg bg-red-500/5 border border-red-500/10">
                             <p className="text-red-400 text-xs">{authError}</p>
-                            {/* Fallback to redirect if popup fails explicitly */}
                             <button type="button" onClick={handleGoogleRedirect} className="mt-2 text-xs underline text-red-300 hover:text-white">Try Redirect Method</button>
                         </motion.div>
                     )}

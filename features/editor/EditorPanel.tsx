@@ -52,19 +52,14 @@ const ProjectCardEditor: React.FC<{ project: Project; albums: Album[]; onChange:
 
     // Link Validation & Auto-Save Logic
     const handleLinkChange = async (val: string) => {
-        // Auto-transform Google Drive links to direct download URLs
         const directUrl = getDirectVideoUrl(val);
-        
-        // Immediate update to UI
         onChange({ link: directUrl });
         
-        // Reset status if empty
         if (!directUrl) {
             setLinkStatus('idle');
             return;
         }
 
-        // Basic length check before validating
         if (directUrl.length < 8) {
              setLinkStatus('invalid');
              return;
@@ -72,20 +67,14 @@ const ProjectCardEditor: React.FC<{ project: Project; albums: Album[]; onChange:
 
         setLinkStatus('validating');
 
-        // Debounce the metadata fetch slightly to avoid slamming API while typing
         const timer = setTimeout(async () => {
             try {
                 const m = await getVideoMetadata(directUrl);
                 if (m.thumbnail) {
-                    // Success!
                     onChange({ link: directUrl, thumbnail: m.thumbnail, aspectRatio: m.aspectRatio });
                     setLinkStatus('valid');
-                    // TRIGGER AUTO SAVE
                     onAutoSave();
                 } else {
-                    // If no thumbnail, we still mark valid if it's a native link format we trust,
-                    // but visual feedback might stay 'idle' or 'valid' based on use case.
-                    // For now, let's assume valid if metadata check didn't throw.
                     setLinkStatus('valid');
                 }
             } catch (e) {
@@ -99,7 +88,6 @@ const ProjectCardEditor: React.FC<{ project: Project; albums: Album[]; onChange:
     return (
         <div className={`bg-zinc-900/50 border rounded-xl overflow-visible transition-all duration-300 ${isExpanded ? 'border-zinc-700 bg-zinc-900' : 'border-zinc-800 hover:border-zinc-700'}`}>
              <div className="p-4 flex gap-4 items-start cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
-                 {/* Increased size from w-24 to w-40 for better visibility */}
                  <div className="w-40 aspect-video bg-black rounded-lg border border-zinc-800 overflow-hidden shrink-0 flex items-center justify-center relative group">
                     {project.thumbnail ? <img src={project.thumbnail} className="w-full h-full object-cover"/> : <Video size={16} className="text-zinc-700"/>}
                     {linkStatus === 'validating' && <div className="absolute inset-0 bg-black/50 flex items-center justify-center"><Loader2 size={12} className="animate-spin text-white"/></div>}
@@ -199,15 +187,11 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
     const [stats, setStats] = useState({ views: 0, clicks: 0 });
     const [isUploadingShowreel, setIsUploadingShowreel] = useState(false);
     const [linkCopied, setLinkCopied] = useState(false);
-    
-    // Image Cropper State
     const [cropperState, setCropperState] = useState<{ isOpen: boolean; img: string | null }>({ isOpen: false, img: null });
 
     useEffect(() => {
         if (data.uid) getPortfolioStats(data.uid).then(setStats);
     }, [data.uid]);
-
-    // --- Media Handlers ---
 
     const handleProfileImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -229,12 +213,9 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
         }
     };
 
-    // STRICT SHOWREEL UPLOAD LOGIC
     const handleShowreelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
-        
-        // STRICT MP4 CHECK
         if (file.type !== 'video/mp4') {
             alert("Only .mp4 files (H.264 + AAC) are accepted for showreels.");
             return;
@@ -242,13 +223,9 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
 
         setIsUploadingShowreel(true);
         try {
-            // FIXED PATH REPLACEMENT
             const path = `users/${data.uid}/showreel/showreel.mp4`;
-            
-            // Upload Video
             const url = await uploadFileToStorage(file, path);
             
-            // Generate & Upload Thumbnail
             let thumbUrl = data.showreelThumbnail;
             try {
                 const { blob } = await generateThumbnailFromVideo(file);
@@ -271,20 +248,22 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
         }
     };
 
+    const getPortfolioUrl = () => {
+        return `${window.location.origin}/#/v/${data.settings?.username}`;
+    };
+
     const handleCopyLink = () => {
-        const url = `${window.location.origin}/v/${data.settings?.username}`;
-        navigator.clipboard.writeText(url);
+        navigator.clipboard.writeText(getPortfolioUrl());
         setLinkCopied(true);
         setTimeout(() => setLinkCopied(false), 2000);
     };
 
     const handleDownloadQr = () => {
-        const url = `${window.location.origin}/v/${data.settings?.username}`;
+        const url = getPortfolioUrl();
         const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(url)}`;
         downloadQrCode(qrUrl, 'portfolio-qr.png');
     };
 
-    // --- Project Handlers ---
     const addProject = () => {
         const newProject: Project = {
             id: Date.now().toString(),
@@ -329,7 +308,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
                 <ImageCropper imageSrc={cropperState.img} onCancel={() => setCropperState({ isOpen: false, img: null })} onCropComplete={handleCropComplete} />
             )}
 
-            {/* Sidebar Navigation */}
             <aside className="w-20 lg:w-64 border-r border-zinc-900 flex flex-col justify-between bg-zinc-950 z-20">
                 <div>
                     <div className="p-6 flex items-center gap-3">
@@ -375,9 +353,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
                 </div>
             </aside>
 
-            {/* Main Content */}
             <main className="flex-1 flex flex-col min-w-0 bg-[#050505] relative">
-                {/* Top Bar */}
                 <header className="h-16 border-b border-zinc-900 flex items-center justify-between px-6 bg-[#050505]/80 backdrop-blur-md z-10 sticky top-0">
                     <div className="flex items-center gap-4">
                         <h2 className="font-display font-bold text-lg capitalize">{activeTab}</h2>
@@ -388,11 +364,10 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
                              <span className={isSaving ? "opacity-100" : "opacity-0 transition-opacity"}>{isSaving ? "Saving..." : "Saved"}</span>
                         </div>
                         
-                        {/* Live Link Controls */}
                         {data.meta?.publish?.isPublished && (
                             <div className="hidden md:flex items-center gap-1 mr-2 px-2 py-1 bg-zinc-900 rounded-lg border border-zinc-800">
                                 <a 
-                                    href={`/v/${data.settings?.username}`} 
+                                    href={getPortfolioUrl()} 
                                     target="_blank" 
                                     rel="noopener noreferrer"
                                     className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-zinc-300 hover:text-white hover:bg-zinc-800 rounded-md transition-colors"
@@ -424,13 +399,11 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
                     </div>
                 </header>
 
-                {/* Scrollable Area */}
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-6 lg:p-10">
                     <div className="max-w-4xl mx-auto space-y-12 pb-24">
                         
                         {activeTab === 'profile' && (
                             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-10">
-                                {/* Bio Section */}
                                 <section className="grid grid-cols-1 md:grid-cols-12 gap-8">
                                     <div className="md:col-span-4 flex flex-col items-center text-center gap-4">
                                         <div className="relative group w-40 h-40 rounded-full bg-zinc-900 border-2 border-dashed border-zinc-700 hover:border-zinc-500 transition-colors overflow-hidden flex items-center justify-center cursor-pointer">
@@ -470,7 +443,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
                                 
                                 <div className="h-px bg-zinc-900 w-full" />
 
-                                {/* STRICT SHOWREEL SECTION */}
                                 <section className="space-y-6">
                                     <div className="flex items-center justify-between">
                                         <h3 className="text-xl font-display font-bold text-white">Showreel</h3>
@@ -493,7 +465,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
                                                 </div>
                                             )}
                                             
-                                            {/* Upload Overlay */}
                                             <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-3 backdrop-blur-sm">
                                                  <label className="cursor-pointer flex flex-col items-center group/btn">
                                                     <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mb-3 shadow-lg group-hover/btn:scale-110 transition-transform">
