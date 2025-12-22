@@ -11,40 +11,36 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script>
       // CRITICAL: Aggressive Service Worker & Cache Cleanup
-      // This fixes loading errors by ensuring no stale SW intercepts the request.
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(function(registrations) {
-          if (registrations.length > 0) {
-            let count = 0;
+      // This is the primary fix for "ServiceWorker intercepted..." errors.
+      (function() {
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function(registrations) {
+            let hasSW = registrations.length > 0;
             for(let registration of registrations) {
-              registration.unregister().then(function() {
-                 count++;
-                 if (count === registrations.length && navigator.serviceWorker.controller) {
-                    // If we had an active controller, reload the page to get a clean network request
-                    console.log('Reloading to clear Service Worker control...');
-                    window.location.reload();
-                 }
-              });
+              registration.unregister();
             }
-          }
-        }).catch(function(err) {
-          console.error('Service Worker unregistration failed:', err);
-        });
-      }
-      
-      if ('caches' in window) {
-        caches.keys().then(function(names) {
-          for (let name of names) {
-            caches.delete(name);
-          }
-        });
-      }
+            // If a SW was found and controlling, reload to get clean network state
+            if (hasSW && navigator.serviceWorker.controller) {
+               console.log('[Frames] Reloading to purge Service Worker control...');
+               window.location.reload();
+            }
+          });
+        }
+        
+        if ('caches' in window) {
+          caches.keys().then(function(names) {
+            for (let name of names) {
+              caches.delete(name);
+            }
+          });
+        }
+      })();
 
-      // Error suppression for non-critical extension errors
+      // Error suppression
       window.addEventListener('error', function(e) {
-        if (e.message && (e.message.includes('rangeCount') || e.message.includes('selection') || e.message.includes('contextmenuhlpr') || e.message.includes('Script error'))) {
+        // Suppress benign extension errors
+        if (e.message && (e.message.includes('rangeCount') || e.message.includes('selection'))) {
           e.preventDefault();
-          e.stopPropagation();
           return true;
         }
       }, true);
@@ -80,10 +76,7 @@
         scroll-behavior: smooth;
       }
       
-      .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-      .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-      .custom-scrollbar::-webkit-scrollbar-thumb { background: #27272a; border-radius: 10px; }
-      
+      /* Autofill Styling */
       input:-webkit-autofill,
       input:-webkit-autofill:hover, 
       input:-webkit-autofill:focus {

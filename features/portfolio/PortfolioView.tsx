@@ -112,7 +112,7 @@ const VideoPlayer: React.FC<{
                         muted
                         loop
                         playsInline
-                        preload="auto"
+                        crossOrigin="anonymous" 
                     />
                 )}
 
@@ -133,6 +133,7 @@ const VideoPlayer: React.FC<{
                     playsInline 
                     autoPlay={true}
                     preload="auto"
+                    crossOrigin="anonymous" 
                     onLoadedMetadata={() => setIsLoaded(true)}
                     onError={() => setHasError(true)}
                 />
@@ -253,6 +254,7 @@ const VideoPlayer: React.FC<{
                         loop
                         playsInline
                         preload="auto"
+                        crossOrigin="anonymous" 
                     />
                 )}
                 <AnimatePresence>
@@ -274,6 +276,7 @@ const VideoPlayer: React.FC<{
                         playsInline 
                         preload={autoplay ? "auto" : "metadata"}
                         controls={controls}
+                        crossOrigin="anonymous" 
                         onLoadedMetadata={handleLoadedMetadata}
                         onError={() => { setHasError(true); setIsLoaded(true); }}
                     />
