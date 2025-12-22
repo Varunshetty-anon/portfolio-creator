@@ -90,11 +90,16 @@ const VideoPlayer: React.FC<{
         if (isShowreel && autoplay && videoRef.current) {
             // Explicitly force play for Showreel to avoid race conditions
             videoRef.current.muted = true;
+            videoRef.current.defaultMuted = true;
+            
             const playPromise = videoRef.current.play();
             if (playPromise !== undefined) {
                 playPromise.catch((e) => {
-                    // Silent fail is okay, UI will show static poster if needed
-                    console.warn("Autoplay block:", e);
+                    console.warn("Autoplay block (recovered):", e);
+                    // Ensure mute is forced if autoplay failed due to audio
+                    if (videoRef.current) {
+                        videoRef.current.muted = true;
+                    }
                 });
             }
         }
@@ -112,7 +117,7 @@ const VideoPlayer: React.FC<{
                         muted
                         loop
                         playsInline
-                        crossOrigin="anonymous" 
+                        preload="metadata"
                     />
                 )}
 
@@ -132,8 +137,7 @@ const VideoPlayer: React.FC<{
                     muted={true}
                     playsInline 
                     autoPlay={true}
-                    preload="auto"
-                    crossOrigin="anonymous" 
+                    preload="metadata"
                     onLoadedMetadata={() => setIsLoaded(true)}
                     onError={() => setHasError(true)}
                 />
@@ -253,8 +257,7 @@ const VideoPlayer: React.FC<{
                         muted
                         loop
                         playsInline
-                        preload="auto"
-                        crossOrigin="anonymous" 
+                        preload="metadata"
                     />
                 )}
                 <AnimatePresence>
@@ -274,9 +277,8 @@ const VideoPlayer: React.FC<{
                         autoPlay={autoplay}
                         muted={muted}
                         playsInline 
-                        preload={autoplay ? "auto" : "metadata"}
+                        preload="metadata"
                         controls={controls}
-                        crossOrigin="anonymous" 
                         onLoadedMetadata={handleLoadedMetadata}
                         onError={() => { setHasError(true); setIsLoaded(true); }}
                     />
