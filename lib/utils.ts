@@ -395,7 +395,10 @@ export const loadPublicPortfolio = async (slug: string): Promise<PortfolioData |
 
 // REALTIME PUBLIC SUBSCRIPTION
 export const subscribeToPublicPortfolio = (slug: string, onData: (data: PortfolioData | null) => void) => {
-    if (!db) return () => {};
+    if (!db) {
+        console.warn("Database not initialized, cannot subscribe.");
+        return () => {};
+    }
     const cleanSlug = slug.toLowerCase();
     const q = query(collection(db, PORTFOLIOS_COL), where("slug", "==", cleanSlug));
     
@@ -404,33 +407,39 @@ export const subscribeToPublicPortfolio = (slug: string, onData: (data: Portfoli
             onData(null);
             return;
         }
-        const docSnap = snapshot.docs[0];
+        
+        // Handle case where multiple docs might match (shouldn't happen with unique constraint)
+        const docSnap = snapshot.docs[0]; 
         const meta = docSnap.data() as PortfolioMeta;
         const uid = docSnap.id;
         
+        // Strict check: Must be explicitly published and have a live version
         if (!meta.publish?.isPublished || !meta.publish?.liveVersion) {
             onData(null);
             return;
         }
 
-        // Fetch the specific version content
-        // We do a one-time fetch here because versions are snapshots. 
-        // If the liveVersion changes (which triggers this snapshot), we fetch the new one.
         try {
             const vRef = doc(db, PORTFOLIOS_COL, uid, VERSIONS_COL, meta.publish.liveVersion);
+            
+            // We use getDoc here because versions are immutable snapshots.
+            // The Firestore Rule ensures we can only read if it matches liveVersion.
             const vSnap = await getDoc(vRef);
+            
             if (vSnap.exists()) {
                  const content = vSnap.data() as PortfolioContent;
+                 // Merge with INITIAL_DATA to ensure new fields (like aiTools) don't break the UI
                  onData({ ...INITIAL_DATA, ...content, uid, meta });
             } else {
+                 console.error(`Live version ${meta.publish.liveVersion} not found for user ${uid}`);
                  onData(null);
             }
         } catch (e) {
-            console.error("Version fetch failed", e);
+            console.error("Failed to load portfolio version:", e);
             onData(null);
         }
     }, (error) => {
-        console.error("Public subscription error:", error);
+        console.error("Real-time subscription error:", error);
         onData(null);
     });
 };
