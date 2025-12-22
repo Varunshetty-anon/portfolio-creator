@@ -136,13 +136,8 @@ export const getDirectVideoUrl = (url: string): string => {
   if (url.includes('dropbox.com')) {
     return url.replace('www.dropbox.com', 'dl.dropboxusercontent.com').replace('?dl=0', '');
   }
-  // Google Drive
-  if (url.includes('drive.google.com')) {
-    const id = extractGoogleDriveId(url);
-    if (id) {
-      return `https://drive.google.com/uc?export=download&id=${id}`;
-    }
-  }
+  // Google Drive Logic REMOVED: We want Drive links to remain as is, 
+  // so they fall through to the iframe embed logic in PortfolioView.
   return url;
 };
 
@@ -150,10 +145,11 @@ export const getDirectVideoUrl = (url: string): string => {
 export const isNativeVideo = (url: string): boolean => {
   if (!url) return false;
   const u = url.toLowerCase();
+  // REMOVED: u.includes('drive.google.com/uc?export=download')
+  // Google Drive is NOT a native video source. It must be embedded via iframe.
   return (
     u.includes('firebasestorage') ||
     u.includes('dl.dropboxusercontent.com') ||
-    u.includes('drive.google.com/uc?export=download') ||
     u.endsWith('.mp4') ||
     u.endsWith('.webm') ||
     u.endsWith('.mov')

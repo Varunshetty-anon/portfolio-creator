@@ -5,7 +5,7 @@ import {
     Volume2, VolumeX, Play, ArrowUpRight, X, Check, Zap, Layers, AlertTriangle 
 } from 'lucide-react';
 import { PortfolioData, Project, INITIAL_DATA } from '../../types';
-import { EDITING_TOOLS_LIST, AI_TOOLS_LIST, trackPortfolioView, getDirectVideoUrl, isNativeVideo } from '../../lib/utils';
+import { EDITING_TOOLS_LIST, AI_TOOLS_LIST, trackPortfolioView, getDirectVideoUrl, isNativeVideo, extractGoogleDriveId } from '../../lib/utils';
 
 interface PortfolioViewProps {
   data: PortfolioData;
@@ -92,14 +92,15 @@ const VideoPlayer: React.FC<{
             videoRef.current.muted = true;
             const playPromise = videoRef.current.play();
             if (playPromise !== undefined) {
-                playPromise.catch(() => {
+                playPromise.catch((e) => {
                     // Silent fail is okay, UI will show static poster if needed
+                    console.warn("Autoplay block:", e);
                 });
             }
         }
     }, [isShowreel, autoplay, normalizedSrc]);
 
-    // SHOWREEL SPECIFIC LOGIC
+    // SHOWREEL SPECIFIC LOGIC (NATIVE ONLY)
     if (isShowreel) {
         return (
             <div className={`relative bg-[#050505] overflow-hidden rounded-2xl ${className}`} style={{ aspectRatio: cssAspectRatio }}>
@@ -111,6 +112,7 @@ const VideoPlayer: React.FC<{
                         muted
                         loop
                         playsInline
+                        preload="auto"
                     />
                 )}
 
@@ -127,13 +129,13 @@ const VideoPlayer: React.FC<{
                     src={normalizedSrc}
                     className="w-full h-full object-cover relative z-0"
                     loop 
-                    muted={muted}
+                    muted={true}
                     playsInline 
-                    autoPlay={autoplay}
+                    autoPlay={true}
                     preload="auto"
                     onLoadedMetadata={() => setIsLoaded(true)}
                     onError={() => setHasError(true)}
-                    onSuspend={(e) => { if(autoplay) e.currentTarget.play().catch(() => {}) }}
+                    // Removed crossOrigin="anonymous" to fix CORS issues with opaque resources
                 />
 
                 {hasError && (
@@ -161,9 +163,9 @@ const VideoPlayer: React.FC<{
         )
     }
 
-    // --- STANDARD PROJECT PLAYER (Previous Logic) ---
+    // --- STANDARD PROJECT PLAYER ---
     
-    // --- Autoplay Logic (Projects Only) ---
+    // --- Autoplay Logic (Native Projects Only) ---
     useEffect(() => {
         const video = videoRef.current;
         if (!video || !autoplay || !isNative || hasError || isShowreel) return;
@@ -199,6 +201,14 @@ const VideoPlayer: React.FC<{
         const mute = muted ? 1 : 0;
         const origin = typeof window !== 'undefined' ? window.location.origin : '';
         
+        // Google Drive Embed Logic
+        if (normalizedSrc.includes('drive.google.com')) {
+            const id = extractGoogleDriveId(normalizedSrc);
+            if (id) {
+                return `https://drive.google.com/file/d/${id}/preview`;
+            }
+        }
+
         if (normalizedSrc.includes('youtube.com') || normalizedSrc.includes('youtu.be')) {
             const match = normalizedSrc.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/);
             const ytId = match?.[2];
@@ -220,10 +230,10 @@ const VideoPlayer: React.FC<{
         const { videoWidth, videoHeight } = e.currentTarget;
         if (videoWidth && videoHeight) {
             const r = videoWidth / videoHeight;
-            if (Math.abs(r - 9/16) < 0.05) setDetectedRatio('9:16');
-            else if (Math.abs(r - 16/9) < 0.05) setDetectedRatio('16:9');
-            else if (Math.abs(r - 4/3) < 0.05) setDetectedRatio('4:3');
-            else if (Math.abs(r - 1) < 0.05) setDetectedRatio('1:1');
+            if (Math.abs(r - 9/16) < 0.1) setDetectedRatio('9:16');
+            else if (Math.abs(r - 16/9) < 0.1) setDetectedRatio('16:9');
+            else if (Math.abs(r - 4/3) < 0.1) setDetectedRatio('4:3');
+            else if (Math.abs(r - 1) < 0.1) setDetectedRatio('1:1');
             else setDetectedRatio(`${videoWidth}/${videoHeight}`);
         }
         setIsLoaded(true);
@@ -243,7 +253,7 @@ const VideoPlayer: React.FC<{
                         muted
                         loop
                         playsInline
-                        aria-hidden="true"
+                        preload="auto"
                     />
                 )}
                 <AnimatePresence>
@@ -267,7 +277,6 @@ const VideoPlayer: React.FC<{
                         controls={controls}
                         onLoadedMetadata={handleLoadedMetadata}
                         onError={() => { setHasError(true); setIsLoaded(true); }}
-                        crossOrigin="anonymous"
                     />
                 )}
                  {onToggleMute && !hasError && !controls && (

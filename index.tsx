@@ -2,27 +2,16 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 
-// CRITICAL: Cleanup any lingering Service Workers that might break media streaming or cause "Invalid State" errors.
-// This is essential for environments like sandboxed iframes.
+// AGGRESSIVE SERVICE WORKER CLEANUP
+// This is critical to fix CORS issues with Firebase Storage and Google Drive video playback.
 if ('serviceWorker' in navigator) {
-  try {
-    navigator.serviceWorker.getRegistrations()
-      .then((registrations) => {
-        for (const registration of registrations) {
-          registration.unregister()
-            .then(() => console.debug('[Frames] SW Unregistered'))
-            .catch(() => {});
-        }
-      })
-      .catch((err) => {
-        // Suppress expected errors in restricted environments
-        if (!err.message?.includes('invalid state') && err.name !== 'InvalidStateError') {
-          console.warn('[Frames] Service Worker check error:', err.message);
-        }
+  navigator.serviceWorker.getRegistrations().then((registrations) => {
+    for (const registration of registrations) {
+      registration.unregister().then((boolean) => {
+          if (boolean) console.log('[Frames] Legacy Service Worker unregistered.');
       });
-  } catch (e) {
-    // Silent catch for catastrophic environment failures
-  }
+    }
+  }).catch(console.error);
 }
 
 const rootElement = document.getElementById('root');
