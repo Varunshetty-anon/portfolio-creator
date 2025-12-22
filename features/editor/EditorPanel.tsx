@@ -278,6 +278,12 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
         setTimeout(() => setLinkCopied(false), 2000);
     };
 
+    const handleDownloadQr = () => {
+        const url = `${window.location.origin}/v/${data.settings?.username}`;
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(url)}`;
+        downloadQrCode(qrUrl, 'portfolio-qr.png');
+    };
+
     // --- Project Handlers ---
     const addProject = () => {
         const newProject: Project = {
@@ -401,6 +407,14 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
                                 >
                                     {linkCopied ? <Check size={12} className="text-green-500"/> : <Link2 size={12} />}
                                     {linkCopied ? 'Copied' : 'Copy'}
+                                </button>
+                                <div className="w-px h-4 bg-zinc-800"></div>
+                                <button 
+                                    onClick={handleDownloadQr}
+                                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-zinc-300 hover:text-white hover:bg-zinc-800 rounded-md transition-colors"
+                                    title="Download QR"
+                                >
+                                    <QrCode size={12} />
                                 </button>
                             </div>
                         )}

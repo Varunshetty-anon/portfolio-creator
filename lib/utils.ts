@@ -1,6 +1,6 @@
 import { PortfolioData, PortfolioContent, UserProfile, PortfolioMeta, INITIAL_DATA, Project } from '../types';
 import { db, storage, auth, googleProvider, isConfigured } from './firebase';
-import { doc, getDoc, setDoc, collection, query, where, getDocs, deleteDoc, addDoc, serverTimestamp, increment, writeBatch, getDocsFromServer, getDocFromServer, DocumentSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, query, where, getDocs, deleteDoc, addDoc, serverTimestamp, increment, writeBatch, getDocsFromServer, getDocFromServer, DocumentSnapshot, onSnapshot } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL, listAll, deleteObject } from 'firebase/storage';
 import { signInWithPopup, signInWithRedirect, signInWithEmailAndPassword, createUserWithEmailAndPassword, User, deleteUser, setPersistence, browserLocalPersistence, inMemoryPersistence } from 'firebase/auth';
 import { GoogleGenAI } from "@google/genai";
@@ -357,10 +357,13 @@ const CACHE_DURATION = 1000 * 60 * 5;
 export const loadPublicPortfolio = async (slug: string): Promise<PortfolioData | null> => {
   if (!db) return null;
   const cleanSlug = slug.toLowerCase();
-  const cached = portfolioCache.get(cleanSlug);
-  if (cached && (Date.now() - cached.timestamp < CACHE_DURATION)) {
-      return cached.data;
-  }
+  
+  // Cache check disabled for debugging / ensuring fresh fetches if needed
+  // const cached = portfolioCache.get(cleanSlug);
+  // if (cached && (Date.now() - cached.timestamp < CACHE_DURATION)) {
+  //     return cached.data;
+  // }
+
   const q = query(collection(db, PORTFOLIOS_COL), where("slug", "==", cleanSlug));
   let querySnap;
   try {
@@ -389,6 +392,49 @@ export const loadPublicPortfolio = async (slug: string): Promise<PortfolioData |
   portfolioCache.set(cleanSlug, { data: result, timestamp: Date.now() });
   return result;
 };
+
+// REALTIME PUBLIC SUBSCRIPTION
+export const subscribeToPublicPortfolio = (slug: string, onData: (data: PortfolioData | null) => void) => {
+    if (!db) return () => {};
+    const cleanSlug = slug.toLowerCase();
+    const q = query(collection(db, PORTFOLIOS_COL), where("slug", "==", cleanSlug));
+    
+    return onSnapshot(q, async (snapshot) => {
+        if (snapshot.empty) {
+            onData(null);
+            return;
+        }
+        const docSnap = snapshot.docs[0];
+        const meta = docSnap.data() as PortfolioMeta;
+        const uid = docSnap.id;
+        
+        if (!meta.publish?.isPublished || !meta.publish?.liveVersion) {
+            onData(null);
+            return;
+        }
+
+        // Fetch the specific version content
+        // We do a one-time fetch here because versions are snapshots. 
+        // If the liveVersion changes (which triggers this snapshot), we fetch the new one.
+        try {
+            const vRef = doc(db, PORTFOLIOS_COL, uid, VERSIONS_COL, meta.publish.liveVersion);
+            const vSnap = await getDoc(vRef);
+            if (vSnap.exists()) {
+                 const content = vSnap.data() as PortfolioContent;
+                 onData({ ...INITIAL_DATA, ...content, uid, meta });
+            } else {
+                 onData(null);
+            }
+        } catch (e) {
+            console.error("Version fetch failed", e);
+            onData(null);
+        }
+    }, (error) => {
+        console.error("Public subscription error:", error);
+        onData(null);
+    });
+};
+
 
 export const ensureUserProfile = async (user: User): Promise<UserProfile> => {
     if (!db) throw new Error("Database not initialized");

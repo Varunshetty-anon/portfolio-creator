@@ -5,7 +5,6 @@ import { EditorPanel } from './features/editor/EditorPanel';
 import { OnboardingFlow } from './features/onboarding/OnboardingFlow';
 import { PortfolioData, INITIAL_DATA } from './types';
 import { 
-    loadPublicPortfolio, 
     loadEditorState, 
     saveDraft, 
     publishPortfolio, 
@@ -19,7 +18,8 @@ import {
     loginWithGoogleRedirect,
     checkUsernameAvailable, 
     deletePortfolioFromDB, 
-    deleteUserAuth 
+    deleteUserAuth,
+    subscribeToPublicPortfolio 
 } from './lib/utils';
 import { Loader2, Eye, EyeOff, PenTool, AlertCircle, RefreshCw, LogOut, ArrowRight, Sparkles } from 'lucide-react';
 import { Button } from './components/ui/Button';
@@ -51,91 +51,83 @@ const App: React.FC = () => {
   useEffect(() => { dataRef.current = data; }, [data]);
 
   useEffect(() => {
-    let unsubscribe: () => void;
+    // 1. PUBLIC ROUTING CHECK
+    // Check if we are on a public portfolio route (e.g., /v/username)
+    const path = window.location.pathname;
+    const match = path.match(/^\/v\/([^/]+)/);
     
-    const initApp = async () => {
+    if (match) {
+        const slug = match[1];
+        setLoadingMessage('Loading Portfolio...');
         setIsLoading(true);
-        setLoadingMessage('Initializing...');
 
-        const path = window.location.pathname;
-        const hash = window.location.hash.replace('#', '');
-        let slug = null;
-        
-        const pathMatch = path.match(/^\/v\/([^/]+)/);
-        if (pathMatch) {
-            slug = pathMatch[1];
-        } else if (hash && !['editor', 'onboarding'].includes(hash)) {
-            slug = hash;
-        }
+        // Subscribe to real-time updates for the public portfolio
+        const unsubscribe = subscribeToPublicPortfolio(slug, (publicData) => {
+             if (publicData) {
+                 setData(publicData);
+                 setRoute('public');
+             } else {
+                 setFatalError("Portfolio not found or is not published yet.");
+                 setRoute('error');
+             }
+             setIsLoading(false);
+        });
 
-        if (slug) {
-            try {
-                setLoadingMessage('Loading Portfolio...');
-                const publicData = await loadPublicPortfolio(slug);
-                if (publicData) {
-                    setData(publicData);
-                    setRoute('public');
-                    setIsLoading(false);
-                    return;
-                }
-            } catch (e) {
-                console.error("Failed to load public portfolio", e);
-            }
-        }
+        // Cleanup subscription on unmount
+        return () => unsubscribe();
+    }
 
-        if (isConfigured && auth) {
-            // Check for redirect result first
-            getRedirectResult(auth).catch(e => {
-                console.warn("Redirect check:", e);
-                // Don't block app load on redirect error, just log it
-            });
+    // 2. AUTH & EDITOR ROUTING
+    // If not a public route, proceed with standard Auth check
+    let unsubscribeAuth: () => void;
 
-            unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
-                if (user) {
-                    setLoadingMessage('Syncing Profile...');
-                    try {
-                        const userProfile = await ensureUserProfile(user);
-                        
-                        if (!userProfile.onboarded) {
-                             const cleanUsername = (user.displayName?.split(' ')[0] || user.email?.split('@')[0] || 'user').toLowerCase() + Math.floor(Math.random()*1000);
-                             const initialData: PortfolioData = { 
-                                ...INITIAL_DATA, 
-                                uid: user.uid, 
-                                contactEmail: user.email || '', 
-                                username: cleanUsername,
-                                name: user.displayName || ''
-                            };
-                            setData(initialData);
-                            setRoute('onboarding');
-                        } else {
-                            const draftData = await loadEditorState(user.uid);
-                            setData(draftData || INITIAL_DATA);
-                            setRoute('editor');
-                        }
-                        setFatalError(null);
-                    } catch (e: any) {
-                        console.error("Auth load error", e);
-                        // Don't fatal error immediately, allow retry
-                        setFatalError("Failed to load your profile. Please check your connection.");
-                        setRoute('error');
-                    } finally {
-                        setIsAuthProcessing(false); 
-                        setIsLoading(false);
+    if (isConfigured && auth) {
+        // Handle Redirect Results (for Google Login)
+        getRedirectResult(auth).catch(e => console.warn("Redirect check:", e));
+
+        unsubscribeAuth = onAuthStateChanged(auth, async (user: User | null) => {
+            if (user) {
+                setLoadingMessage('Syncing Profile...');
+                try {
+                    const userProfile = await ensureUserProfile(user);
+                    
+                    if (!userProfile.onboarded) {
+                            const cleanUsername = (user.displayName?.split(' ')[0] || user.email?.split('@')[0] || 'user').toLowerCase() + Math.floor(Math.random()*1000);
+                            const initialData: PortfolioData = { 
+                            ...INITIAL_DATA, 
+                            uid: user.uid, 
+                            contactEmail: user.email || '', 
+                            username: cleanUsername,
+                            name: user.displayName || ''
+                        };
+                        setData(initialData);
+                        setRoute('onboarding');
+                    } else {
+                        const draftData = await loadEditorState(user.uid);
+                        setData(draftData || INITIAL_DATA);
+                        setRoute('editor');
                     }
-                } else {
-                    setRoute('home');
-                    setData(null);
-                    setIsAuthProcessing(false);
+                    setFatalError(null);
+                } catch (e: any) {
+                    console.error("Auth load error", e);
+                    setFatalError("Failed to load your profile. Please check your connection.");
+                    setRoute('error');
+                } finally {
+                    setIsAuthProcessing(false); 
                     setIsLoading(false);
                 }
-            });
-        } else {
-            setIsLoading(false);
-        }
-    };
+            } else {
+                setRoute('home');
+                setData(null);
+                setIsAuthProcessing(false);
+                setIsLoading(false);
+            }
+        });
+    } else {
+        setIsLoading(false);
+    }
 
-    initApp();
-    return () => { if (unsubscribe) unsubscribe(); };
+    return () => { if (unsubscribeAuth) unsubscribeAuth(); };
   }, []);
 
   const handleEmailAuth = async (e: React.FormEvent) => {
@@ -252,11 +244,10 @@ const App: React.FC = () => {
               <div className="w-12 h-12 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mb-6 ring-1 ring-red-500/20">
                   <AlertCircle size={24} />
               </div>
-              <h2 className="text-xl font-display font-medium text-white mb-2">Connection Issue</h2>
+              <h2 className="text-xl font-display font-medium text-white mb-2">Portfolio Unavailable</h2>
               <p className="text-zinc-500 text-sm max-w-sm mb-8 leading-relaxed">{fatalError}</p>
               <div className="flex gap-4">
-                  <Button variant="outline" onClick={() => window.location.reload()} icon={<RefreshCw size={14}/>}>Retry</Button>
-                  <Button variant="ghost" onClick={handleLogout} icon={<LogOut size={14}/>}>Reset</Button>
+                  <Button variant="outline" onClick={() => window.location.href = '/'} icon={<ArrowRight size={14}/>}>Go Home</Button>
               </div>
           </div>
       );
