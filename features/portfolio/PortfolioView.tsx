@@ -85,6 +85,20 @@ const VideoPlayer: React.FC<{
         }
     }, [muted]);
 
+    // --- Showreel Autoplay Force ---
+    useEffect(() => {
+        if (isShowreel && autoplay && videoRef.current) {
+            // Explicitly force play for Showreel to avoid race conditions
+            videoRef.current.muted = true;
+            const playPromise = videoRef.current.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(() => {
+                    // Silent fail is okay, UI will show static poster if needed
+                });
+            }
+        }
+    }, [isShowreel, autoplay, normalizedSrc]);
+
     // SHOWREEL SPECIFIC LOGIC
     if (isShowreel) {
         return (
@@ -149,7 +163,7 @@ const VideoPlayer: React.FC<{
 
     // --- STANDARD PROJECT PLAYER (Previous Logic) ---
     
-    // --- Autoplay Logic ---
+    // --- Autoplay Logic (Projects Only) ---
     useEffect(() => {
         const video = videoRef.current;
         if (!video || !autoplay || !isNative || hasError || isShowreel) return;
@@ -219,7 +233,7 @@ const VideoPlayer: React.FC<{
         return (
              <div 
                 className={`relative bg-[#050505] ${className} ${hasError ? 'border border-red-900/50 rounded-2xl' : ''}`} 
-                style={controls ? {} : { aspectRatio: cssAspectRatio }}
+                style={{ aspectRatio: cssAspectRatio }}
             >
                 {ambience && !hasError && (
                     <video
@@ -512,7 +526,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                                         controls={true}
                                         aspectRatio={selectedProject.aspectRatio}
                                         objectFit="contain"
-                                        className="w-full h-full mx-auto"
+                                        className="max-w-full max-h-full mx-auto"
                                     />
                                 </div>
                             </div>
