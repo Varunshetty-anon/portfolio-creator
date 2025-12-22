@@ -45,6 +45,9 @@ const ToolIcon = React.memo(({ name, className = "w-5 h-5" }: { name: string; cl
     return <img src={imgSrc} alt={name} className={`${className} object-contain opacity-70 group-hover:opacity-100 transition-opacity`} onError={(e) => (e.currentTarget.style.display = 'none')} />;
 });
 
+// NATIVE VIDEO PLAYER
+// Strictly configured for direct streaming from Firebase/CDN.
+// No Fetch, No AudioContext, No Custom buffering.
 const VideoPlayer: React.FC<{ 
     src: string; 
     thumbnail: string; 
@@ -54,10 +57,9 @@ const VideoPlayer: React.FC<{
     aspectRatio?: string;
     className?: string;
     onToggleMute?: () => void;
-    ambience?: boolean;
     isShowreel?: boolean;
     objectFit?: 'cover' | 'contain';
-}> = ({ src, thumbnail, autoplay = false, muted = true, controls = false, aspectRatio = '16:9', className = '', onToggleMute, ambience = false, isShowreel = false, objectFit = 'cover' }) => {
+}> = ({ src, thumbnail, autoplay = false, muted = true, controls = false, aspectRatio = '16:9', className = '', onToggleMute, isShowreel = false, objectFit = 'cover' }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const [isLoaded, setIsLoaded] = useState(false);
     const [detectedRatio, setDetectedRatio] = useState<string | null>(null);
@@ -66,7 +68,7 @@ const VideoPlayer: React.FC<{
     const normalizedSrc = useMemo(() => getDirectVideoUrl(src), [src]);
     const isNative = useMemo(() => isNativeVideo(normalizedSrc), [normalizedSrc]);
 
-    // Force failure resets
+    // Force reset on src change
     useEffect(() => {
         setHasError(false);
         setIsLoaded(false);
@@ -76,70 +78,115 @@ const VideoPlayer: React.FC<{
     const effectiveAspectRatio = detectedRatio || aspectRatio || '16:9';
     const cssAspectRatio = useMemo(() => effectiveAspectRatio.replace(':', '/'), [effectiveAspectRatio]);
     
-    // Sync Muted
+    // Sync Muted State
     useEffect(() => {
         if (videoRef.current) {
             videoRef.current.muted = muted;
         }
     }, [muted]);
 
-    // --- Showreel Autoplay Force ---
+    // Native Autoplay Handling
     useEffect(() => {
-        if (isShowreel && autoplay && videoRef.current) {
-            // Explicitly force play for Showreel
-            // We use standard DOM methods, no fancy logic.
-            // Muted must be true for autoplay to work reliably.
-            const vid = videoRef.current;
-            if (vid.paused) {
-                const playPromise = vid.play();
-                if (playPromise !== undefined) {
-                    playPromise.catch(() => {
-                        // If failed, ensure muted is set (sometimes required again) and try again or fail gracefully
-                        vid.muted = true;
-                    });
+        const vid = videoRef.current;
+        if (vid && autoplay && !hasError) {
+            // Ensure muted is set before play attempt
+            vid.muted = true; 
+            vid.playsInline = true;
+            
+            const attemptPlay = async () => {
+                try {
+                    await vid.play();
+                } catch (e) {
+                    console.warn("Autoplay blocked/failed", e);
+                    // Force mute and retry if failed (common browser policy)
+                    vid.muted = true;
                 }
+            };
+            
+            if (vid.paused) {
+                attemptPlay();
             }
         }
-    }, [isShowreel, autoplay, normalizedSrc]);
+    }, [autoplay, normalizedSrc, hasError]);
 
-    // SHOWREEL SPECIFIC LOGIC
-    if (isShowreel) {
+    const handleLoadedMetadata = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+        const { videoWidth, videoHeight } = e.currentTarget;
+        if (videoWidth && videoHeight) {
+             const r = videoWidth / videoHeight;
+             if (Math.abs(r - 9/16) < 0.1) setDetectedRatio('9:16');
+             else if (Math.abs(r - 16/9) < 0.1) setDetectedRatio('16:9');
+             else if (Math.abs(r - 4/3) < 0.1) setDetectedRatio('4:3');
+             else if (Math.abs(r - 1) < 0.1) setDetectedRatio('1:1');
+             else setDetectedRatio(`${videoWidth}/${videoHeight}`);
+        }
+        setIsLoaded(true);
+    };
+
+    // Embed Logic
+    const getEmbedSrc = () => {
+        const auto = autoplay ? 1 : 0;
+        const mute = muted ? 1 : 0;
+        const origin = typeof window !== 'undefined' ? window.location.origin : '';
+        
+        if (normalizedSrc.includes('drive.google.com')) {
+            const id = extractGoogleDriveId(normalizedSrc);
+            return id ? `https://drive.google.com/file/d/${id}/preview` : normalizedSrc;
+        }
+        if (normalizedSrc.includes('youtube.com') || normalizedSrc.includes('youtu.be')) {
+            const match = normalizedSrc.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/);
+            const ytId = match?.[2];
+            if (!ytId) return normalizedSrc;
+            return `https://www.youtube.com/embed/${ytId}?autoplay=${auto}&mute=${mute}&controls=${controls ? 1 : 0}&loop=1&playlist=${ytId}&playsinline=1&rel=0&modestbranding=1&showinfo=0&origin=${origin}`;
+        }
+        if (normalizedSrc.includes('vimeo.com')) {
+            const match = normalizedSrc.match(/vimeo\.com\/(?:channels\/(?:\w+\/)?|groups\/(?:[^\/]*)\/videos\/|album\/(?:\d+)\/video\/|video\/|)(\d+)(?:$|\/|\?)/);
+            const vId = match?.[1];
+            if (!vId) return normalizedSrc;
+            return `https://player.vimeo.com/video/${vId}?autoplay=${auto}&muted=${mute}&loop=1&background=${(!controls && muted) ? 1 : 0}&playsinline=1`;
+        }
+        return normalizedSrc;
+    };
+
+    // RENDER: Native Video (Showreel or Uploads)
+    if (isNative || isShowreel) {
         return (
-            <div className={`relative bg-[#050505] overflow-hidden rounded-2xl ${className}`} style={{ aspectRatio: cssAspectRatio }}>
+             <div 
+                className={`relative bg-[#050505] overflow-hidden rounded-2xl ${className}`}
+                style={{ aspectRatio: cssAspectRatio }}
+            >
                 <AnimatePresence>
-                    {!isLoaded && (
-                        <motion.div initial={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 1 }} className="absolute inset-0 z-10 bg-[#09090b]">
-                            {thumbnail && <img src={thumbnail} className="w-full h-full object-cover opacity-80" alt="Poster" />}
+                    {!isLoaded && !hasError && (
+                        <motion.div initial={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.5 }} className="absolute inset-0 z-10 bg-[#09090b] flex items-center justify-center">
+                            {thumbnail && <img src={thumbnail} className="absolute inset-0 w-full h-full object-cover opacity-60 blur-lg scale-110" alt="Thumbnail" />}
                         </motion.div>
                     )}
                 </AnimatePresence>
-
-                <video 
-                    ref={videoRef}
-                    src={normalizedSrc}
-                    className="w-full h-full object-cover relative z-0"
-                    loop 
-                    muted={muted}
-                    playsInline 
-                    autoPlay
-                    preload="metadata"
-                    // Important: No crossOrigin attribute to allow opaque response from Firebase/Storage
-                    onLoadedMetadata={() => setIsLoaded(true)}
-                    onError={() => setHasError(true)}
-                />
-
-                {hasError && (
-                     <div className="absolute inset-0 flex items-center justify-center bg-black z-20">
-                         {thumbnail && <img src={thumbnail} className="w-full h-full object-cover opacity-60" alt="Static Fallback" />}
-                         <div className="absolute inset-0 flex items-center justify-center">
-                             <div className="p-4 rounded-full bg-white/10 backdrop-blur-md border border-white/20">
-                                 <Play size={32} className="text-white fill-white" />
-                             </div>
-                         </div>
-                     </div>
+                
+                {!hasError && (
+                    <video 
+                        key={normalizedSrc}
+                        ref={videoRef}
+                        src={normalizedSrc}
+                        className={`w-full h-full object-${objectFit}`} 
+                        loop 
+                        autoPlay={autoplay}
+                        muted={muted}
+                        playsInline 
+                        preload="metadata"
+                        controls={controls}
+                        onLoadedMetadata={handleLoadedMetadata}
+                        onError={(e) => { 
+                            console.warn("Video Playback Error:", e);
+                            setHasError(true); 
+                        }}
+                        // CRITICAL: Do NOT add crossOrigin="anonymous". 
+                        // Firebase Storage returns opaque responses which fail CORS checks for video tags unless configured otherwise.
+                        // Playback works fine without it.
+                    />
                 )}
 
-                 {onToggleMute && !hasError && (
+                 {/* Custom Mute Toggle */}
+                 {onToggleMute && !hasError && !controls && (
                     <motion.button 
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
@@ -149,131 +196,13 @@ const VideoPlayer: React.FC<{
                         {muted ? <VolumeX size={20}/> : <Volume2 size={20}/>}
                     </motion.button>
                 )}
-            </div>
-        )
-    }
 
-    // --- STANDARD PROJECT PLAYER ---
-    
-    // --- Autoplay Logic (Native Projects Only) ---
-    useEffect(() => {
-        const video = videoRef.current;
-        if (!video || !autoplay || !isNative || hasError || isShowreel) return;
-
-        const observer = new IntersectionObserver(
-            (entries) => {
-                entries.forEach((entry) => {
-                    if (entry.isIntersecting) {
-                        video.muted = muted;
-                        const playPromise = video.play();
-                        if (playPromise !== undefined) {
-                            playPromise.catch((e) => { 
-                                 if (!video.muted) {
-                                     video.muted = true;
-                                     video.play().catch(e => {});
-                                 }
-                            });
-                        }
-                    } else {
-                        video.pause();
-                    }
-                });
-            },
-            { threshold: 0.5 }
-        );
-
-        observer.observe(video);
-        return () => observer.disconnect();
-    }, [autoplay, isNative, normalizedSrc, muted, hasError, isShowreel]);
-
-    const getEmbedSrc = () => {
-        const auto = autoplay ? 1 : 0;
-        const mute = muted ? 1 : 0;
-        const origin = typeof window !== 'undefined' ? window.location.origin : '';
-        
-        // Google Drive Embed Logic
-        if (normalizedSrc.includes('drive.google.com')) {
-            const id = extractGoogleDriveId(normalizedSrc);
-            if (id) {
-                return `https://drive.google.com/file/d/${id}/preview`;
-            }
-        }
-
-        if (normalizedSrc.includes('youtube.com') || normalizedSrc.includes('youtu.be')) {
-            const match = normalizedSrc.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/);
-            const ytId = match?.[2];
-            if (!ytId) return normalizedSrc;
-            const forceMute = (auto && muted) ? 1 : mute;
-            return `https://www.youtube.com/embed/${ytId}?autoplay=${auto}&mute=${forceMute}&controls=${controls ? 1 : 0}&loop=1&playlist=${ytId}&playsinline=1&rel=0&modestbranding=1&showinfo=0&enablejsapi=1&origin=${origin}`;
-        }
-        if (normalizedSrc.includes('vimeo.com')) {
-            const match = normalizedSrc.match(/vimeo\.com\/(?:channels\/(?:\w+\/)?|groups\/(?:[^\/]*)\/videos\/|album\/(?:\d+)\/video\/|video\/|)(\d+)(?:$|\/|\?)/);
-            const vId = match?.[1];
-            if (!vId) return normalizedSrc;
-            const isBackground = !controls && muted; 
-            return `https://player.vimeo.com/video/${vId}?autoplay=${auto}&muted=${mute}&loop=1&background=${isBackground ? 1 : 0}&playsinline=1`;
-        }
-        return normalizedSrc;
-    };
-
-    const handleLoadedMetadata = (e: React.SyntheticEvent<HTMLVideoElement>) => {
-        const { videoWidth, videoHeight } = e.currentTarget;
-        if (videoWidth && videoHeight) {
-            const r = videoWidth / videoHeight;
-            if (Math.abs(r - 9/16) < 0.1) setDetectedRatio('9:16');
-            else if (Math.abs(r - 16/9) < 0.1) setDetectedRatio('16:9');
-            else if (Math.abs(r - 4/3) < 0.1) setDetectedRatio('4:3');
-            else if (Math.abs(r - 1) < 0.1) setDetectedRatio('1:1');
-            else setDetectedRatio(`${videoWidth}/${videoHeight}`);
-        }
-        setIsLoaded(true);
-    };
-
-    if (isNative) {
-        return (
-             <div 
-                className={`relative bg-[#050505] ${className} ${hasError ? 'border border-red-900/50 rounded-2xl' : ''}`} 
-                style={{ aspectRatio: cssAspectRatio }}
-            >
-                <AnimatePresence>
-                    {!isLoaded && !hasError && (
-                        <motion.div initial={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.8 }} className="absolute inset-0 z-10 bg-[#09090b] flex items-center justify-center rounded-2xl overflow-hidden">
-                            {thumbnail && <img src={thumbnail} className="absolute inset-0 w-full h-full object-cover opacity-60 blur-lg scale-110" alt="Thumbnail" />}
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-                {!hasError && (
-                    <video 
-                        key={normalizedSrc}
-                        ref={videoRef}
-                        src={normalizedSrc}
-                        className={`relative w-full h-full object-${objectFit} z-10 rounded-2xl bg-black`} 
-                        loop 
-                        autoPlay={autoplay}
-                        muted={muted}
-                        playsInline 
-                        preload="metadata"
-                        controls={controls}
-                        // Important: No crossOrigin for standard playback
-                        onLoadedMetadata={handleLoadedMetadata}
-                        onError={() => { setHasError(true); setIsLoaded(true); }}
-                    />
-                )}
-                 {onToggleMute && !hasError && !controls && (
-                    <motion.button 
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
-                        onClick={(e) => { e.stopPropagation(); onToggleMute(); }}
-                        className="absolute bottom-4 right-4 z-20 p-3 rounded-full bg-black/40 backdrop-blur-md text-white hover:bg-white hover:text-black transition-all border border-white/10"
-                    >
-                        {muted ? <VolumeX size={18}/> : <Volume2 size={18}/>}
-                    </motion.button>
-                )}
                 {hasError && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center z-20 bg-zinc-900 rounded-2xl overflow-hidden" style={{ aspectRatio: cssAspectRatio }}>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center z-20 bg-zinc-900">
                         {thumbnail && <img src={thumbnail} className="absolute inset-0 w-full h-full object-cover opacity-20 grayscale" alt="Fallback" />}
                         <div className="relative z-10 bg-black/80 p-4 rounded-xl backdrop-blur-sm border border-zinc-700/30 flex flex-col items-center gap-2">
-                             <span className="text-zinc-400 font-bold text-[10px] tracking-widest uppercase text-center leading-relaxed">Video unavailable.<br/>Please check link access.</span>
+                             <AlertTriangle size={24} className="text-zinc-500"/>
+                             <span className="text-zinc-400 font-bold text-[10px] tracking-widest uppercase text-center">Video unavailable</span>
                         </div>
                     </div>
                 )}
@@ -281,6 +210,7 @@ const VideoPlayer: React.FC<{
         )
     }
 
+    // RENDER: iFrame Embeds
     return (
         <div 
             className={`relative bg-[#050505] overflow-hidden rounded-2xl ${className}`} 
@@ -288,10 +218,7 @@ const VideoPlayer: React.FC<{
         >
             <AnimatePresence>
                 {!isLoaded && (
-                    <motion.div 
-                        initial={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.8 }}
-                        className="absolute inset-0 z-10 bg-[#09090b] flex items-center justify-center"
-                    >
+                    <motion.div initial={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.5 }} className="absolute inset-0 z-10 bg-[#09090b] flex items-center justify-center">
                         {thumbnail && <img src={thumbnail} className="absolute inset-0 w-full h-full object-cover opacity-60 blur-lg scale-110" alt="Thumbnail" />}
                     </motion.div>
                 )}
@@ -322,12 +249,12 @@ const VideoPlayer: React.FC<{
     );
 };
 
-// --- Animations ---
+// --- Animations & Other Components ---
 
 const IntroOverlay: React.FC<{ data: PortfolioData; onComplete: () => void; isImageLoaded: boolean }> = ({ data, onComplete, isImageLoaded }) => {
     useEffect(() => {
         if (isImageLoaded) {
-            const timer = setTimeout(onComplete, 3500); // Extended duration for impact
+            const timer = setTimeout(onComplete, 3500); 
             return () => clearTimeout(timer);
         }
     }, [onComplete, isImageLoaded]);
@@ -376,18 +303,14 @@ const IntroOverlay: React.FC<{ data: PortfolioData; onComplete: () => void; isIm
             exit="exit"
             className="fixed inset-0 z-[100] bg-[#050505] flex flex-col items-center justify-center p-6 overflow-hidden perspective-[1000px]"
         >
-            {/* Cinematic Gradient Background */}
             <div className="absolute inset-0 bg-gradient-to-tr from-indigo-900/10 via-transparent to-zinc-900/10 opacity-50" />
-            
             <div className="relative z-10 flex flex-col items-center gap-8">
                 <motion.div variants={textVariants} className="relative">
                      <h1 className="text-7xl md:text-9xl font-display font-black uppercase text-transparent bg-clip-text bg-gradient-to-b from-white via-white to-zinc-600 tracking-tighter leading-none select-none">
                         {data.name || "VARU"}
                     </h1>
                 </motion.div>
-                
                 <motion.div variants={lineVariants} className="h-[2px] bg-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.8)]" />
-                
                 <motion.div variants={textVariants} className="flex flex-col items-center gap-4">
                      <span className="text-lg md:text-2xl font-medium text-zinc-400 tracking-[0.3em] uppercase mix-blend-plus-lighter">
                         {data.role || 'Portfolio'}
@@ -450,7 +373,6 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
     const [isShowreelMuted, setIsShowreelMuted] = useState(true);
     
     useEffect(() => {
-        // Preload Image logic, but also fallback quickly if no image exists
         if (safeData.profileImage) {
             const img = new Image();
             img.src = safeData.profileImage;
@@ -645,7 +567,6 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                                     autoplay={true} 
                                     muted={isShowreelMuted}
                                     onToggleMute={() => setIsShowreelMuted(!isShowreelMuted)}
-                                    ambience={false}
                                     isShowreel={true}
                                     className="w-full h-full scale-[1.01] group-hover:scale-100 transition-transform duration-1000"
                                 />

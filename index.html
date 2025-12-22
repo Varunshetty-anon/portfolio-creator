@@ -10,33 +10,22 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script>
-      // NUCLEAR SERVICE WORKER KILLER
+      // CONDITIONAL SERVICE WORKER MANAGEMENT
+      // Only purge Service Workers if we are on a public portfolio route to ensure playback stability.
       (function() {
-        if ('serviceWorker' in navigator) {
-          navigator.serviceWorker.getRegistrations().then(function(registrations) {
-            if (registrations.length === 0) return;
-            
-            // Unregister all
-            for(let registration of registrations) {
-              registration.unregister();
-            }
-
-            // Reload protection: prevent infinite reload loops
-            // We allow one reload per session to clear the controller.
-            const hasReloaded = sessionStorage.getItem('sw_reloaded');
-            if (!hasReloaded && navigator.serviceWorker.controller) {
-               console.log('[Frames] Zombie Service Worker detected. Reloading to purge...');
-               sessionStorage.setItem('sw_reloaded', 'true');
-               window.location.reload();
-            }
-          });
-        }
+        const isPublicRoute = window.location.pathname.includes('/v/') || window.location.hash.includes('/v/');
         
-        // Clear Caches
-        if ('caches' in window) {
-          caches.keys().then(function(names) {
-            for (let name of names) {
-              caches.delete(name);
+        if (isPublicRoute && 'serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function(registrations) {
+            if (registrations.length > 0) {
+                console.log('[Frames] Public Route detected. Unregistering all Service Workers...');
+                for(let registration of registrations) {
+                  registration.unregister();
+                }
+                // Reload to ensure a clean slate if a controller was active
+                if (navigator.serviceWorker.controller) {
+                    window.location.reload();
+                }
             }
           });
         }
@@ -109,7 +98,7 @@
 </head>
   <body>
     <div id="root"></div>
-    <!-- Added query param v=4 to force cache invalidation -->
-    <script type="module" src="/index.tsx?v=4"></script>
+    <!-- Added query param v=5 to force cache invalidation -->
+    <script type="module" src="/index.tsx?v=5"></script>
   </body>
 </html>
