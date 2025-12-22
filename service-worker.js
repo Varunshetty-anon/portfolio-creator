@@ -2,20 +2,18 @@
 // This script replaces any existing service worker to fix media playback and CORS issues.
 
 self.addEventListener('install', (event) => {
+  // Force this new SW to become active immediately
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-  // Immediately unregister to relinquish control
-  self.registration.unregister()
-    .then(() => self.clients.matchAll())
-    .then((clients) => {
-      clients.forEach(client => {
-        // Notify clients or reload if strictly necessary, 
-        // but for now we just want to stop interfering.
-        console.log('[Frames] Service Worker self-destructed. Page should work on next load.');
-      });
-    });
+  // Take control of all clients immediately
+  event.waitUntil(
+    self.clients.claim().then(() => {
+        // Then immediately unregister to ensure no SW is controlling the page in the future
+        return self.registration.unregister();
+    })
+  );
 });
 
 self.addEventListener('fetch', (event) => {

@@ -346,7 +346,7 @@ const VideoPlayer: React.FC<{
 const IntroOverlay: React.FC<{ data: PortfolioData; onComplete: () => void; isImageLoaded: boolean }> = ({ data, onComplete, isImageLoaded }) => {
     useEffect(() => {
         if (isImageLoaded) {
-            const timer = setTimeout(onComplete, 2600); 
+            const timer = setTimeout(onComplete, 3500); // Extended duration for impact
             return () => clearTimeout(timer);
         }
     }, [onComplete, isImageLoaded]);
@@ -355,23 +355,35 @@ const IntroOverlay: React.FC<{ data: PortfolioData; onComplete: () => void; isIm
         hidden: { opacity: 0 },
         visible: { 
             opacity: 1,
-            transition: { staggerChildren: 0.15, delayChildren: 0.2 }
+            transition: { 
+                when: "beforeChildren",
+                staggerChildren: 0.3 
+            }
         },
         exit: { 
             opacity: 0, 
-            y: -20, 
-            filter: 'blur(10px)',
-            transition: { duration: 0.8, ease: [0.6, 0.05, 0.01, 0.9] as [number, number, number, number] } 
+            scale: 1.05,
+            filter: 'blur(20px)',
+            transition: { duration: 1.2, ease: [0.6, 0.05, 0.01, 0.9] as [number, number, number, number] } 
         }
     };
 
-    const itemVariants: Variants = {
-        hidden: { y: 30, opacity: 0, scale: 0.95 },
+    const textVariants: Variants = {
+        hidden: { y: 100, opacity: 0, rotateX: 20 },
         visible: { 
             y: 0, 
             opacity: 1, 
-            scale: 1,
-            transition: { duration: 1.2, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] } 
+            rotateX: 0,
+            transition: { duration: 1.4, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] } 
+        }
+    };
+
+    const lineVariants: Variants = {
+        hidden: { width: 0, opacity: 0 },
+        visible: { 
+            width: 120, 
+            opacity: 1,
+            transition: { duration: 1.2, delay: 0.5, ease: "easeInOut" } 
         }
     };
 
@@ -381,22 +393,23 @@ const IntroOverlay: React.FC<{ data: PortfolioData; onComplete: () => void; isIm
             initial="hidden"
             animate={isImageLoaded ? "visible" : "hidden"}
             exit="exit"
-            className="fixed inset-0 z-[100] bg-[#050505] flex flex-col items-center justify-center p-6"
+            className="fixed inset-0 z-[100] bg-[#050505] flex flex-col items-center justify-center p-6 overflow-hidden perspective-[1000px]"
         >
-            <motion.div variants={itemVariants} className="mb-8">
-                <div className="w-32 h-32 md:w-40 md:h-40 rounded-full overflow-hidden border border-zinc-800 shadow-2xl">
-                   {isImageLoaded && <img src={data.profileImage} className="w-full h-full object-cover" alt={data.name} />}
-                </div>
-            </motion.div>
+            {/* Cinematic Gradient Background */}
+            <div className="absolute inset-0 bg-gradient-to-tr from-indigo-900/10 via-transparent to-zinc-900/10 opacity-50" />
             
-            <div className="text-center space-y-3">
-                <motion.h1 variants={itemVariants} className="text-4xl md:text-6xl font-display font-black uppercase text-white tracking-tight">
-                    {data.name}
-                </motion.h1>
-                <motion.div variants={itemVariants} className="flex flex-col items-center gap-4">
-                     <div className="h-px w-12 bg-zinc-700" />
-                     <span className="text-lg md:text-xl font-medium text-zinc-400 tracking-wide uppercase">
-                        {data.role || 'Video Editor'}
+            <div className="relative z-10 flex flex-col items-center gap-8">
+                <motion.div variants={textVariants} className="relative">
+                     <h1 className="text-7xl md:text-9xl font-display font-black uppercase text-transparent bg-clip-text bg-gradient-to-b from-white via-white to-zinc-600 tracking-tighter leading-none select-none">
+                        {data.name || "VARU"}
+                    </h1>
+                </motion.div>
+                
+                <motion.div variants={lineVariants} className="h-[2px] bg-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.8)]" />
+                
+                <motion.div variants={textVariants} className="flex flex-col items-center gap-4">
+                     <span className="text-lg md:text-2xl font-medium text-zinc-400 tracking-[0.3em] uppercase mix-blend-plus-lighter">
+                        {data.role || 'Portfolio'}
                      </span>
                 </motion.div>
             </div>
@@ -456,6 +469,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
     const [isShowreelMuted, setIsShowreelMuted] = useState(true);
     
     useEffect(() => {
+        // Preload Image logic, but also fallback quickly if no image exists
         if (safeData.profileImage) {
             const img = new Image();
             img.src = safeData.profileImage;
@@ -586,7 +600,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
 
                         <div className="space-y-4">
                             <h1 className="text-6xl lg:text-8xl font-display font-black text-white tracking-tighter leading-[0.85] uppercase">
-                                {safeData.name}
+                                {safeData.name || "VARU"}
                             </h1>
                             <p className="text-xl font-medium text-zinc-500">{safeData.role}</p>
                             <div className="flex flex-wrap gap-4 text-xs font-bold text-zinc-600 uppercase tracking-widest pt-2">

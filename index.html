@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https: blob:; style-src 'self' 'unsafe-inline' https:; img-src 'self' https: data: blob:; font-src 'self' https: data:; media-src 'self' https: blob:; connect-src 'self' https: wss:; frame-src 'self' https://drive.google.com https://www.youtube.com https://player.vimeo.com; object-src 'none'; base-uri 'self'; form-action 'self';">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https: blob: data:; style-src 'self' 'unsafe-inline' https:; img-src 'self' https: data: blob:; font-src 'self' https: data:; media-src 'self' https: blob:; connect-src 'self' https: wss:; frame-src 'self' https://drive.google.com https://www.youtube.com https://player.vimeo.com; object-src 'none'; base-uri 'self'; form-action 'self';">
     <base href="/" />
     <title>Frames Studio - Premium Portfolio</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
@@ -11,13 +11,21 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script>
       // CRITICAL: Aggressive Service Worker & Cache Cleanup
-      // This fixes NS_ERROR_CORRUPTED_CONTENT by removing old SWs and clearing stale caches.
+      // This fixes loading errors by ensuring no stale SW intercepts the request.
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.getRegistrations().then(function(registrations) {
-          for(let registration of registrations) {
-            registration.unregister().then(function(success) {
-               if (success) console.log('Service Worker successfully unregistered.');
-            });
+          if (registrations.length > 0) {
+            let count = 0;
+            for(let registration of registrations) {
+              registration.unregister().then(function() {
+                 count++;
+                 if (count === registrations.length && navigator.serviceWorker.controller) {
+                    // If we had an active controller, reload the page to get a clean network request
+                    console.log('Reloading to clear Service Worker control...');
+                    window.location.reload();
+                 }
+              });
+            }
           }
         }).catch(function(err) {
           console.error('Service Worker unregistration failed:', err);
@@ -102,6 +110,6 @@
 </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/index.tsx?v=2"></script>
+    <script type="module" src="/index.tsx?v=3"></script>
   </body>
 </html>

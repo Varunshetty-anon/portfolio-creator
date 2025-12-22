@@ -1,4 +1,5 @@
 
+
 export interface Album {
   id: string;
   title: string;
@@ -105,7 +106,7 @@ export interface PortfolioData extends PortfolioContent {
 
 export const INITIAL_CONTENT: PortfolioContent = {
   username: "", // slug
-  name: "", 
+  name: "VARU", // Default name as requested
   role: "",
   location: "Remote",
   languages: "English",
