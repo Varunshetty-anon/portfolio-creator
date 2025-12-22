@@ -10,8 +10,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script>
-      // CRITICAL: Aggressive Service Worker Unregistration
-      // This runs before anything else to ensure no SW intercepts requests.
+      // CRITICAL: Aggressive Service Worker & Cache Cleanup
+      // This fixes NS_ERROR_CORRUPTED_CONTENT by removing old SWs and clearing stale caches.
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.getRegistrations().then(function(registrations) {
           for(let registration of registrations) {
@@ -23,8 +23,16 @@
           console.error('Service Worker unregistration failed:', err);
         });
       }
+      
+      if ('caches' in window) {
+        caches.keys().then(function(names) {
+          for (let name of names) {
+            caches.delete(name);
+          }
+        });
+      }
 
-      // Error suppression
+      // Error suppression for non-critical extension errors
       window.addEventListener('error', function(e) {
         if (e.message && (e.message.includes('rangeCount') || e.message.includes('selection') || e.message.includes('contextmenuhlpr') || e.message.includes('Script error'))) {
           e.preventDefault();
