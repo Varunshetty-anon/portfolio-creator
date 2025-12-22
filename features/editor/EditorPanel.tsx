@@ -6,7 +6,7 @@ import { Input, TextArea } from '../../components/ui/Input';
 import { Button } from '../../components/ui/Button';
 import { ToolSelector } from '../../components/ToolSelector';
 import { ImageCropper } from '../../components/ImageCropper';
-import { Plus, Trash2, Video, Upload, ChevronDown, Loader2, CheckCircle2, AlertTriangle, Eye, Settings, LogOut, Wrench, LayoutDashboard, User, X, Link, Youtube, HardDrive, Database, Globe, ExternalLink, QrCode, Download, Copy, Link2, Check, Play, GripVertical, FolderPlus, Folder, FileVideo, Instagram, Twitter, Linkedin } from 'lucide-react';
+import { Plus, Trash2, Video, Upload, ChevronDown, Loader2, CheckCircle2, AlertTriangle, Eye, Settings, LogOut, Wrench, LayoutDashboard, User, X, Link, Youtube, HardDrive, Database, Globe, ExternalLink, QrCode, Download, Copy, Link2, Check, Play, GripVertical, FolderPlus, Folder, FileVideo, Instagram, Twitter, Linkedin, MonitorPlay } from 'lucide-react';
 import { uploadFileToStorage, getVideoMetadata, getPortfolioStats, PROJECT_CONTENT_TYPES, EDITING_TOOLS_LIST, downloadQrCode, generateThumbnailFromVideo, getDirectVideoUrl } from '../../lib/utils';
 
 interface EditorPanelProps {
@@ -198,6 +198,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
     const [activeTab, setActiveTab] = useState<'profile' | 'projects' | 'design'>('profile');
     const [stats, setStats] = useState({ views: 0, clicks: 0 });
     const [isUploadingShowreel, setIsUploadingShowreel] = useState(false);
+    const [linkCopied, setLinkCopied] = useState(false);
     
     // Image Cropper State
     const [cropperState, setCropperState] = useState<{ isOpen: boolean; img: string | null }>({ isOpen: false, img: null });
@@ -268,6 +269,13 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
         } finally {
             setIsUploadingShowreel(false);
         }
+    };
+
+    const handleCopyLink = () => {
+        const url = `${window.location.origin}/v/${data.settings?.username}`;
+        navigator.clipboard.writeText(url);
+        setLinkCopied(true);
+        setTimeout(() => setLinkCopied(false), 2000);
     };
 
     // --- Project Handlers ---
@@ -350,7 +358,7 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
                     </div>
                     {onPreview && (
                         <button onClick={onPreview} className="w-full flex items-center justify-center lg:justify-start gap-3 p-3 text-zinc-500 hover:text-white transition-colors rounded-lg hover:bg-zinc-900/50">
-                            <ExternalLink size={18} />
+                            <MonitorPlay size={18} />
                             <span className="hidden lg:block text-sm">Preview</span>
                         </button>
                     )}
@@ -373,6 +381,30 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
                         <div className="hidden md:flex items-center gap-2 mr-4 text-xs text-zinc-500">
                              <span className={isSaving ? "opacity-100" : "opacity-0 transition-opacity"}>{isSaving ? "Saving..." : "Saved"}</span>
                         </div>
+                        
+                        {/* Live Link Controls */}
+                        {data.meta?.publish?.isPublished && (
+                            <div className="hidden md:flex items-center gap-1 mr-2 px-2 py-1 bg-zinc-900 rounded-lg border border-zinc-800">
+                                <a 
+                                    href={`/v/${data.settings?.username}`} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-zinc-300 hover:text-white hover:bg-zinc-800 rounded-md transition-colors"
+                                >
+                                    <ExternalLink size={12} />
+                                    Open
+                                </a>
+                                <div className="w-px h-4 bg-zinc-800"></div>
+                                <button 
+                                    onClick={handleCopyLink}
+                                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-zinc-300 hover:text-white hover:bg-zinc-800 rounded-md transition-colors"
+                                >
+                                    {linkCopied ? <Check size={12} className="text-green-500"/> : <Link2 size={12} />}
+                                    {linkCopied ? 'Copied' : 'Copy'}
+                                </button>
+                            </div>
+                        )}
+
                         <Button size="sm" variant="secondary" onClick={() => onSave()}>Save Draft</Button>
                         <PublishButton onPublish={onPublish} />
                     </div>

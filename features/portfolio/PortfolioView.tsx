@@ -135,7 +135,6 @@ const VideoPlayer: React.FC<{
                     preload="auto"
                     onLoadedMetadata={() => setIsLoaded(true)}
                     onError={() => setHasError(true)}
-                    // Removed crossOrigin="anonymous" to fix CORS issues with opaque resources
                 />
 
                 {hasError && (
@@ -324,6 +323,7 @@ const VideoPlayer: React.FC<{
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                 referrerPolicy="strict-origin-when-cross-origin"
                 allowFullScreen 
+                loading="lazy"
                 onLoad={() => setIsLoaded(true)} 
             />
 
@@ -568,7 +568,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                     bg-[#050505] border-b lg:border-b-0 lg:border-r border-zinc-900 
                     p-8 md:p-12 xl:p-16 
                     flex flex-col lg:justify-between gap-12 lg:gap-8
-                    z-20
+                    z-50 lg:z-20
                 ">
                     <div className="space-y-10 lg:space-y-12">
                         <div className="relative inline-block">
@@ -609,7 +609,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                             {safeData.bio}
                         </p>
 
-                        <div className="flex flex-wrap gap-3 pb-2">
+                        <div className="flex flex-wrap gap-3 pb-2 relative z-50">
                             {safeData.socials && Object.entries(safeData.socials).map(([key, val]) => {
                                 if (!val) return null;
                                 const Icon = { instagram: Instagram, twitter: Twitter, youtube: Youtube, linkedin: Linkedin, email: Mail, discord: Globe }[key.toLowerCase()] || Globe;
@@ -744,7 +744,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                              </div>
                         </section>
                         
-                        <div className="lg:hidden mt-20 pt-8 border-t border-zinc-900">
+                        <div className="lg:hidden mt-20 pt-8 border-t border-zinc-900 pb-12">
                             <h2 className="text-2xl font-display font-bold text-white mb-2">Let's Create.</h2>
                             <a href={`mailto:${safeData.contactEmail}`} className="text-lg text-zinc-500">{safeData.contactEmail}</a>
                         </div>
