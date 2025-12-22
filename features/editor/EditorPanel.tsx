@@ -185,7 +185,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
 }) => {
     const [activeTab, setActiveTab] = useState<'profile' | 'projects' | 'design'>('profile');
     const [stats, setStats] = useState({ views: 0, clicks: 0 });
-    const [isUploadingShowreel, setIsUploadingShowreel] = useState(false);
     const [linkCopied, setLinkCopied] = useState(false);
     const [cropperState, setCropperState] = useState<{ isOpen: boolean; img: string | null }>({ isOpen: false, img: null });
 
@@ -210,41 +209,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
             setCropperState({ isOpen: false, img: null });
         } catch (e) {
             console.error("Upload failed", e);
-        }
-    };
-
-    const handleShowreelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        if (file.type !== 'video/mp4') {
-            alert("Only .mp4 files (H.264 + AAC) are accepted for showreels.");
-            return;
-        }
-
-        setIsUploadingShowreel(true);
-        try {
-            const path = `users/${data.uid}/showreel/showreel.mp4`;
-            const url = await uploadFileToStorage(file, path);
-            
-            let thumbUrl = data.showreelThumbnail;
-            try {
-                const { blob } = await generateThumbnailFromVideo(file);
-                const tPath = `users/${data.uid}/showreel/thumbnail.jpg`;
-                thumbUrl = await uploadFileToStorage(new File([blob], 'thumbnail.jpg', { type: 'image/jpeg' }), tPath);
-            } catch (err) {
-                console.warn("Thumbnail generation failed, using existing or placeholder", err);
-            }
-
-            onChange({
-                ...data,
-                showreelLink: url,
-                showreelThumbnail: thumbUrl
-            });
-        } catch (error) {
-            console.error("Upload failed", error);
-            alert("Upload failed. Please try again.");
-        } finally {
-            setIsUploadingShowreel(false);
         }
     };
 
@@ -441,50 +405,6 @@ export const EditorPanel: React.FC<EditorPanelProps> = ({
                                     </div>
                                 </section>
                                 
-                                <div className="h-px bg-zinc-900 w-full" />
-
-                                <section className="space-y-6">
-                                    <div className="flex items-center justify-between">
-                                        <h3 className="text-xl font-display font-bold text-white">Showreel</h3>
-                                    </div>
-                                    
-                                    <div className="bg-zinc-900/50 border border-zinc-800 rounded-2xl p-6">
-                                        <div className="aspect-video bg-black rounded-xl overflow-hidden relative group border border-zinc-800 mb-6">
-                                            {data.showreelLink ? (
-                                                 <video 
-                                                    src={data.showreelLink} 
-                                                    className="w-full h-full object-cover" 
-                                                    muted 
-                                                    loop 
-                                                    playsInline
-                                                    autoPlay
-                                                 />
-                                            ) : (
-                                                <div className="absolute inset-0 flex items-center justify-center text-zinc-600">
-                                                    <span className="text-sm font-medium">No Showreel Uploaded</span>
-                                                </div>
-                                            )}
-                                            
-                                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-3 backdrop-blur-sm">
-                                                 <label className="cursor-pointer flex flex-col items-center group/btn">
-                                                    <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mb-3 shadow-lg group-hover/btn:scale-110 transition-transform">
-                                                        {isUploadingShowreel ? <Loader2 className="animate-spin text-black" size={24}/> : <Upload className="text-black" size={24}/>}
-                                                    </div>
-                                                    <span className="text-white font-bold text-sm tracking-wide">Upload New Showreel</span>
-                                                    <span className="text-zinc-400 text-xs mt-1">MP4 Only • H.264 • Max 100MB</span>
-                                                    <input 
-                                                        type="file" 
-                                                        accept="video/mp4" 
-                                                        className="hidden" 
-                                                        onChange={handleShowreelUpload}
-                                                        disabled={isUploadingShowreel}
-                                                    />
-                                                 </label>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </section>
-
                                 <div className="h-px bg-zinc-900 w-full" />
 
                                 <section className="space-y-6">

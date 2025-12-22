@@ -46,8 +46,6 @@ const ToolIcon = React.memo(({ name, className = "w-5 h-5" }: { name: string; cl
 });
 
 // NATIVE VIDEO PLAYER
-// Strictly configured for direct streaming from Firebase/CDN.
-// No Fetch, No AudioContext, No Custom buffering.
 const VideoPlayer: React.FC<{ 
     src: string; 
     thumbnail: string; 
@@ -147,7 +145,7 @@ const VideoPlayer: React.FC<{
         return normalizedSrc;
     };
 
-    // RENDER: Native Video (Showreel or Uploads)
+    // RENDER: Native Video (Uploaded Project)
     if (isNative || isShowreel) {
         return (
              <div 
@@ -179,9 +177,6 @@ const VideoPlayer: React.FC<{
                             console.warn("Video Playback Error:", e);
                             setHasError(true); 
                         }}
-                        // CRITICAL: Do NOT add crossOrigin="anonymous". 
-                        // Firebase Storage returns opaque responses which fail CORS checks for video tags unless configured otherwise.
-                        // Playback works fine without it.
                     />
                 )}
 
@@ -370,7 +365,6 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
     const [introComplete, setIntroComplete] = useState(false);
     const [isImageLoaded, setIsImageLoaded] = useState(false);
     const [selectedProject, setSelectedProject] = useState<Project | null>(null);
-    const [isShowreelMuted, setIsShowreelMuted] = useState(true);
     
     useEffect(() => {
         if (safeData.profileImage) {
@@ -554,25 +548,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
 
                 <main className="w-full lg:ml-[35%] xl:ml-[32%] lg:w-auto relative z-10 bg-[#050505]">
                     
-                    {safeData.showreelLink && (
-                        <section className="p-6 md:p-12 xl:p-16 border-b border-zinc-900/50">
-                            <div className="flex items-center gap-3 mb-6 max-w-2xl mx-auto">
-                                <h2 className="text-3xl font-display font-bold text-white tracking-tight">Showreel</h2>
-                            </div>
-                            
-                            <div className="max-w-2xl mx-auto w-full aspect-video md:aspect-[2.35/1] relative group overflow-visible">
-                                <VideoPlayer 
-                                    src={safeData.showreelLink} 
-                                    thumbnail={safeData.showreelThumbnail} 
-                                    autoplay={true} 
-                                    muted={isShowreelMuted}
-                                    onToggleMute={() => setIsShowreelMuted(!isShowreelMuted)}
-                                    isShowreel={true}
-                                    className="w-full h-full scale-[1.01] group-hover:scale-100 transition-transform duration-1000"
-                                />
-                            </div>
-                        </section>
-                    )}
+                    {/* SHOWREEL SECTION REMOVED */}
 
                     <div className="p-5 md:p-10 xl:p-14 pb-24">
                         {categorizedProjects.length > 0 && categorizedProjects.map((section, idx) => (
