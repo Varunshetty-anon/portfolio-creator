@@ -59,7 +59,6 @@ const VideoPlayer: React.FC<{
     objectFit?: 'cover' | 'contain';
 }> = ({ src, thumbnail, autoplay = false, muted = true, controls = false, aspectRatio = '16:9', className = '', onToggleMute, ambience = false, isShowreel = false, objectFit = 'cover' }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
-    const ambienceRef = useRef<HTMLVideoElement>(null);
     const [isLoaded, setIsLoaded] = useState(false);
     const [detectedRatio, setDetectedRatio] = useState<string | null>(null);
     const [hasError, setHasError] = useState(false);
@@ -81,46 +80,32 @@ const VideoPlayer: React.FC<{
     useEffect(() => {
         if (videoRef.current) {
             videoRef.current.muted = muted;
-            videoRef.current.defaultMuted = muted;
         }
     }, [muted]);
 
     // --- Showreel Autoplay Force ---
     useEffect(() => {
         if (isShowreel && autoplay && videoRef.current) {
-            // Explicitly force play for Showreel to avoid race conditions
-            videoRef.current.muted = true;
-            videoRef.current.defaultMuted = true;
-            
-            const playPromise = videoRef.current.play();
-            if (playPromise !== undefined) {
-                playPromise.catch((e) => {
-                    console.warn("Autoplay block (recovered):", e);
-                    // Ensure mute is forced if autoplay failed due to audio
-                    if (videoRef.current) {
-                        videoRef.current.muted = true;
-                    }
-                });
+            // Explicitly force play for Showreel
+            // We use standard DOM methods, no fancy logic.
+            // Muted must be true for autoplay to work reliably.
+            const vid = videoRef.current;
+            if (vid.paused) {
+                const playPromise = vid.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(() => {
+                        // If failed, ensure muted is set (sometimes required again) and try again or fail gracefully
+                        vid.muted = true;
+                    });
+                }
             }
         }
     }, [isShowreel, autoplay, normalizedSrc]);
 
-    // SHOWREEL SPECIFIC LOGIC (NATIVE ONLY)
+    // SHOWREEL SPECIFIC LOGIC
     if (isShowreel) {
         return (
             <div className={`relative bg-[#050505] overflow-hidden rounded-2xl ${className}`} style={{ aspectRatio: cssAspectRatio }}>
-                {ambience && !hasError && (
-                    <video
-                        ref={ambienceRef}
-                        src={normalizedSrc}
-                        className="absolute inset-0 w-full h-full object-cover blur-[60px] opacity-50 scale-110 pointer-events-none -z-10"
-                        muted
-                        loop
-                        playsInline
-                        preload="metadata"
-                    />
-                )}
-
                 <AnimatePresence>
                     {!isLoaded && (
                         <motion.div initial={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 1 }} className="absolute inset-0 z-10 bg-[#09090b]">
@@ -134,10 +119,11 @@ const VideoPlayer: React.FC<{
                     src={normalizedSrc}
                     className="w-full h-full object-cover relative z-0"
                     loop 
-                    muted={true}
+                    muted={muted}
                     playsInline 
-                    autoPlay={true}
+                    autoPlay
                     preload="metadata"
+                    // Important: No crossOrigin attribute to allow opaque response from Firebase/Storage
                     onLoadedMetadata={() => setIsLoaded(true)}
                     onError={() => setHasError(true)}
                 />
@@ -249,17 +235,6 @@ const VideoPlayer: React.FC<{
                 className={`relative bg-[#050505] ${className} ${hasError ? 'border border-red-900/50 rounded-2xl' : ''}`} 
                 style={{ aspectRatio: cssAspectRatio }}
             >
-                {ambience && !hasError && (
-                    <video
-                        ref={ambienceRef}
-                        src={normalizedSrc}
-                        className="absolute inset-0 w-full h-full object-cover blur-[50px] opacity-60 scale-110 pointer-events-none transition-opacity duration-1000 -z-10"
-                        muted
-                        loop
-                        playsInline
-                        preload="metadata"
-                    />
-                )}
                 <AnimatePresence>
                     {!isLoaded && !hasError && (
                         <motion.div initial={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.8 }} className="absolute inset-0 z-10 bg-[#09090b] flex items-center justify-center rounded-2xl overflow-hidden">
@@ -279,6 +254,7 @@ const VideoPlayer: React.FC<{
                         playsInline 
                         preload="metadata"
                         controls={controls}
+                        // Important: No crossOrigin for standard playback
                         onLoadedMetadata={handleLoadedMetadata}
                         onError={() => { setHasError(true); setIsLoaded(true); }}
                     />
@@ -669,7 +645,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({ data, isPreview = 
                                     autoplay={true} 
                                     muted={isShowreelMuted}
                                     onToggleMute={() => setIsShowreelMuted(!isShowreelMuted)}
-                                    ambience={true}
+                                    ambience={false}
                                     isShowreel={true}
                                     className="w-full h-full scale-[1.01] group-hover:scale-100 transition-transform duration-1000"
                                 />
