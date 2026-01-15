@@ -2,7 +2,6 @@ import { PortfolioData, PortfolioContent, UserProfile, PortfolioMeta, INITIAL_DA
 import { db, auth, googleProvider, isConfigured } from './firebase';
 import { doc, getDoc, setDoc, collection, query, where, getDocs, deleteDoc, addDoc, serverTimestamp, increment, writeBatch, getDocsFromServer, getDocFromServer, DocumentSnapshot, onSnapshot } from 'firebase/firestore';
 import { signInWithPopup, signInWithRedirect, signInWithEmailAndPassword, createUserWithEmailAndPassword, User, deleteUser, setPersistence, browserLocalPersistence, inMemoryPersistence } from 'firebase/auth';
-import { GoogleGenAI } from "@google/genai";
 
 const USERS_COL = 'users';
 const PORTFOLIOS_COL = 'portfolios';
@@ -580,41 +579,15 @@ export const getCroppedImg = (imageSrc: string, pixelCrop: any): Promise<Blob> =
 };
 
 export const generateAiBio = async (currentBio: string, role: string, skills: string[]): Promise<string> => {
-  try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `Rewrite this video editor bio to be high-end and professional. Role: ${role}. Skills: ${skills.join(', ')}. Bio: "${currentBio}". Max 3 sentences.`,
-    });
-    return response.text?.trim() || currentBio;
-  } catch (e) { return currentBio; }
+  return currentBio;
 };
 
 export const generateAiDescription = async (title: string, category: string, currentDesc: string): Promise<string> => {
-  try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `Rewrite this project description to be punchy for a portfolio. Title: ${title}. Category: ${category}. Draft: "${currentDesc}". Max 2 sentences.`,
-    });
-    return response.text?.trim() || currentDesc;
-  } catch (e) { return currentDesc; }
+  return currentDesc;
 };
 
 export const generateAiThumbnail = async (title: string, category: string): Promise<string> => {
-  try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
-      contents: { parts: [{ text: `Cinematic professional video project thumbnail for "${title}" in category "${category}". High contrast, dramatic lighting, 4k.` }] }
-    });
-    for (const cand of response.candidates || []) {
-      for (const part of cand.content.parts) {
-        if (part.inlineData) return `data:image/png;base64,${part.inlineData.data}`;
-      }
-    }
-    return '';
-  } catch (e) { return ''; }
+  return '';
 };
 
 export const checkUsernameAvailable = async (username: string): Promise<boolean> => {
