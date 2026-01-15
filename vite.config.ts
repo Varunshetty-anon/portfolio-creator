@@ -8,8 +8,6 @@ export default defineConfig({
     sourcemap: true
   },
   server: {
-    // @ts-ignore
-    historyApiFallback: true,
     host: true
   }
 });
