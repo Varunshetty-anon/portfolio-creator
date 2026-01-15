@@ -1,7 +1,6 @@
 import { PortfolioData, PortfolioContent, UserProfile, PortfolioMeta, INITIAL_DATA, Project } from '../types';
-import { db, storage, auth, googleProvider, isConfigured } from './firebase';
+import { db, auth, googleProvider, isConfigured } from './firebase';
 import { doc, getDoc, setDoc, collection, query, where, getDocs, deleteDoc, addDoc, serverTimestamp, increment, writeBatch, getDocsFromServer, getDocFromServer, DocumentSnapshot, onSnapshot } from 'firebase/firestore';
-import { ref, uploadBytesResumable, getDownloadURL, listAll, deleteObject } from 'firebase/storage';
 import { signInWithPopup, signInWithRedirect, signInWithEmailAndPassword, createUserWithEmailAndPassword, User, deleteUser, setPersistence, browserLocalPersistence, inMemoryPersistence } from 'firebase/auth';
 import { GoogleGenAI } from "@google/genai";
 
@@ -11,7 +10,13 @@ const VERSIONS_COL = 'versions';
 const ANALYTICS_COL = 'analytics';
 
 export { isConfigured, auth };
-export const hasCloudStorage = !!storage;
+export const hasCloudStorage = true;
+
+// Cloudinary Config
+// @ts-ignore
+const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+// @ts-ignore
+const CLOUDINARY_UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
 
 // --- Helper for Timeouts ---
 const withTimeout = <T>(promise: Promise<T>, ms: number = 10000, errorMsg: string = "Request timed out"): Promise<T> => {
@@ -148,6 +153,7 @@ export const isNativeVideo = (url: string): boolean => {
   // REMOVED: u.includes('drive.google.com/uc?export=download')
   // Google Drive is NOT a native video source. It must be embedded via iframe.
   return (
+    u.includes('res.cloudinary.com') ||
     u.includes('firebasestorage') ||
     u.includes('dl.dropboxusercontent.com') ||
     u.endsWith('.mp4') ||
@@ -162,15 +168,7 @@ export const getDriveThumbnail = (url: string): string | null => {
 };
 
 export const getStoragePathFromUrl = (url: string): string | null => {
-    try {
-        if (!url || !url.includes('firebasestorage.googleapis.com')) return null;
-        const decoded = decodeURIComponent(url);
-        const regex = /\/o\/([^?]+)/;
-        const match = decoded.match(regex);
-        return match ? match[1] : null;
-    } catch (e) {
-        return null;
-    }
+    return null;
 }
 
 export const getVideoMetadata = async (url: string): Promise<{ thumbnail: string | null, aspectRatio: '16:9' | '9:16' | '4:3' | '1:1' }> => {
@@ -271,58 +269,8 @@ export const publishPortfolio = async (uid: string, data: PortfolioData): Promis
 };
 
 export const cleanupUnusedMedia = async (uid: string, currentData?: any): Promise<number> => {
-    if (!db || !storage || !uid) return 0;
-    const protectedPaths = new Set<string>();
-    const addProtected = (url: string | undefined) => {
-        const path = getStoragePathFromUrl(url || '');
-        if (path) protectedPaths.add(path);
-    };
-    const collectFromContent = (data: any) => {
-        if (!data) return;
-        addProtected(data.profileImage);
-        addProtected(data.showreelLink);
-        addProtected(data.showreelThumbnail); 
-        if (Array.isArray(data.projects)) {
-            data.projects.forEach((p: any) => {
-                addProtected(p.thumbnail);
-                if (p.link) addProtected(p.link);
-            });
-        }
-    };
-
-    try {
-        if (currentData) collectFromContent(currentData);
-        const draftSnap = await getDoc(doc(db, PORTFOLIOS_COL, uid, VERSIONS_COL, 'draft'));
-        if (draftSnap.exists()) collectFromContent(draftSnap.data());
-        const metaSnap = await getDoc(doc(db, PORTFOLIOS_COL, uid));
-        if (metaSnap.exists()) {
-            const meta = metaSnap.data() as PortfolioMeta;
-            if (meta.publish?.liveVersion) {
-                const liveSnap = await getDoc(doc(db, PORTFOLIOS_COL, uid, VERSIONS_COL, meta.publish.liveVersion));
-                if (liveSnap.exists()) collectFromContent(liveSnap.data());
-            }
-        }
-        const userRootRef = ref(storage, `users/${uid}`);
-        const getAllFiles = async (rootRef: any): Promise<any[]> => {
-            let files: any[] = [];
-            const res = await listAll(rootRef);
-            files = [...files, ...res.items];
-            for (const folder of res.prefixes) {
-                const folderFiles = await getAllFiles(folder);
-                files = [...files, ...folderFiles];
-            }
-            return files;
-        };
-        const allFiles = await getAllFiles(userRootRef);
-        const filesToDelete = allFiles.filter(fileRef => !protectedPaths.has(fileRef.fullPath));
-        await Promise.all(filesToDelete.map(fileRef => deleteObject(fileRef).catch(e => {
-            console.warn(`Failed to delete ${fileRef.fullPath}`, e);
-        })));
-        return filesToDelete.length;
-    } catch (e) {
-        console.error("Cleanup failed:", e);
-        return 0;
-    }
+    // Cleanup not supported with unsigned Cloudinary uploads from client
+    return 0;
 };
 
 export const loadEditorState = async (uid: string): Promise<PortfolioData | null> => {
@@ -506,42 +454,52 @@ export const getPortfolioStats = async (uid: string): Promise<{ views: number; c
 
 export const uploadFileToStorage = (file: File, path: string, onProgress?: (progress: number) => void): Promise<string> => {
   return new Promise((resolve, reject) => {
-    if (!storage) return reject(new Error("Storage not configured"));
-    
-    const storageRef = ref(storage, path);
-    let contentType = file.type || 'application/octet-stream';
-    const lowerPath = path.toLowerCase();
-    
-    if (lowerPath.endsWith('.jpg') || lowerPath.endsWith('.jpeg')) contentType = 'image/jpeg';
-    else if (lowerPath.endsWith('.png')) contentType = 'image/png';
-    else if (lowerPath.endsWith('.webp')) contentType = 'image/webp';
-    else if (lowerPath.endsWith('.mp4') || file.type === 'video/mp4') contentType = 'video/mp4';
-    else if (lowerPath.endsWith('.mov')) contentType = 'video/quicktime';
-
-    const metadata: any = {
-        contentType: contentType,
-    };
-
-    // CRITICAL: Force MP4 Metadata for showreels and video files
-    if (contentType === 'video/mp4') {
-        metadata.cacheControl = 'public,max-age=31536000';
-    } else {
-        metadata.cacheControl = 'public, max-age=31536000';
+    if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
+        console.error("Cloudinary config missing", { CLOUDINARY_CLOUD_NAME, CLOUDINARY_UPLOAD_PRESET });
+        return reject(new Error("Cloudinary not configured. Check VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET."));
     }
 
-    const uploadTask = uploadBytesResumable(storageRef, file, metadata);
+    const url = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/auto/upload`;
+    const xhr = new XMLHttpRequest();
+    const formData = new FormData();
+    
+    formData.append("file", file);
+    formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+    
+    const folder = path.substring(0, path.lastIndexOf('/'));
+    if (folder) {
+        formData.append("folder", folder);
+    }
 
-    uploadTask.on('state_changed', 
-      (snapshot) => {
-        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-        if (onProgress) onProgress(progress);
-      }, 
-      (error) => reject(error), 
-      async () => {
-        const url = await getDownloadURL(uploadTask.snapshot.ref);
-        resolve(url);
-      }
-    );
+    xhr.open("POST", url, true);
+    xhr.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+
+    if (onProgress) {
+        xhr.upload.addEventListener("progress", (e) => {
+            if (e.lengthComputable) {
+                const progress = (e.loaded / e.total) * 100;
+                onProgress(progress);
+            }
+        });
+    }
+
+    xhr.onreadystatechange = () => {
+        if (xhr.readyState === 4) {
+            if (xhr.status === 200) {
+                try {
+                    const response = JSON.parse(xhr.responseText);
+                    resolve(response.secure_url);
+                } catch (e) {
+                    reject(new Error("Failed to parse Cloudinary response"));
+                }
+            } else {
+                reject(new Error(`Cloudinary upload failed: ${xhr.status} ${xhr.statusText}`));
+            }
+        }
+    };
+
+    xhr.onerror = () => reject(new Error("Cloudinary upload network error"));
+    xhr.send(formData);
   });
 };
 
@@ -713,7 +671,7 @@ export const loginWithGoogleRedirect = async () => {
 };
 
 export const deletePortfolioFromDB = async (uid: string) => {
-  if (!db || !storage || !uid) return;
+  if (!db || !uid) return;
   try {
       const versionsRef = collection(db, PORTFOLIOS_COL, uid, VERSIONS_COL);
       const versionsSnap = await getDocs(versionsRef);
@@ -724,14 +682,7 @@ export const deletePortfolioFromDB = async (uid: string) => {
   await deleteDoc(doc(db, PORTFOLIOS_COL, uid));
   await deleteDoc(doc(db, USERS_COL, uid));
   await deleteDoc(doc(db, 'portfolio_stats', uid));
-  try {
-     const recursiveDelete = async (folderRef: any) => {
-        const list = await listAll(folderRef);
-        await Promise.all(list.items.map(item => deleteObject(item)));
-        await Promise.all(list.prefixes.map(prefix => recursiveDelete(prefix)));
-     };
-     await recursiveDelete(ref(storage, `users/${uid}`));
-  } catch (e) {}
+  // Cloudinary storage cleanup skipped
 };
 
 export const deleteUserAuth = async () => {

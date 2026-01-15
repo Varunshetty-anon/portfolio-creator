@@ -25,9 +25,10 @@ self.addEventListener('fetch', (event) => {
     return; 
   }
 
-  // 2. BYPASS FIREBASE STORAGE & DRIVE
+  // 2. BYPASS CLOUDINARY, FIREBASE STORAGE & DRIVE
   // Avoid CORS/Opaque response issues in SW.
   if (
+    url.hostname.includes('res.cloudinary.com') ||
     url.hostname.includes('firebasestorage.googleapis.com') ||
     url.hostname.includes('drive.google.com')
   ) {
