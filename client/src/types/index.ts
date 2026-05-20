@@ -63,6 +63,9 @@ export interface PortfolioData {
 
   // Projects (embedded for drafts, or fetched separately)
   projects: Project[];
+
+  // Optional live content
+  liveContent?: any;
 }
 
 export interface User {

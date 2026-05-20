@@ -93,13 +93,13 @@ export const portfolioApi = {
   get: () =>
     request('/portfolio'),
 
-  create: (data: Record<string, unknown>) =>
+  create: (data: any) =>
     request('/portfolio', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
-  update: (data: Record<string, unknown>) =>
+  update: (data: any) =>
     request('/portfolio', {
       method: 'PUT',
       body: JSON.stringify(data),
@@ -163,10 +163,10 @@ export const analyticsApi = {
   trackView: (portfolioId: string) =>
     request(`/analytics/view/${portfolioId}`, { method: 'POST' }).catch(() => {}),
 
-  trackClick: (portfolioId: string, type: string) =>
+  trackClick: (portfolioId: string, metadata: any) =>
     request(`/analytics/click/${portfolioId}`, {
       method: 'POST',
-      body: JSON.stringify({ type }),
+      body: JSON.stringify({ type: 'click', metadata }),
     }).catch(() => {}),
 
   getSummary: () =>
