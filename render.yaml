@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: frames-studio
+    runtime: node
+    buildCommand: |
+      cd client && npm ci && npm run build &&
+      cd ../server && npm ci && npm run build
+    startCommand: cd server && node dist/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: CLIENT_URL
+        sync: false
+    healthCheckPath: /api/v1/health
