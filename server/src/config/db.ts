@@ -32,7 +32,9 @@ export async function connectDB(): Promise<void> {
   // ── Retry loop with exponential back-off ────────────────────────
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      await mongoose.connect(uri);
+      await mongoose.connect(uri, {
+        dbName: 'frames',
+      });
       return; // success — exit
     } catch (err) {
       const delay = BASE_DELAY_MS * Math.pow(2, attempt - 1);
