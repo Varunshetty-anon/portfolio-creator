@@ -3,7 +3,7 @@
 // ========================
 // Will be fully built in Phase 6.
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
@@ -23,6 +23,29 @@ const OnboardingFlow: React.FC = () => {
     username: '',
     role: '',
   });
+  const [isChecking, setIsChecking] = useState(true);
+
+  // Check for existing portfolio on mount
+  useEffect(() => {
+    let isMounted = true;
+    const checkExistingPortfolio = async () => {
+      try {
+        const response = await portfolioApi.get() as any;
+        if (response?.portfolio && isMounted) {
+          // Portfolio already exists, skip onboarding
+          await refreshUser();
+          navigate('/editor', { replace: true });
+        }
+      } catch (e) {
+        // Assume no portfolio or error, continue with onboarding
+      } finally {
+        if (isMounted) setIsChecking(false);
+      }
+    };
+    
+    checkExistingPortfolio();
+    return () => { isMounted = false; };
+  }, [navigate, refreshUser]);
 
   const steps = [
     { title: "What's your name?", subtitle: 'This appears on your portfolio.', icon: User },
@@ -53,8 +76,21 @@ const OnboardingFlow: React.FC = () => {
         });
         await refreshUser();
         navigate('/editor', { replace: true });
-      } catch (e) {
+      } catch (e: any) {
         console.error('Onboarding failed:', e);
+        
+        // Safe Fallback: If portfolio already exists, fetch it and redirect
+        if (e.message?.includes('You already have a portfolio') || e.status === 409) {
+          try {
+            await portfolioApi.get();
+            await refreshUser();
+            navigate('/editor', { replace: true });
+            return;
+          } catch (fallbackError) {
+            console.error('Fallback fetch failed:', fallbackError);
+          }
+        }
+        
         setIsSubmitting(false);
       }
     }
@@ -78,9 +114,9 @@ const OnboardingFlow: React.FC = () => {
       >
         {/* Progress */}
         <div className="flex gap-2 mb-8 justify-center">
-          {steps.map((_, i) => (
+          {steps.map((stepData, i) => (
             <div
-              key={i}
+              key={stepData.title}
               className={`h-1.5 rounded-full transition-all duration-500 ${
                 i <= step ? 'w-12 bg-white shadow-[0_0_10px_white]' : 'w-2 bg-zinc-700'
               }`}
@@ -168,10 +204,10 @@ const OnboardingFlow: React.FC = () => {
           <Button
             className="w-full py-4"
             onClick={handleNext}
-            disabled={!isValid()}
-            loading={isSubmitting}
+            disabled={!isValid() || isChecking}
+            loading={isSubmitting || isChecking}
           >
-            {step < 2 ? 'Continue' : 'Create Portfolio'}
+            {isChecking ? 'Checking status...' : (step < 2 ? 'Continue' : 'Create Portfolio')}
           </Button>
         </div>
       </motion.div>

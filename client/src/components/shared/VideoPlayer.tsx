@@ -54,10 +54,23 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     setIsMuted(!isMuted);
   }, [isMuted]);
 
-  // Auto-play native video
+  // Auto-play native video with AudioContext/Playback error guards
   useEffect(() => {
     if (isNative && videoRef.current && autoplay) {
-      videoRef.current.play().catch(() => {});
+      try {
+        const playPromise = videoRef.current.play();
+        if (playPromise !== undefined) {
+          playPromise.catch((e) => {
+            console.warn('Video auto-play blocked or failed:', e);
+            // Handle specific AudioContext/play errors gracefully
+            if (e.name === 'NotAllowedError') {
+              setIsMuted(true); // Force mute and try again if it was a permissions issue
+            }
+          });
+        }
+      } catch (err) {
+        console.warn('Error starting video playback:', err);
+      }
     }
   }, [isNative, autoplay]);
 
