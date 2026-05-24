@@ -4,7 +4,7 @@
 // Will be fully built in Phase 6.
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
 import { portfolioApi } from '@/lib/api';
@@ -49,11 +49,9 @@ const OnboardingFlow: React.FC = () => {
   }, [refreshUser]);
 
   // Navigate when context is safely hydrated
-  useEffect(() => {
-    if (user?.onboarded) {
-      navigate('/editor', { replace: true });
-    }
-  }, [user?.onboarded, navigate]);
+  if (user?.onboarded) {
+    return <Navigate to="/editor" replace />;
+  }
 
   const steps = [
     { title: "What's your name?", subtitle: 'This appears on your portfolio.', icon: User },
@@ -85,7 +83,8 @@ const OnboardingFlow: React.FC = () => {
           role: formData.role,
         });
         await refreshUser();
-        // Navigation is handled automatically by the useEffect listening to user.onboarded
+        // Fallback imperative navigation just in case
+        setTimeout(() => navigate('/editor', { replace: true }), 100);
       } catch (e: any) {
         console.error('Onboarding failed:', e);
         
@@ -94,7 +93,7 @@ const OnboardingFlow: React.FC = () => {
           try {
             await portfolioApi.get();
             await refreshUser();
-            // Navigation handled by useEffect
+            setTimeout(() => navigate('/editor', { replace: true }), 100);
             return;
           } catch (fallbackError) {
             console.error('Fallback fetch failed:', fallbackError);
