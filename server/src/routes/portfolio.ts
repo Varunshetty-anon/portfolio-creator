@@ -7,6 +7,7 @@ import { Router, type Request, type Response, type NextFunction } from 'express'
 import Portfolio from '../models/Portfolio.js';
 import Project from '../models/Project.js';
 import Analytics from '../models/Analytics.js';
+import User from '../models/User.js';
 import { authenticateToken } from '../middleware/auth.js';
 import { AppError } from '../middleware/errors.js';
 import { sanitizeUsername } from '../utils/helpers.js';
@@ -22,7 +23,6 @@ router.get('/', authenticateToken, async (req: Request, res: Response, next: Nex
     }
 
     // Sync onboarded flag if missing (to prevent infinite frontend redirect loops)
-    const { default: User } = await import('../models/User.js');
     const user = await User.findById(req.user!.userId);
     if (user && !user.onboarded) {
       user.onboarded = true;
@@ -77,7 +77,6 @@ router.post('/', authenticateToken, async (req: Request, res: Response, next: Ne
       draftContent: req.body.draftContent,
     });
 
-    const { default: User } = await import('../models/User.js');
     await User.findByIdAndUpdate(userId, { onboarded: true });
 
     res.status(201).json({ success: true, data: { portfolio } });
