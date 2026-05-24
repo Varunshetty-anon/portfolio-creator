@@ -63,12 +63,12 @@ export const ProjectGrid: React.FC<ProjectGridProps> = ({ projects, onProjectCli
           <motion.div
             key={project._id || project.id}
             variants={item}
-            className={`group relative rounded-xl overflow-hidden bg-zinc-900 cursor-pointer ${
+            className={`group relative rounded-2xl overflow-hidden bg-frames-surface border border-frames-border shadow-cinematic cursor-pointer ${
               project.aspectRatio === '9:16' ? 'md:row-span-2' : ''
             }`}
             onClick={() => onProjectClick(project)}
-            whileHover={{ y: -5 }}
-            transition={{ duration: 0.3 }}
+            whileHover={{ y: -8, scale: 1.02 }}
+            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
           >
             {/* Thumbnail */}
             <div className={`w-full ${aspectClass} overflow-hidden`}>
@@ -101,7 +101,7 @@ export const ProjectGrid: React.FC<ProjectGridProps> = ({ projects, onProjectCli
                   )}
                 </div>
                 
-                <h3 className="text-xl font-display font-bold text-white mb-2 line-clamp-2">
+                <h3 className="text-2xl font-display font-bold text-white mb-2 line-clamp-2 tracking-tight">
                   {project.title}
                 </h3>
                 

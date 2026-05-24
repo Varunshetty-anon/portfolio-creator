@@ -26,9 +26,9 @@ export const Input: React.FC<InputProps> = ({
     )}
     <div className="relative">
       <input
-        className={`w-full bg-zinc-900/50 border rounded-lg py-2.5 text-zinc-200 text-sm focus:outline-none focus:border-zinc-600 focus:ring-1 focus:ring-zinc-600 focus:bg-zinc-900 transition-all placeholder:text-zinc-600 ${
-          icon ? 'pl-10 pr-4' : 'px-4'
-        } ${error ? 'border-red-500/50' : 'border-zinc-800'} ${className}`}
+        className={`w-full bg-transparent border-b py-2.5 text-frames-text text-sm font-sans focus:outline-none focus:border-white transition-colors placeholder:text-frames-text-muted ${
+          icon ? 'pl-8 pr-4' : 'px-0'
+        } ${error ? 'border-red-500/50' : 'border-frames-border'} ${className}`}
         {...props}
       />
       {icon && (
@@ -56,8 +56,8 @@ export const TextArea: React.FC<TextAreaProps> = ({
       </label>
     )}
     <textarea
-      className={`w-full bg-zinc-900/50 border rounded-lg px-4 py-2.5 text-zinc-200 text-sm focus:outline-none focus:border-zinc-600 focus:ring-1 focus:ring-zinc-600 focus:bg-zinc-900 transition-all resize-none placeholder:text-zinc-600 ${
-        error ? 'border-red-500/50' : 'border-zinc-800'
+      className={`w-full bg-transparent border-b px-0 py-2.5 text-frames-text text-sm font-sans focus:outline-none focus:border-white transition-colors resize-none placeholder:text-frames-text-muted ${
+        error ? 'border-red-500/50' : 'border-frames-border'
       } ${className}`}
       {...props}
     />

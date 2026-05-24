@@ -22,13 +22,13 @@ export const Button: React.FC<ButtonProps> = ({
 
   const variants: Record<string, string> = {
     primary:
-      'bg-white text-black hover:bg-zinc-200 focus-visible:ring-zinc-500 border border-transparent',
+      'bg-white text-black hover:bg-zinc-200 focus-visible:ring-zinc-500 border border-transparent shadow-cinematic',
     secondary:
-      'bg-zinc-800 text-white hover:bg-zinc-700 focus-visible:ring-zinc-700 border border-transparent',
+      'bg-frames-surface-raised text-white hover:bg-frames-border focus-visible:ring-zinc-700 border border-frames-border',
     ghost:
-      'bg-transparent text-zinc-400 hover:text-white hover:bg-zinc-800/50',
+      'bg-transparent text-frames-text-muted hover:text-white hover:bg-white/5',
     outline:
-      'bg-transparent border border-zinc-800 text-zinc-300 hover:border-zinc-600 hover:text-white',
+      'bg-transparent border border-frames-border text-frames-text-muted hover:border-white hover:text-white hover:shadow-cinematic-hover',
     danger:
       'bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 hover:text-red-300',
   };

@@ -9,8 +9,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { Eye, EyeOff, Sparkles } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import { authApi } from '@/lib/api';
+import { BrandLogo } from '@/components/shared/BrandLogo';
 
 const AuthPage: React.FC = () => {
   const { isAuthenticated, user, isLoading } = useAuth();
@@ -64,50 +65,51 @@ const AuthPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-frames-bg flex flex-col md:flex-row relative overflow-hidden font-sans selection:bg-white/20">
-      {/* Left: Branding */}
-      <div className="flex-1 flex flex-col justify-between p-8 md:p-12 lg:p-16 relative z-10 border-b md:border-b-0 md:border-r border-zinc-900/50">
-        {/* Logo */}
-        <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center">
-          <span className="font-display font-black text-black text-lg">F</span>
-        </div>
+    <div className="min-h-screen bg-frames-base flex flex-col md:flex-row relative overflow-hidden font-sans selection:bg-white/20">
+      {/* Background Ambient Glows */}
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-white/5 blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[30%] h-[30%] rounded-full bg-white/5 blur-[100px] pointer-events-none" />
+
+      {/* Left: Cinematic Branding */}
+      <div className="flex-1 flex flex-col justify-between p-8 md:p-12 lg:p-24 relative z-10">
+        <BrandLogo />
 
         {/* Hero */}
-        <div className="py-12 md:py-0">
+        <div className="py-12 md:py-0 max-w-2xl">
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-            className="text-5xl md:text-7xl font-display font-bold text-white tracking-tight mb-6 leading-[0.9]"
+            transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
+            className="text-5xl md:text-7xl lg:text-[80px] font-display font-bold text-transparent bg-clip-text bg-gradient-to-b from-white to-white/60 tracking-tighter mb-8 leading-[1.0]"
           >
-            Your Portfolio.
-            <br />
-            <span className="text-zinc-600">Reimagined.</span>
+            Craft a portfolio <br />
+            that looks as premium <br />
+            as your edits.
           </motion.h1>
           <motion.p
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-            className="text-zinc-400 text-lg max-w-md font-light leading-relaxed"
+            transition={{ duration: 1, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            className="text-frames-text-muted text-xl font-light leading-relaxed max-w-md"
           >
-            Frames is the premium portfolio builder designed specifically for
-            video editors and motion designers.
+            Built exclusively for video editors and motion designers to showcase their work without compromise.
           </motion.p>
         </div>
 
         {/* Footer */}
-        <div className="flex gap-6 text-[10px] font-bold uppercase tracking-widest text-zinc-600">
+        <div className="flex gap-6 text-[10px] font-display font-bold uppercase tracking-[0.2em] text-frames-text-subtle">
           <span>© FRAMES STUDIO</span>
+          <span>CRAFTED FOR EDITORS</span>
         </div>
       </div>
 
       {/* Right: Auth Form */}
-      <div className="flex-1 flex items-center justify-center p-8 bg-zinc-950/30">
+      <div className="flex-1 flex items-center justify-center p-8 relative z-10">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.3 }}
-          className="w-full max-w-sm"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.8, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
+          className="w-full max-w-md glass p-10 md:p-14 rounded-3xl shadow-cinematic-lg"
         >
           {/* Tab Switcher */}
           <div className="mb-8 flex gap-4 border-b border-zinc-800 pb-1">
@@ -193,22 +195,27 @@ const AuthPage: React.FC = () => {
             )}
 
             {/* Actions */}
-            <div className="pt-4 space-y-3">
+            <div className="pt-8 space-y-4">
               <Button
                 type="submit"
-                className="w-full py-6 text-sm font-medium"
+                className="w-full py-6 text-sm font-display tracking-widest uppercase shadow-cinematic-hover hover:scale-[1.02] transition-transform duration-500 ease-out"
                 loading={isProcessing}
               >
-                {authMode === 'login' ? 'Enter Studio' : 'Get Started'}
+                {authMode === 'login' ? 'Enter Studio' : 'Create Account'}
               </Button>
+
+              <div className="relative flex items-center py-4">
+                <div className="flex-grow border-t border-frames-border" />
+                <span className="flex-shrink-0 mx-4 text-xs font-display tracking-widest text-frames-text-subtle uppercase">Or</span>
+                <div className="flex-grow border-t border-frames-border" />
+              </div>
 
               <Button
                 type="button"
                 variant="outline"
-                className="w-full py-6 text-sm font-medium border-zinc-800 text-zinc-400 hover:bg-zinc-900 hover:text-white hover:border-zinc-700"
+                className="w-full py-6 text-sm font-medium border-frames-border text-frames-text-muted hover:bg-white hover:text-black hover:border-white transition-all duration-500 ease-out"
                 onClick={handleGoogleAuth}
                 disabled={isProcessing}
-                icon={<Sparkles size={14} />}
               >
                 Continue with Google
               </Button>

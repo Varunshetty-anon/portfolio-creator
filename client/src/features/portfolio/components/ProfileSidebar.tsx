@@ -26,12 +26,12 @@ export const ProfileSidebar: React.FC<ProfileSidebarProps> = ({ data }) => {
 
   return (
     <motion.aside 
-      className="w-full lg:w-80 lg:fixed lg:h-screen lg:overflow-y-auto lg:border-r border-frames-border bg-frames-surface-raised/50 lg:bg-transparent backdrop-blur-sm z-10 scrollbar-hide"
+      className="w-full lg:w-[360px] lg:fixed lg:h-screen lg:overflow-y-auto lg:border-r border-frames-border bg-frames-surface lg:glass-strong backdrop-blur-xl z-10 scrollbar-hide"
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.8, delay: 0.2 }}
+      transition={{ duration: 1, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
     >
-      <div className="p-6 lg:p-10 flex flex-col min-h-full">
+      <div className="p-8 lg:p-12 flex flex-col min-h-full">
         
         {/* Profile Image */}
         {profileImageUrl && (
@@ -48,15 +48,15 @@ export const ProfileSidebar: React.FC<ProfileSidebarProps> = ({ data }) => {
         )}
 
         {/* Identity */}
-        <div className="mb-8">
-          <h1 className="text-2xl lg:text-3xl font-display font-bold text-white mb-2">{name}</h1>
-          <p className="text-sm tracking-widest uppercase text-accent-gold font-medium">{role}</p>
+        <div className="mb-10">
+          <h1 className="text-3xl lg:text-4xl font-display font-bold text-white mb-2 tracking-tight">{name}</h1>
+          <p className="text-xs tracking-[0.2em] uppercase text-frames-text-muted font-display">{role}</p>
         </div>
 
         {/* Bio */}
         {bio && (
-          <div className="mb-8">
-            <p className="text-zinc-400 text-sm leading-relaxed whitespace-pre-wrap">{bio}</p>
+          <div className="mb-10">
+            <p className="text-frames-text-subtle text-sm leading-relaxed whitespace-pre-wrap">{bio}</p>
           </div>
         )}
 

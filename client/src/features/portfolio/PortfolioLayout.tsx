@@ -110,7 +110,7 @@ export default function PortfolioLayout() {
         <ProfileSidebar data={content as PortfolioData} />
 
         {/* Right Content Area */}
-        <main className="flex-1 lg:ml-80 w-full relative">
+        <main className="flex-1 lg:ml-[360px] w-full relative">
           
           {/* Showreel Section */}
           {content.showreelUrl && (
@@ -137,7 +137,7 @@ export default function PortfolioLayout() {
           {!content.showreelUrl && <div className="h-12 lg:h-24"></div>}
 
           {/* Main Container */}
-          <div className="px-6 lg:px-12 pb-24">
+          <div className="px-8 lg:px-16 pb-32">
             
             {/* Projects Grid */}
             <section className="py-12">

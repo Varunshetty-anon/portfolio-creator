@@ -7,14 +7,14 @@
    ======================== */
 
 :root {
-  --color-bg: #050505;
+  --color-bg: #000000;
   --color-surface: #09090b;
-  --color-surface-raised: #1a1a1e;
+  --color-surface-raised: #18181b;
   --color-border: #27272a;
   --color-border-subtle: #1a1a1e;
-  --color-text: #f4f4f5;
-  --color-text-muted: #71717a;
-  --color-text-subtle: #52525b;
+  --color-text: #ffffff;
+  --color-text-muted: #a1a1aa;
+  --color-text-subtle: #71717a;
   --color-accent: #C0A36E;
   --color-accent-light: #E5C07B;
 
@@ -138,17 +138,25 @@ textarea:-webkit-autofill {
 
   /* Glass morphism */
   .glass {
-    background: rgba(9, 9, 11, 0.6);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(9, 9, 11, 0.4);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.03);
   }
 
   .glass-strong {
-    background: rgba(9, 9, 11, 0.8);
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(32px);
+    -webkit-backdrop-filter: blur(32px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  /* Cinematic Gradient Text */
+  .text-gradient-cinematic {
+    background: linear-gradient(180deg, #ffffff 0%, rgba(255, 255, 255, 0.5) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 
   /* Hide scrollbar */

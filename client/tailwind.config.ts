@@ -27,14 +27,16 @@ export default {
           'gold-dark': '#9A7D4E',
         },
         frames: {
+          base: '#000000',
           bg: '#050505',
           surface: '#09090b',
-          'surface-raised': '#1a1a1e',
+          'surface-raised': '#18181b',
+          elevated: '#18181b',
           border: '#27272a',
           'border-subtle': '#1a1a1e',
-          text: '#f4f4f5',
-          'text-muted': '#71717a',
-          'text-subtle': '#52525b',
+          text: '#ffffff',
+          'text-muted': '#a1a1aa',
+          'text-subtle': '#71717a',
         },
       },
       animation: {
@@ -79,9 +81,15 @@ export default {
       backdropBlur: {
         xs: '2px',
       },
+      boxShadow: {
+        'cinematic': '0 0 40px -10px rgba(255, 255, 255, 0.05)',
+        'cinematic-lg': '0 0 60px -15px rgba(255, 255, 255, 0.08)',
+        'cinematic-hover': '0 0 40px -5px rgba(255, 255, 255, 0.1)',
+      },
       transitionTimingFunction: {
         'premium': 'cubic-bezier(0.16, 1, 0.3, 1)',
         'smooth': 'cubic-bezier(0.4, 0, 0.2, 1)',
+        'cinematic': 'cubic-bezier(0.2, 0.8, 0.2, 1)',
       },
     },
   },
