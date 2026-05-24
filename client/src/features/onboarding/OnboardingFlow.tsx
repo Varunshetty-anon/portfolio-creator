@@ -85,7 +85,7 @@ const OnboardingFlow: React.FC = () => {
           role: formData.role,
         });
         await refreshUser();
-        navigate('/editor', { replace: true });
+        // Navigation is handled automatically by the useEffect listening to user.onboarded
       } catch (e: any) {
         console.error('Onboarding failed:', e);
         
@@ -94,7 +94,7 @@ const OnboardingFlow: React.FC = () => {
           try {
             await portfolioApi.get();
             await refreshUser();
-            navigate('/editor', { replace: true });
+            // Navigation handled by useEffect
             return;
           } catch (fallbackError) {
             console.error('Fallback fetch failed:', fallbackError);

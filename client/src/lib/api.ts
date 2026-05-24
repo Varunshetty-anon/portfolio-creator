@@ -79,7 +79,7 @@ export const authApi = {
     request('/auth/logout', { method: 'POST' }),
 
   getMe: () =>
-    request('/auth/me'),
+    request(`/auth/me?_t=${Date.now()}`),
 
   deleteAccount: () =>
     request('/auth/account', { method: 'DELETE' }),
@@ -91,7 +91,7 @@ export const authApi = {
 
 export const portfolioApi = {
   get: () =>
-    request('/portfolio'),
+    request(`/portfolio?_t=${Date.now()}`),
 
   create: (data: any) =>
     request('/portfolio', {
