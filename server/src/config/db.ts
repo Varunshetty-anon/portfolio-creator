@@ -19,6 +19,11 @@ export async function connectDB(): Promise<void> {
   // ── Connection event listeners ──────────────────────────────────
   mongoose.connection.on('connected', () => {
     console.log('✅ MongoDB connected successfully.');
+    if (mongoose.connection.db) {
+      console.log(`🔍 [AUDIT] Active DB connection name: ${mongoose.connection.db.databaseName}`);
+    } else {
+      console.log('🔍 [AUDIT] DB object not available yet.');
+    }
   });
 
   mongoose.connection.on('error', (err) => {
