@@ -35,5 +35,10 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <Navigate to="/onboarding" replace />;
   }
 
+  // Reverse-guard: if an onboarded user tries to access the onboarding page, redirect to editor
+  if (location.pathname === '/onboarding' && user && user.onboarded) {
+    return <Navigate to="/editor" replace />;
+  }
+
   return <>{children}</>;
 };

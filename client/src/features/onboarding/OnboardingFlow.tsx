@@ -32,9 +32,10 @@ const OnboardingFlow: React.FC = () => {
       try {
         const response = await portfolioApi.get() as any;
         if (response?.portfolio && isMounted) {
-          // Portfolio already exists, skip onboarding
+          // Portfolio already exists, skip onboarding.
+          // refreshUser will update user.onboarded to true.
+          // We do NOT navigate here immediately to avoid context hydration race conditions.
           await refreshUser();
-          navigate('/editor', { replace: true });
         }
       } catch (e) {
         // Assume no portfolio or error, continue with onboarding
@@ -45,7 +46,14 @@ const OnboardingFlow: React.FC = () => {
     
     checkExistingPortfolio();
     return () => { isMounted = false; };
-  }, [navigate, refreshUser]);
+  }, [refreshUser]);
+
+  // Navigate when context is safely hydrated
+  useEffect(() => {
+    if (user?.onboarded) {
+      navigate('/editor', { replace: true });
+    }
+  }, [user?.onboarded, navigate]);
 
   const steps = [
     { title: "What's your name?", subtitle: 'This appears on your portfolio.', icon: User },
