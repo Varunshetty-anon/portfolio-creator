@@ -24,7 +24,7 @@ router.post('/reset', async (req: Request, res: Response) => {
     const existingCollections = collectionsBefore.map(c => c.name);
 
     // Get specific counts
-    let beforeCounts = {};
+    let beforeCounts: Record<string, number> = {};
     for (const name of existingCollections) {
       beforeCounts[name] = await db.collection(name).countDocuments();
     }
@@ -44,7 +44,7 @@ router.post('/reset', async (req: Request, res: Response) => {
     // Wait, let's actually drop them to ensure perfectly clean schemas? No, deleteMany is safer to preserve indexes.
     
     // STEP 3: POST-AUDIT
-    let afterCounts = {};
+    let afterCounts: Record<string, number> = {};
     for (const name of existingCollections) {
       afterCounts[name] = await db.collection(name).countDocuments();
     }
