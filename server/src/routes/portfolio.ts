@@ -21,6 +21,14 @@ router.get('/', authenticateToken, async (req: Request, res: Response, next: Nex
       return res.json({ success: true, data: { portfolio: null } });
     }
 
+    // Sync onboarded flag if missing (to prevent infinite frontend redirect loops)
+    const { default: User } = await import('../models/User.js');
+    const user = await User.findById(req.user!.userId);
+    if (user && !user.onboarded) {
+      user.onboarded = true;
+      await user.save();
+    }
+
     // Also fetch projects
     const projects = await Project.find({ portfolioId: portfolio._id }).sort({ order: 1 });
 
@@ -68,6 +76,9 @@ router.post('/', authenticateToken, async (req: Request, res: Response, next: Ne
       availability: req.body.availability,
       draftContent: req.body.draftContent,
     });
+
+    const { default: User } = await import('../models/User.js');
+    await User.findByIdAndUpdate(userId, { onboarded: true });
 
     res.status(201).json({ success: true, data: { portfolio } });
   } catch (err) {

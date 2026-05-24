@@ -126,7 +126,7 @@ const OnboardingFlow: React.FC = () => {
 
         {/* Icon */}
         <motion.div
-          key={step}
+          key={`icon-${step}`}
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           className="w-14 h-14 bg-zinc-800/80 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-zinc-700/50"
@@ -144,7 +144,7 @@ const OnboardingFlow: React.FC = () => {
 
         {/* Step Content */}
         <motion.div
-          key={step}
+          key={`content-${step}`}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
