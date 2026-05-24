@@ -28,9 +28,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Check authentication status on mount
   const refreshUser = useCallback(async () => {
     try {
-      const user = await authApi.getMe() as User;
+      const response = await authApi.getMe() as { user: User };
       setState({
-        user,
+        user: response.user,
         isAuthenticated: true,
         isLoading: false,
       });
@@ -50,9 +50,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string) => {
     setState(prev => ({ ...prev, isLoading: true }));
     try {
-      const user = await authApi.login(email, password) as User;
+      const response = await authApi.login(email, password) as { user: User };
       setState({
-        user,
+        user: response.user,
         isAuthenticated: true,
         isLoading: false,
       });
@@ -65,9 +65,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signup = async (email: string, password: string, displayName: string) => {
     setState(prev => ({ ...prev, isLoading: true }));
     try {
-      const user = await authApi.signup(email, password, displayName) as User;
+      const response = await authApi.signup(email, password, displayName) as { user: User };
       setState({
-        user,
+        user: response.user,
         isAuthenticated: true,
         isLoading: false,
       });
