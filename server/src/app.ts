@@ -60,6 +60,10 @@ const apiLimiter = rateLimit({
 app.use('/api/', apiLimiter);
 
 // ── API routes ──────────────────────────────────────────────────────
+app.get('/api/health', (_req: Request, res: Response) => {
+  res.json({ status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString() });
+});
+
 app.get('/api/v1/health', (_req: Request, res: Response) => {
   res.json({ success: true, data: { status: 'ok', timestamp: new Date().toISOString() } });
 });
@@ -70,15 +74,17 @@ app.use('/api/v1/upload', uploadRoutes);
 app.use('/api/v1/analytics', analyticsRoutes);
 
 // ── Production: serve static SPA ────────────────────────────────────
-if (process.env.NODE_ENV === 'production') {
-  const clientDist = path.resolve(__dirname, '../../client/dist');
-  app.use(express.static(clientDist));
+const clientDist = path.resolve(__dirname, '../../client/dist');
+app.use(express.static(clientDist));
 
-  // SPA fallback — all non-API routes serve index.html
-  app.get('*', (_req: Request, res: Response) => {
-    res.sendFile(path.join(clientDist, 'index.html'));
-  });
-}
+// SPA fallback — all non-API routes serve index.html
+app.get('*', (req: Request, res: Response, next: express.NextFunction) => {
+  // If the request is for an API route that wasn't matched, return 404 JSON instead of index.html
+  if (req.path.startsWith('/api/')) {
+    return next();
+  }
+  res.sendFile(path.join(clientDist, 'index.html'));
+});
 
 // ── Global error handler (must be last) ─────────────────────────────
 app.use(errorHandler);
