@@ -71,6 +71,8 @@ const OnboardingFlow: React.FC = () => {
   };
 
   const handleNext = async () => {
+    if (isSubmitting || isChecking) return;
+    
     if (step < 2) {
       setStep(step + 1);
     } else {
