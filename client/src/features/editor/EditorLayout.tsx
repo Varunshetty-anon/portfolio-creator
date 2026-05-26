@@ -19,6 +19,7 @@ import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import ProfileSection from './sections/ProfileSection';
 import ProjectsSection from './sections/ProjectsSection';
 import DesignSection from './sections/DesignSection';
+import { Logo } from '@/components/shared/Logo';
 
 type TabType = 'profile' | 'projects' | 'design';
 
@@ -138,12 +139,7 @@ export default function EditorLayout() {
         
         {/* Logo Area */}
         <div className="h-16 flex items-center justify-center lg:justify-start lg:px-6 border-b border-frames-border">
-          <div className="w-8 h-8 rounded-md bg-white flex items-center justify-center font-display font-bold text-black shrink-0">
-            F
-          </div>
-          <span className="hidden lg:block ml-3 font-display font-bold text-white tracking-widest text-sm uppercase">
-            Studio
-          </span>
+          <Logo />
         </div>
 
         {/* Navigation */}

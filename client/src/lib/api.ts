@@ -128,7 +128,7 @@ export const portfolioApi = {
 export const uploadApi = {
   profileImage: (file: File, onProgress?: (pct: number) => void) => {
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('image', file);
     // Note: Progress tracking requires XMLHttpRequest; for now use simple fetch
     return request<{ url: string }>('/upload/profile-image', {
       method: 'POST',
@@ -138,7 +138,7 @@ export const uploadApi = {
 
   projectMedia: (file: File) => {
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('media', file);
     return request<{ url: string; thumbnailUrl?: string; aspectRatio?: string }>('/upload/project-media', {
       method: 'POST',
       body: formData,
@@ -147,7 +147,7 @@ export const uploadApi = {
 
   showreel: (file: File) => {
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('video', file);
     return request<{ url: string; thumbnailUrl?: string }>('/upload/showreel', {
       method: 'POST',
       body: formData,

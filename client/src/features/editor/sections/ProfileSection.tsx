@@ -10,6 +10,7 @@ import type { PortfolioData } from '@/types';
 import { Input, TextArea } from '@/components/ui/Input';
 import { ImageCropper } from '@/components/shared/ImageCropper';
 import { uploadApi } from '@/lib/api';
+import { useToast } from '@/context/ToastContext';
 
 interface ProfileSectionProps {
   data: PortfolioData;
@@ -17,6 +18,7 @@ interface ProfileSectionProps {
 }
 
 export default function ProfileSection({ data, onChange }: ProfileSectionProps) {
+  const { toast } = useToast();
   const [showSocials, setShowSocials] = useState(false);
   const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -55,9 +57,10 @@ export default function ProfileSection({ data, onChange }: ProfileSectionProps) 
       const file = new File([croppedBlob], 'profile.jpg', { type: 'image/jpeg' });
       const result = await uploadApi.profileImage(file);
       handleInputChange('profileImageUrl', result.url);
+      toast("Profile photo updated successfully.", "success");
     } catch (err) {
       console.error("Upload failed", err);
-      alert("Failed to upload profile image. Please try again.");
+      toast("Failed to upload profile image. Please try again.", "error");
     } finally {
       setIsUploading(false);
     }

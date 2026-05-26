@@ -6,7 +6,7 @@
 import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, PlayCircle } from 'lucide-react';
-import { VideoPlayer } from '@/components/shared/VideoPlayer';
+import { MediaPlayer } from '@/components/shared/MediaPlayer';
 import type { Project } from '@/types';
 import { PROJECT_CONTENT_TYPES, PROJECT_SUBJECT_MATTERS } from '@/lib/constants';
 
@@ -78,14 +78,11 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({ project, onClose }) 
                 <div className={`w-full max-h-full shadow-2xl ${
                   project.aspectRatio === '9:16' ? 'max-w-[400px]' : 'max-w-full'
                 }`}>
-                  <VideoPlayer 
+                  <MediaPlayer 
                     url={project.videoUrl} 
-                    thumbnail={project.thumbnailUrl}
+                    thumbnailUrl={project.thumbnailUrl}
                     aspectRatio={project.aspectRatio}
-                    autoplay={true}
-                    controls={true}
-                    muted={false} // Unmuted in modal
-                    className="rounded-none md:rounded-xl shadow-2xl ring-1 ring-white/10"
+                    autoPlay={true}
                   />
                 </div>
               </div>

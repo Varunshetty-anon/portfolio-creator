@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/Button';
 import { ToolSelector } from '@/components/shared/ToolSelector';
 import { EDITING_TOOLS_LIST, AI_TOOLS_LIST } from '@/lib/constants';
 import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
 
 interface DesignSectionProps {
   data: PortfolioData;
@@ -20,6 +21,7 @@ interface DesignSectionProps {
 
 export default function DesignSection({ data, onChange }: DesignSectionProps) {
   const { deleteAccount } = useAuth();
+  const { toast } = useToast();
   
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
@@ -43,7 +45,7 @@ export default function DesignSection({ data, onChange }: DesignSectionProps) {
     } catch (err) {
       console.error("Delete account failed:", err);
       setIsDeleting(false);
-      alert("Failed to delete account. Please try again.");
+      toast("Failed to delete account. Please try again.", "error");
     }
   };
 
