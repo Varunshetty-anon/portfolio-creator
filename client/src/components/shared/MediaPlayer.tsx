@@ -2,7 +2,7 @@
 // FRAMES MediaPlayer Component
 // ========================
 import React, { useState, useRef, useEffect } from 'react';
-import ReactPlayer from 'react-player/lazy';
+import ReactPlayer from 'react-player';
 import { Play, Pause, Volume2, VolumeX, Maximize } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -37,7 +37,7 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
   const [hasStarted, setHasStarted] = useState(autoPlay);
   const [progress, setProgress] = useState(0);
   
-  const playerRef = useRef<ReactPlayer>(null);
+  const playerRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const normalizedUrl = normalizeUrl(url);
@@ -48,8 +48,11 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
     setPlaying(!playing);
   };
 
-  const handleProgress = (state: { played: number }) => {
-    setProgress(state.played * 100);
+  const handleTimeUpdate = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+    const video = e.currentTarget;
+    if (video.duration) {
+      setProgress((video.currentTime / video.duration) * 100);
+    }
   };
 
   const handleFullscreen = (e: React.MouseEvent) => {
@@ -92,17 +95,17 @@ export const MediaPlayer: React.FC<MediaPlayerProps> = ({
       <div className={`absolute inset-0 ${!hasStarted ? 'opacity-0' : 'opacity-100'} transition-opacity duration-500`}>
         <ReactPlayer
           ref={playerRef}
-          url={normalizedUrl}
+          src={normalizedUrl}
           width="100%"
           height="100%"
           playing={playing}
           muted={muted}
-          onProgress={handleProgress}
+          onTimeUpdate={handleTimeUpdate}
           controls={false} // We provide custom controls
           config={{
             youtube: { playerVars: { controls: 0, modestbranding: 1, rel: 0, showinfo: 0 } },
             vimeo: { playerOptions: { controls: false, byline: false, title: false } }
-          }}
+          } as any}
           style={{ position: 'absolute', top: 0, left: 0 }}
         />
       </div>
