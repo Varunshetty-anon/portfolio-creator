@@ -49,7 +49,11 @@ function normaliseError(err: any): AppError {
 
   // Multer file-size error
   if (err.code === 'LIMIT_FILE_SIZE') {
-    return new AppError('File size exceeds the allowed limit.', 400);
+    let msg = 'File size exceeds the allowed limit.';
+    if (err.field === 'image') msg = 'Image too large. Max size is 10MB.';
+    if (err.field === 'media') msg = 'Media too large. Max size is 15MB for images and 500MB for videos.';
+    if (err.field === 'video') msg = 'Video too large. Max size is 500MB.';
+    return new AppError(msg, 400);
   }
 
   // Already an AppError — return as-is

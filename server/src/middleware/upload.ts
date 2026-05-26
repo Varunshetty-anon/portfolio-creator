@@ -10,7 +10,7 @@ import type { Request } from 'express';
 import { AppError } from './errors.js';
 
 // ── Allowed MIME prefixes ───────────────────────────────────────────
-const IMAGE_MIMES = /^image\/(jpeg|png|gif|webp|svg\+xml|avif)$/;
+const IMAGE_MIMES = /^image\/(jpeg|png|webp)$/;
 const VIDEO_MIMES = /^video\/(mp4|quicktime|x-msvideo|webm|x-matroska)$/;
 const MEDIA_MIMES = new RegExp(`${IMAGE_MIMES.source}|${VIDEO_MIMES.source}`);
 
@@ -19,7 +19,7 @@ function imageFilter(_req: Request, file: Express.Multer.File, cb: FileFilterCal
   if (IMAGE_MIMES.test(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new AppError('Only image files (JPEG, PNG, GIF, WebP, AVIF, SVG) are allowed.', 400));
+    cb(new AppError('Unsupported file type. Use JPG, PNG or WEBP.', 400));
   }
 }
 

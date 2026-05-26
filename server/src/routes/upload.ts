@@ -73,6 +73,11 @@ router.post(
       }
 
       const isVideo = req.file.mimetype.startsWith('video/');
+      
+      if (!isVideo && req.file.size > 15 * 1024 * 1024) {
+        throw new AppError('Image too large. Max size is 15MB.', 400);
+      }
+
       const resourceType = isVideo ? 'video' : 'image';
 
       const uploadOptions: Record<string, unknown> = {

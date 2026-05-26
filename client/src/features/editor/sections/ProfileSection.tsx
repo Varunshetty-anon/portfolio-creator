@@ -58,9 +58,10 @@ export default function ProfileSection({ data, onChange }: ProfileSectionProps) 
       const result = await uploadApi.profileImage(file);
       handleInputChange('profileImageUrl', result.url);
       toast("Profile photo updated successfully.", "success");
-    } catch (err) {
+    } catch (err: any) {
       console.error("Upload failed", err);
-      toast("Failed to upload profile image. Please try again.", "error");
+      const errorMessage = err?.message || "Failed to upload profile image. Please try again.";
+      toast(errorMessage, "error");
     } finally {
       setIsUploading(false);
     }
