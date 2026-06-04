@@ -7,7 +7,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Volume2, VolumeX, Play, AlertCircle } from 'lucide-react';
-import { getYouTubeId, getVimeoId, isNativeVideo } from '@/lib/media-utils';
+import { getYouTubeId, getVimeoId, isNativeVideo, getGoogleDriveId } from '@/lib/media-utils';
 
 interface VideoPlayerProps {
   url: string;
@@ -44,7 +44,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
   const youtubeId = getYouTubeId(url);
   const vimeoId = getVimeoId(url);
-  const isNative = isNativeVideo(url);
+  const gdriveId = getGoogleDriveId(url);
+  const isNative = isNativeVideo(url) || !!gdriveId;
 
   const toggleMute = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -129,10 +130,21 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     // Native video
     if (isNative || url) {
+      let optimizedUrl = url;
+      
+      if (gdriveId) {
+        optimizedUrl = `https://drive.google.com/uc?export=download&id=${gdriveId}`;
+      } else if (url && url.includes('cloudinary.com/video/upload/')) {
+        // Don't inject if it already has transformations (simple check)
+        if (!url.includes('/upload/q_auto') && !url.includes('/upload/f_auto')) {
+          optimizedUrl = url.replace('/upload/', '/upload/q_auto,f_auto/');
+        }
+      }
+
       return (
         <video
           ref={videoRef}
-          src={url}
+          src={optimizedUrl}
           className="absolute inset-0 w-full h-full object-cover"
           autoPlay={autoplay}
           muted={isMuted}

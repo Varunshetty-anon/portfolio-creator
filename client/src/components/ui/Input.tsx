@@ -1,68 +1,107 @@
-import React from 'react';
+import React, { InputHTMLAttributes, ReactNode, TextareaHTMLAttributes, forwardRef } from 'react';
 
-interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
-  label?: string;
-  icon?: React.ReactNode;
-  error?: string;
-}
-
-interface TextAreaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'size'> {
   label?: string;
   error?: string;
+  hint?: string;
+  size?: 'sm' | 'md';
+  leftIcon?: ReactNode;
+  rightElement?: ReactNode;
 }
 
-export const Input: React.FC<InputProps> = ({
-  label,
-  icon,
-  error,
-  className = '',
-  ...props
-}) => (
-  <div className="w-full">
-    {label && (
-      <label className="block text-[10px] font-bold text-zinc-500 mb-1.5 uppercase tracking-wider">
-        {label}
-      </label>
-    )}
-    <div className="relative">
-      <input
-        className={`w-full bg-transparent border-b py-2.5 text-frames-text text-sm font-sans focus:outline-none focus:border-white transition-colors placeholder:text-frames-text-muted ${
-          icon ? 'pl-8 pr-4' : 'px-0'
-        } ${error ? 'border-red-500/50' : 'border-frames-border'} ${className}`}
-        {...props}
-      />
-      {icon && (
-        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none flex items-center justify-center">
-          {icon}
+export const Input = React.forwardRef<HTMLInputElement, InputProps>(
+  (
+    {
+      label,
+      error,
+      hint,
+      size = 'md',
+      leftIcon,
+      rightElement,
+      className = '',
+      id,
+      ...rest
+    },
+    ref
+  ) => {
+    const generatedId = React.useId();
+    const inputId = id || generatedId;
+
+    return (
+      <div className="flex flex-col gap-1 w-full">
+        {label && (
+          <label
+            htmlFor={inputId}
+            className="text-xs uppercase tracking-wider text-text-muted mb-1"
+          >
+            {label}
+          </label>
+        )}
+        <div className="relative flex items-center">
+          {leftIcon && (
+            <div className="absolute left-0 pl-0 flex items-center pointer-events-none text-text-muted">
+              {leftIcon}
+            </div>
+          )}
+          <input
+            ref={ref}
+            id={inputId}
+            className={`w-full bg-transparent border-0 border-b border-border text-text-primary placeholder:text-text-muted focus:ring-0 focus:outline-none focus:border-b-2 focus:border-accent transition-colors duration-fast ease-out ${
+              leftIcon ? 'pl-8' : 'pl-0'
+            } ${rightElement ? 'pr-10' : 'pr-0'} ${
+              size === 'sm' ? 'py-1 text-sm' : 'py-2 text-base'
+            } ${error ? 'border-danger focus:border-danger' : ''} ${className}`}
+            {...rest}
+          />
+          {rightElement && (
+            <div className="absolute right-0 pr-0 flex items-center">
+              {rightElement}
+            </div>
+          )}
         </div>
-      )}
-    </div>
-    {error && (
-      <p className="mt-1 text-xs text-red-400">{error}</p>
-    )}
-  </div>
+        {error && <span className="text-xs text-danger mt-1">{error}</span>}
+        {hint && !error && <span className="text-xs text-text-muted mt-1">{hint}</span>}
+      </div>
+    );
+  }
 );
 
-export const TextArea: React.FC<TextAreaProps> = ({
-  label,
-  error,
-  className = '',
-  ...props
-}) => (
-  <div className="w-full">
-    {label && (
-      <label className="block text-[10px] font-bold text-zinc-500 mb-1.5 uppercase tracking-wider">
-        {label}
-      </label>
-    )}
-    <textarea
-      className={`w-full bg-transparent border-b px-0 py-2.5 text-frames-text text-sm font-sans focus:outline-none focus:border-white transition-colors resize-none placeholder:text-frames-text-muted ${
-        error ? 'border-red-500/50' : 'border-frames-border'
-      } ${className}`}
-      {...props}
-    />
-    {error && (
-      <p className="mt-1 text-xs text-red-400">{error}</p>
-    )}
-  </div>
+Input.displayName = 'Input';
+
+export interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
+  label?: string;
+  error?: string;
+  hint?: string;
+}
+
+export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
+  ({ className, error, hint, label, id, ...props }, ref) => {
+    const generatedId = React.useId();
+    const textareaId = id || generatedId;
+
+    return (
+      <div className="flex flex-col gap-1 w-full">
+        {label && (
+          <label
+            htmlFor={textareaId}
+            className="text-xs uppercase tracking-wider text-text-muted mb-1"
+          >
+            {label}
+          </label>
+        )}
+        <textarea
+          ref={ref}
+          id={textareaId}
+          className={`w-full bg-transparent border-0 border-b border-border text-text-primary placeholder:text-text-muted focus:ring-0 focus:outline-none focus:border-b-2 focus:border-accent transition-colors duration-fast ease-out py-2 text-base min-h-[80px] resize-y ${
+            error ? 'border-danger focus:border-danger' : ''
+          } ${className}`}
+          {...props}
+        />
+        {error && <span className="text-xs text-danger mt-1">{error}</span>}
+        {hint && !error && <span className="text-xs text-text-muted mt-1">{hint}</span>}
+      </div>
+    );
+  }
 );
+
+Textarea.displayName = 'Textarea';

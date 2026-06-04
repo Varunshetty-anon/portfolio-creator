@@ -19,18 +19,28 @@ import { SkillsSection } from './components/SkillsSection';
 import { VideoPlayer } from '@/components/shared/VideoPlayer';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 
-export default function PortfolioLayout() {
+export interface PortfolioLayoutProps {
+  isPreviewMode?: boolean;
+  draftData?: { portfolio: PortfolioData; projects: Project[] };
+}
+
+export default function PortfolioLayout({ isPreviewMode = false, draftData }: PortfolioLayoutProps) {
   const { username } = useParams<{ username: string }>();
   
   const [data, setData] = useState<{ portfolio: PortfolioData; projects: Project[] } | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!isPreviewMode);
   const [error, setError] = useState<string | null>(null);
   
-  const [introFinished, setIntroFinished] = useState(false);
+  const [introFinished, setIntroFinished] = useState(isPreviewMode);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
-  // Fetch portfolio data
+  // Fetch portfolio data if not in preview mode
   useEffect(() => {
+    if (isPreviewMode) {
+      if (draftData) setData(draftData);
+      return;
+    }
+
     let isMounted = true;
     
     async function loadPortfolio() {
@@ -60,7 +70,7 @@ export default function PortfolioLayout() {
 
     loadPortfolio();
     return () => { isMounted = false; };
-  }, [username]);
+  }, [username, isPreviewMode, draftData]);
 
   // Track clicks on projects
   const handleProjectClick = (project: Project) => {
@@ -89,62 +99,97 @@ export default function PortfolioLayout() {
   const { portfolio, projects } = data;
   const content = portfolio.liveContent || portfolio; // Use live content if available, fallback to root
 
+  const themeClass = content.theme && content.theme !== 'minimalism' ? `theme-${content.theme}` : '';
+
   return (
-    <div className="min-h-screen bg-frames-bg text-frames-text font-sans selection:bg-accent-gold/30 selection:text-white">
+    <div className={`min-h-screen bg-frames-bg text-frames-text font-sans selection:bg-accent-gold/30 selection:text-white ${themeClass}`}>
       
       {/* Intro Cinematic */}
-      <IntroOverlay 
-        name={content.name || username || 'Portfolio'} 
-        role={content.role || 'Creator'} 
-        onComplete={() => setIntroFinished(true)} 
-      />
+      {!isPreviewMode && (
+        <IntroOverlay 
+          name={content.name || username || 'Portfolio'} 
+          role={content.role || 'Creator'} 
+          onComplete={() => setIntroFinished(true)} 
+        />
+      )}
 
       {/* Main Content (revealed after intro or immediately if skipped) */}
       <motion.div 
-        className="flex flex-col lg:flex-row min-h-screen"
+        className={`flex ${isPreviewMode ? 'flex-col' : 'flex-col lg:flex-row'} min-h-screen`}
         initial={{ opacity: 0 }}
         animate={{ opacity: introFinished ? 1 : 0 }}
         transition={{ duration: 1 }}
       >
         {/* Left Sidebar (Fixed on Desktop) */}
-        <ProfileSidebar data={content as PortfolioData} />
+        <ProfileSidebar data={content as PortfolioData} isPreviewMode={isPreviewMode} />
 
         {/* Right Content Area */}
-        <main className="flex-1 lg:ml-[360px] w-full relative">
+        <main className={`flex-1 ${isPreviewMode ? 'w-full' : 'lg:ml-[360px] w-full'} relative`}>
           
-          {/* Showreel Section */}
-          {content.showreelUrl && (
-            <section className="w-full h-[50vh] lg:h-[70vh] min-h-[400px] bg-black relative border-b border-frames-border">
-              <VideoPlayer 
-                url={content.showreelUrl}
-                thumbnail={content.showreelThumbnailUrl}
-                autoplay={introFinished}
-                muted={true}
-                controls={false}
-                loop={true}
-                className="w-full h-full rounded-none"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-frames-bg via-transparent to-transparent opacity-80 pointer-events-none" />
+          {/* Showreel Section (Cinematic Hero) */}
+          {content.showreelUrl ? (
+            <section className="w-full h-[70vh] lg:h-screen min-h-[500px] bg-black relative overflow-hidden group">
+              <motion.div
+                initial={{ scale: 1.05 }}
+                animate={{ scale: 1 }}
+                transition={{ duration: 1.5, ease: "easeOut" }}
+                className="w-full h-full"
+              >
+                <VideoPlayer 
+                  url={content.showreelUrl}
+                  thumbnail={content.showreelThumbnailUrl}
+                  autoplay={introFinished}
+                  muted={true}
+                  controls={false}
+                  loop={true}
+                  className="w-full h-full rounded-none"
+                />
+              </motion.div>
               
-              <div className="absolute bottom-8 left-8 right-8 lg:bottom-12 lg:left-12">
-                <h2 className="text-sm font-bold uppercase tracking-[0.3em] text-accent-gold mb-2">Showreel</h2>
-                <h3 className="text-2xl lg:text-4xl font-display font-bold text-white">Selected Works</h3>
-              </div>
+              {/* Cinematic Vignette */}
+              <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-bg-base pointer-events-none" />
+              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-transparent via-transparent to-black/50 pointer-events-none" />
+              
+              <motion.div 
+                className="absolute bottom-12 left-8 right-8 lg:bottom-24 lg:left-16"
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5, duration: 0.8 }}
+              >
+                <h2 className="text-sm font-bold uppercase tracking-[0.3em] text-accent mb-3">Showreel</h2>
+                <h3 className="text-3xl lg:text-6xl font-display font-bold text-white drop-shadow-xl">
+                  {content.role || 'Selected Works'}
+                </h3>
+              </motion.div>
+            </section>
+          ) : (
+            <section className="w-full h-[40vh] bg-bg-raised relative flex flex-col justify-end p-8 lg:p-16 border-b border-border">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+              >
+                <h3 className="text-4xl lg:text-5xl font-display font-bold text-text-primary">
+                  {content.role || 'Selected Works'}
+                </h3>
+              </motion.div>
             </section>
           )}
-
-          {/* Spacer if no showreel */}
-          {!content.showreelUrl && <div className="h-12 lg:h-24"></div>}
 
           {/* Main Container */}
           <div className="px-8 lg:px-16 pb-32">
             
             {/* Projects Grid */}
-            <section className="py-12">
-              <div className="flex items-end justify-between mb-10">
-                <h2 className="text-2xl lg:text-3xl font-display font-bold text-white">Projects</h2>
-                <span className="text-zinc-500 font-medium">{projects.length} Works</span>
-              </div>
+            <section className="py-16 lg:py-24">
+              <motion.div 
+                className="flex items-end justify-between mb-12"
+                initial={{ opacity: 0 }}
+                whileInView={{ opacity: 1 }}
+                viewport={{ once: true }}
+              >
+                <h2 className="text-2xl lg:text-4xl font-display font-bold text-text-primary">Projects</h2>
+                <span className="text-text-muted font-medium tracking-wide uppercase text-xs">{projects.length} Works</span>
+              </motion.div>
               
               <ProjectGrid 
                 projects={projects} 

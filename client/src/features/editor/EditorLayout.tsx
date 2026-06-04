@@ -1,11 +1,6 @@
-// ========================
-// FRAMES EditorLayout
-// ========================
-// Main editor view for authenticated users to build their portfolio.
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Film, Palette, Eye, LogOut, Check, Save, Loader2, Play } from 'lucide-react';
+import { User, Film, Palette, LogOut, Check, Save, Loader2, Share2, PanelRightClose, PanelRightOpen, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import { useAuth } from '@/context/AuthContext';
@@ -15,10 +10,13 @@ import { INITIAL_PORTFOLIO } from '@/types';
 
 import { Button } from '@/components/ui/Button';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
+import { ShareModal } from '@/components/shared/ShareModal';
 
 import ProfileSection from './sections/ProfileSection';
 import ProjectsSection from './sections/ProjectsSection';
 import DesignSection from './sections/DesignSection';
+import PortfolioLayout from '@/features/portfolio/PortfolioLayout';
+import type { Project } from '@/types';
 import { Logo } from '@/components/shared/Logo';
 
 type TabType = 'profile' | 'projects' | 'design';
@@ -28,7 +26,10 @@ export default function EditorLayout() {
   const navigate = useNavigate();
   
   const [activeTab, setActiveTab] = useState<TabType>('profile');
+  const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(true);
+  
   const [portfolio, setPortfolio] = useState<PortfolioData>(INITIAL_PORTFOLIO);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
   // Save State
@@ -38,6 +39,7 @@ export default function EditorLayout() {
   // Publish State
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishStatus, setPublishStatus] = useState<'idle' | 'success'>('idle');
+  const [showShareModal, setShowShareModal] = useState(false);
 
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -48,8 +50,10 @@ export default function EditorLayout() {
       try {
         const res = await portfolioApi.get() as any;
         if (isMounted && res.portfolio) {
-          // Merge with initial to ensure all fields exist
           setPortfolio({ ...INITIAL_PORTFOLIO, ...res.portfolio });
+        }
+        if (isMounted && res.projects) {
+          setProjects(res.projects);
         }
       } catch (err) {
         console.error("Failed to load portfolio:", err);
@@ -61,28 +65,22 @@ export default function EditorLayout() {
     return () => { isMounted = false; };
   }, []);
 
-  // Auto-Save Logic (Debounced 2.5s)
+  // Auto-Save Logic (Debounced 1.5s)
   const triggerAutoSave = useCallback((dataToSave: PortfolioData) => {
     setHasUnsavedChanges(true);
-    
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
 
     saveTimeoutRef.current = setTimeout(async () => {
       try {
         setIsSaving(true);
-        // Clean up UI-only or protected fields before sending if needed
-        // The backend handles merging. We just send the full draft.
         await portfolioApi.update(dataToSave);
         setHasUnsavedChanges(false);
       } catch (err) {
         console.error("Auto-save failed:", err);
-        // Keep unsaved indicator on
       } finally {
         setIsSaving(false);
       }
-    }, 2500);
+    }, 1500);
   }, []);
 
   const handleChange = (newData: PortfolioData) => {
@@ -93,7 +91,6 @@ export default function EditorLayout() {
   const handlePublish = async () => {
     try {
       setIsPublishing(true);
-      // Force a synchronous save first if there are unsaved changes
       if (hasUnsavedChanges) {
         if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
         await portfolioApi.update(portfolio);
@@ -126,46 +123,42 @@ export default function EditorLayout() {
   }
 
   const tabs = [
-    { id: 'profile', label: 'Profile', icon: User },
+    { id: 'profile', label: 'Identity', icon: User },
     { id: 'projects', label: 'Projects', icon: Film },
-    { id: 'design', label: 'Design & Tools', icon: Palette },
+    { id: 'design', label: 'Design', icon: Palette },
   ] as const;
 
   return (
-    <div className="flex h-screen bg-frames-bg text-frames-text font-sans overflow-hidden">
+    <div className="flex h-screen bg-bg-base text-text-primary font-body overflow-hidden">
       
-      {/* ── Left Sidebar ── */}
-      <aside className="w-20 lg:w-64 border-r border-frames-border bg-frames-surface flex flex-col transition-all duration-300 z-20">
-        
-        {/* Logo Area */}
-        <div className="h-16 flex items-center justify-center lg:justify-start lg:px-6 border-b border-frames-border">
+      {/* ── Slim Left Sidebar (Navigation) ── */}
+      <aside className="w-16 md:w-[72px] border-r border-border bg-bg-floating flex flex-col items-center py-4 z-20 shrink-0">
+        <div className="mb-8">
           <Logo />
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 py-6 px-3 flex flex-col gap-2">
+        <nav className="flex-1 w-full flex flex-col gap-3 px-3">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as TabType)}
+                onClick={() => {
+                  setActiveTab(tab.id as TabType);
+                  setIsRightSidebarOpen(true);
+                }}
                 className={`
-                  flex items-center p-3 rounded-lg transition-all group relative
-                  ${isActive 
-                    ? 'bg-zinc-800 text-white' 
-                    : 'text-zinc-400 hover:bg-zinc-900/50 hover:text-zinc-200'}
+                  relative flex items-center justify-center w-full aspect-square rounded-xl transition-all group
+                  ${isActive ? 'bg-bg-raised text-text-primary' : 'text-text-muted hover:bg-bg-raised/50 hover:text-text-primary'}
                 `}
+                title={tab.label}
               >
-                <Icon size={20} className={`shrink-0 ${isActive ? 'text-accent-gold' : 'group-hover:text-white'}`} />
-                <span className="hidden lg:block ml-3 font-medium text-sm">{tab.label}</span>
-                
-                {/* Active Indicator Line */}
+                <Icon size={20} className={isActive ? 'text-accent' : ''} strokeWidth={isActive ? 2.5 : 2} />
                 {isActive && (
                   <motion.div 
-                    layoutId="activeTab"
-                    className="absolute left-0 top-2 bottom-2 w-1 bg-accent-gold rounded-r-full"
+                    layoutId="activeTabIndicator"
+                    className="absolute left-0 top-1/4 bottom-1/4 w-[3px] bg-accent rounded-r-full"
                   />
                 )}
               </button>
@@ -173,126 +166,156 @@ export default function EditorLayout() {
           })}
         </nav>
 
-        {/* Bottom Area (Logout / User) */}
-        <div className="p-4 border-t border-frames-border">
+        <div className="mt-auto px-3 w-full">
           <button 
             onClick={handleLogout}
-            className="w-full flex items-center justify-center lg:justify-start p-2 text-zinc-500 hover:text-white transition-colors rounded-lg hover:bg-zinc-900"
+            className="w-full flex items-center justify-center aspect-square text-text-muted hover:text-danger hover:bg-danger/10 transition-colors rounded-xl"
             title="Log out"
           >
-            <LogOut size={18} />
-            <span className="hidden lg:block ml-3 text-sm font-medium">Sign Out</span>
+            <LogOut size={20} />
           </button>
         </div>
       </aside>
 
-      {/* ── Main Content Area ── */}
-      <main className="flex-1 flex flex-col min-w-0 relative bg-frames-bg">
-        
-        {/* Top Header */}
-        <header className="h-16 border-b border-frames-border bg-frames-surface/80 backdrop-blur-md flex items-center justify-between px-6 z-10">
+      {/* ── Main Canvas (Live Preview) ── */}
+      <main className="flex-1 relative bg-bg-raised flex flex-col min-w-0">
+        {/* Floating Top Header */}
+        <header className="absolute top-4 left-4 right-4 z-10 flex items-center justify-between pointer-events-none">
           
           {/* Status Indicator */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-widest">
-              {isSaving ? (
-                <>
-                  <Loader2 size={12} className="animate-spin text-zinc-400" />
-                  <span className="text-zinc-400">Saving...</span>
-                </>
-              ) : hasUnsavedChanges ? (
-                <>
-                  <div className="w-1.5 h-1.5 rounded-full bg-accent-gold animate-pulse" />
-                  <span className="text-accent-gold">Unsaved Changes</span>
-                </>
-              ) : (
-                <>
-                  <Check size={12} className="text-zinc-600" />
-                  <span className="text-zinc-600">Saved</span>
-                </>
-              )}
-            </div>
+          <div className="bg-bg-floating/80 backdrop-blur-md border border-border px-4 py-2 rounded-full shadow-sm pointer-events-auto flex items-center gap-2 text-xs font-medium uppercase tracking-widest">
+            {isSaving ? (
+              <>
+                <Loader2 size={12} className="animate-spin text-text-muted" />
+                <span className="text-text-muted">Saving...</span>
+              </>
+            ) : hasUnsavedChanges ? (
+              <>
+                <div className="w-1.5 h-1.5 rounded-full bg-warning animate-pulse" />
+                <span className="text-warning">Unsaved</span>
+              </>
+            ) : (
+              <>
+                <Check size={12} className="text-success" />
+                <span className="text-text-muted">Saved</span>
+              </>
+            )}
           </div>
 
           {/* Actions */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 bg-bg-floating/80 backdrop-blur-md border border-border p-1.5 rounded-full shadow-sm pointer-events-auto">
             {portfolio.isPublished && portfolio.username && (
-              <a 
-                href={`/portfolio/${portfolio.username}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hidden sm:flex items-center text-xs font-medium text-zinc-400 hover:text-white transition-colors"
-              >
-                <Eye size={14} className="mr-1.5" />
-                View Live
-              </a>
+              <>
+                <button
+                  onClick={() => window.open(`/portfolio/${portfolio.username}`, '_blank')}
+                  className="p-2 text-text-muted hover:text-text-primary transition-colors rounded-full hover:bg-bg-raised"
+                  title="Open Live Site"
+                >
+                  <ExternalLink size={16} />
+                </button>
+                <button
+                  onClick={() => setShowShareModal(true)}
+                  className="p-2 text-text-muted hover:text-accent transition-colors rounded-full hover:bg-bg-raised"
+                  title="Share Portfolio"
+                >
+                  <Share2 size={16} />
+                </button>
+                <div className="w-px h-4 bg-border mx-1" />
+              </>
             )}
             
             <Button 
               size="sm" 
               onClick={handlePublish}
               loading={isPublishing}
-              className={`
-                transition-all duration-300 min-w-[100px]
-                ${publishStatus === 'success' ? 'bg-green-600 hover:bg-green-700 text-white border-green-500' : ''}
-              `}
+              className={`rounded-full px-5 ${publishStatus === 'success' ? 'bg-success text-white' : 'bg-text-primary text-bg-base hover:bg-text-primary/90'}`}
             >
-              {publishStatus === 'success' ? (
-                <><Check size={14} className="mr-2" /> Published</>
-              ) : (
-                <><Save size={14} className="mr-2" /> Publish</>
-              )}
+              {publishStatus === 'success' ? 'Published' : 'Publish'}
             </Button>
+            
+            <button
+              onClick={() => setIsRightSidebarOpen(!isRightSidebarOpen)}
+              className="p-2 ml-1 text-text-muted hover:text-text-primary transition-colors rounded-full hover:bg-bg-raised md:hidden"
+            >
+              {isRightSidebarOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
+            </button>
           </div>
         </header>
 
-        {/* Scrollable Workspace */}
-        <div className="flex-1 overflow-y-auto scrollbar-hide p-4 md:p-8 lg:p-12">
-          <div className="max-w-4xl mx-auto pb-24">
-            
-            {/* Header Title */}
-            <div className="mb-10">
-              <h1 className="text-3xl font-display font-bold text-white mb-2 capitalize">
-                {activeTab}
-              </h1>
-              <p className="text-zinc-500 text-sm">
-                {activeTab === 'profile' && 'Manage your personal information and online presence.'}
-                {activeTab === 'projects' && 'Add, edit, and reorder your portfolio pieces.'}
-                {activeTab === 'design' && 'Configure your tools, skills, and account settings.'}
-              </p>
-            </div>
-
-            {/* Tab Content */}
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeTab}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.2 }}
-              >
-                {activeTab === 'profile' && (
-                  <ProfileSection data={portfolio} onChange={handleChange} />
-                )}
-                {activeTab === 'projects' && (
-                  <ProjectsSection 
-                    data={portfolio} 
-                    onChange={handleChange} 
-                    onAutoSave={() => triggerAutoSave(portfolio)} 
-                  />
-                )}
-                {activeTab === 'design' && (
-                  <DesignSection 
-                    data={portfolio} 
-                    onChange={handleChange} 
-                  />
-                )}
-              </motion.div>
-            </AnimatePresence>
-
+        {/* The Live Portfolio Canvas */}
+        <div className="w-full h-full overflow-hidden border-x border-border/50">
+          <div className="w-full h-full overflow-y-auto scrollbar-hide">
+            <PortfolioLayout 
+              isPreviewMode 
+              draftData={{ portfolio, projects }} 
+            />
           </div>
         </div>
       </main>
+
+      {/* ── Right Property Sidebar ── */}
+      <AnimatePresence>
+        {isRightSidebarOpen && (
+          <motion.aside 
+            initial={{ width: 0, opacity: 0 }}
+            animate={{ width: 380, opacity: 1 }}
+            exit={{ width: 0, opacity: 0 }}
+            className="w-full max-w-[380px] shrink-0 border-l border-border bg-bg-floating flex flex-col z-20"
+          >
+            <div className="h-14 border-b border-border flex items-center justify-between px-5 shrink-0">
+              <h2 className="text-sm font-medium capitalize text-text-primary">
+                {activeTab} Properties
+              </h2>
+              <button 
+                onClick={() => setIsRightSidebarOpen(false)}
+                className="text-text-muted hover:text-text-primary transition-colors"
+              >
+                <PanelRightClose size={16} />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-5 scrollbar-hide">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activeTab}
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  {activeTab === 'profile' && (
+                    <ProfileSection data={portfolio} onChange={handleChange} />
+                  )}
+                  {activeTab === 'projects' && (
+                    <ProjectsSection 
+                      data={portfolio} 
+                      onChange={handleChange} 
+                      onAutoSave={() => triggerAutoSave(portfolio)} 
+                      projects={projects}
+                      onChangeProjects={setProjects}
+                    />
+                  )}
+                  {activeTab === 'design' && (
+                    <DesignSection 
+                      data={portfolio} 
+                      onChange={handleChange} 
+                    />
+                  )}
+                </motion.div>
+              </AnimatePresence>
+            </div>
+          </motion.aside>
+        )}
+      </AnimatePresence>
+
+      {/* Share Modal */}
+      {portfolio.username && (
+        <ShareModal 
+          isOpen={showShareModal} 
+          onClose={() => setShowShareModal(false)} 
+          username={portfolio.username} 
+        />
+      )}
     </div>
   );
 }

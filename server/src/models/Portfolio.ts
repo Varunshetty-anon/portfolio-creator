@@ -43,6 +43,7 @@ export interface IPortfolio extends Document {
   showreelThumbnailUrl?: string;
   socials?: ISocials;
   availability?: IAvailability;
+  theme?: 'magazine' | 'futuristic' | 'glassmorphic' | 'minimalism';
   draftContent?: Record<string, unknown>;
   liveContent?: Record<string, unknown>;
   createdAt: Date;
@@ -90,6 +91,7 @@ const portfolioSchema = new Schema<IPortfolio>(
       status: { type: Boolean },
       link: { type: String },
     },
+    theme: { type: String, enum: ['magazine', 'futuristic', 'glassmorphic', 'minimalism'], default: 'minimalism' },
     draftContent: { type: Schema.Types.Mixed },
     liveContent: { type: Schema.Types.Mixed },
   },

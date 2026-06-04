@@ -18,11 +18,11 @@ export const ProjectGrid: React.FC<ProjectGridProps> = ({ projects, onProjectCli
   if (!projects || projects.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-32 text-center">
-        <div className="w-16 h-16 rounded-full bg-zinc-900 flex items-center justify-center mb-4">
-          <Play size={24} className="text-zinc-600" />
+        <div className="w-16 h-16 rounded-full bg-bg-raised flex items-center justify-center mb-4">
+          <Play size={24} className="text-text-muted" />
         </div>
-        <h3 className="text-xl font-display font-medium text-white mb-2">No projects yet</h3>
-        <p className="text-zinc-500 text-sm max-w-md">
+        <h3 className="text-xl font-display font-medium text-text-primary mb-2">No projects yet</h3>
+        <p className="text-text-muted text-sm max-w-md">
           This portfolio is currently empty.
         </p>
       </div>
@@ -63,7 +63,7 @@ export const ProjectGrid: React.FC<ProjectGridProps> = ({ projects, onProjectCli
           <motion.div
             key={project._id || project.id}
             variants={item}
-            className={`group relative rounded-2xl overflow-hidden bg-frames-surface border border-frames-border shadow-cinematic cursor-pointer ${
+            className={`group relative rounded-2xl overflow-hidden bg-bg-base border border-border shadow-cinematic cursor-pointer ${
               project.aspectRatio === '9:16' ? 'md:row-span-2' : ''
             }`}
             onClick={() => onProjectClick(project)}
@@ -80,8 +80,8 @@ export const ProjectGrid: React.FC<ProjectGridProps> = ({ projects, onProjectCli
                   loading="lazy"
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center bg-zinc-800">
-                  <Play size={32} className="text-zinc-700" />
+                <div className="w-full h-full flex items-center justify-center bg-bg-raised">
+                  <Play size={32} className="text-text-muted" />
                 </div>
               )}
             </div>
@@ -91,7 +91,7 @@ export const ProjectGrid: React.FC<ProjectGridProps> = ({ projects, onProjectCli
               
               <div className="transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-accent-gold bg-accent-gold/10 px-2 py-1 rounded backdrop-blur-md">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-accent bg-accent/10 px-2 py-1 rounded backdrop-blur-md">
                     {typeLabel}
                   </span>
                   {project.videoUrl && (
@@ -108,12 +108,12 @@ export const ProjectGrid: React.FC<ProjectGridProps> = ({ projects, onProjectCli
                 {project.softwareUsed && project.softwareUsed.length > 0 && (
                   <div className="flex flex-wrap gap-2 mt-4">
                     {project.softwareUsed.slice(0, 3).map(tool => (
-                      <span key={tool} className="text-[10px] text-zinc-300 font-medium bg-white/10 px-2 py-1 rounded backdrop-blur-md">
+                      <span key={tool} className="text-[10px] text-text-secondary font-medium bg-white/10 px-2 py-1 rounded backdrop-blur-md">
                         {tool}
                       </span>
                     ))}
                     {project.softwareUsed.length > 3 && (
-                      <span className="text-[10px] text-zinc-400 font-medium bg-white/5 px-2 py-1 rounded backdrop-blur-md">
+                      <span className="text-[10px] text-text-muted font-medium bg-white/5 px-2 py-1 rounded backdrop-blur-md">
                         +{project.softwareUsed.length - 3}
                       </span>
                     )}

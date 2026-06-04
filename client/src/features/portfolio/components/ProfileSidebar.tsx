@@ -11,9 +11,10 @@ import type { PortfolioData } from '@/types';
 
 interface ProfileSidebarProps {
   data: PortfolioData;
+  isPreviewMode?: boolean;
 }
 
-export const ProfileSidebar: React.FC<ProfileSidebarProps> = ({ data }) => {
+export const ProfileSidebar: React.FC<ProfileSidebarProps> = ({ data, isPreviewMode }) => {
   const { name, role, bio, location, languages, contactEmail, profileImageUrl, socials, availability } = data;
 
   const socialIcons = {
@@ -26,7 +27,7 @@ export const ProfileSidebar: React.FC<ProfileSidebarProps> = ({ data }) => {
 
   return (
     <motion.aside 
-      className="w-full lg:w-[360px] lg:fixed lg:h-screen lg:overflow-y-auto lg:border-r border-frames-border bg-frames-surface lg:glass-strong backdrop-blur-xl z-10 scrollbar-hide"
+      className={`w-full ${isPreviewMode ? '' : 'lg:w-[360px] lg:fixed lg:h-screen lg:overflow-y-auto lg:border-r'} border-border bg-bg-base ${isPreviewMode ? '' : 'lg:glass-strong'} backdrop-blur-xl z-10 scrollbar-hide`}
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 1, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
@@ -36,7 +37,7 @@ export const ProfileSidebar: React.FC<ProfileSidebarProps> = ({ data }) => {
         {/* Profile Image */}
         {profileImageUrl && (
           <div className="mb-8">
-            <div className="w-24 h-24 lg:w-32 lg:h-32 rounded-full overflow-hidden border-2 border-zinc-800 shadow-2xl relative group">
+            <div className="w-24 h-24 lg:w-32 lg:h-32 rounded-full overflow-hidden border-2 border-border shadow-2xl relative group">
               <img 
                 src={profileImageUrl} 
                 alt={name} 
@@ -49,28 +50,28 @@ export const ProfileSidebar: React.FC<ProfileSidebarProps> = ({ data }) => {
 
         {/* Identity */}
         <div className="mb-10">
-          <h1 className="text-3xl lg:text-4xl font-display font-bold text-white mb-2 tracking-tight">{name}</h1>
-          <p className="text-xs tracking-[0.2em] uppercase text-frames-text-muted font-display">{role}</p>
+          <h1 className="text-3xl lg:text-4xl font-display font-bold text-text-primary mb-2 tracking-tight">{name}</h1>
+          <p className="text-xs tracking-[0.2em] uppercase text-text-muted font-display">{role}</p>
         </div>
 
         {/* Bio */}
         {bio && (
           <div className="mb-10">
-            <p className="text-frames-text-subtle text-sm leading-relaxed whitespace-pre-wrap">{bio}</p>
+            <p className="text-text-secondary text-sm leading-relaxed whitespace-pre-wrap">{bio}</p>
           </div>
         )}
 
         {/* Meta Info */}
         {(location || languages) && (
-          <div className="flex flex-col gap-3 mb-10 pb-8 border-b border-frames-border">
+          <div className="flex flex-col gap-3 mb-10 pb-8 border-b border-border">
             {location && (
-              <div className="flex items-center text-xs text-zinc-500 font-medium">
+              <div className="flex items-center text-xs text-text-muted font-medium">
                 <MapPin size={14} className="mr-2 opacity-70" />
                 {location}
               </div>
             )}
             {languages && (
-              <div className="flex items-center text-xs text-zinc-500 font-medium">
+              <div className="flex items-center text-xs text-text-muted font-medium">
                 <MessageSquare size={14} className="mr-2 opacity-70" />
                 {languages}
               </div>
@@ -80,20 +81,20 @@ export const ProfileSidebar: React.FC<ProfileSidebarProps> = ({ data }) => {
 
         {/* Availability Badge */}
         {availability?.status && (
-          <div className="mb-8 p-4 rounded-xl bg-green-500/10 border border-green-500/20 flex flex-col items-center text-center">
+          <div className="mb-8 p-4 rounded-xl bg-success/10 border border-success/20 flex flex-col items-center text-center">
             <div className="flex items-center justify-center gap-2 mb-2">
               <span className="relative flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-success"></span>
               </span>
-              <span className="text-xs font-bold uppercase tracking-wider text-green-400">Available for Work</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-success">Available for Work</span>
             </div>
             {availability.link && (
               <a 
                 href={availability.link}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-zinc-400 hover:text-white transition-colors underline decoration-zinc-700 underline-offset-4"
+                className="text-xs text-text-muted hover:text-text-primary transition-colors underline decoration-border-strong underline-offset-4"
               >
                 Hire Me
               </a>
@@ -129,7 +130,7 @@ export const ProfileSidebar: React.FC<ProfileSidebarProps> = ({ data }) => {
                     href={url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-zinc-500 hover:text-white transition-colors p-2 hover:bg-zinc-800 rounded-full"
+                    className="text-text-muted hover:text-text-primary transition-colors p-2 hover:bg-bg-floating rounded-full"
                     aria-label={network}
                   >
                     <Icon size={18} />

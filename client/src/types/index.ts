@@ -18,7 +18,7 @@ export interface Project {
   description: string;
   thumbnailUrl: string;
   videoUrl: string;
-  videoSource: 'cloudinary' | 'youtube' | 'vimeo' | 'direct';
+  videoSource: 'cloudinary' | 'youtube' | 'vimeo' | 'gdrive' | 'direct';
   aspectRatio: '16:9' | '9:16' | '4:3' | '1:1';
   contentType: string;
   subjectMatter: string;
@@ -42,6 +42,7 @@ export interface PortfolioData {
   languages: string;
   contactEmail: string;
   profileImageUrl: string;
+  theme?: 'magazine' | 'futuristic' | 'glassmorphic' | 'minimalism';
 
   // Showreel
   showreelUrl: string;
@@ -135,4 +136,5 @@ export const INITIAL_PORTFOLIO: PortfolioData = {
   tools: [],
   aiTools: [],
   projects: [],
+  theme: 'minimalism',
 };

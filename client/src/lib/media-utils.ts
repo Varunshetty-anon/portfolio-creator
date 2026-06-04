@@ -71,17 +71,28 @@ export const getVimeoId = (url: string): string | null => {
 };
 
 /**
+ * Extract Google Drive file ID from URL.
+ */
+export const getGoogleDriveId = (url: string): string | null => {
+  if (!url) return null;
+  // Matches: https://drive.google.com/file/d/FILE_ID/view
+  // Or: https://drive.google.com/open?id=FILE_ID
+  const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
+  return match ? match[1] : null;
+};
+
+/**
  * Detect video source type from URL.
  */
 export const detectVideoSource = (
   url: string
-): 'youtube' | 'vimeo' | 'cloudinary' | 'direct' => {
+): 'youtube' | 'vimeo' | 'cloudinary' | 'gdrive' | 'direct' => {
   if (!url) return 'direct';
   const u = url.toLowerCase();
   if (u.includes('youtube.com') || u.includes('youtu.be')) return 'youtube';
   if (u.includes('vimeo.com')) return 'vimeo';
-  if (u.includes('cloudinary.com') || u.includes('res.cloudinary.com'))
-    return 'cloudinary';
+  if (u.includes('cloudinary.com') || u.includes('res.cloudinary.com')) return 'cloudinary';
+  if (u.includes('drive.google.com')) return 'gdrive';
   return 'direct';
 };
 
@@ -94,6 +105,7 @@ export const isNativeVideo = (url: string): boolean => {
   return (
     u.includes('cloudinary.com') ||
     u.includes('dl.dropboxusercontent.com') ||
+    u.includes('drive.google.com') ||
     u.endsWith('.mp4') ||
     u.endsWith('.webm') ||
     u.endsWith('.mov')

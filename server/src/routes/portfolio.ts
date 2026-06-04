@@ -74,6 +74,7 @@ router.post('/', authenticateToken, async (req: Request, res: Response, next: Ne
       showreelThumbnailUrl: req.body.showreelThumbnailUrl,
       socials: req.body.socials,
       availability: req.body.availability,
+      theme: req.body.theme || 'minimalism',
       draftContent: req.body.draftContent,
     });
 
@@ -97,7 +98,7 @@ router.put('/', authenticateToken, async (req: Request, res: Response, next: Nex
     const editable = [
       'name', 'role', 'bio', 'location', 'languages', 'contactEmail',
       'profileImageUrl', 'showreelUrl', 'showreelThumbnailUrl',
-      'socials', 'availability', 'draftContent',
+      'socials', 'availability', 'theme', 'draftContent',
     ] as const;
 
     for (const field of editable) {
@@ -207,6 +208,7 @@ router.get(
             showreelThumbnailUrl: portfolio.showreelThumbnailUrl,
             socials: portfolio.socials,
             availability: portfolio.availability,
+            theme: portfolio.theme,
             liveContent: portfolio.liveContent,
             publishedAt: portfolio.publishedAt,
           },

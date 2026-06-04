@@ -7,8 +7,9 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GripVertical, ChevronDown, ChevronUp, Trash2, Link as LinkIcon, Image as ImageIcon, Loader2 } from 'lucide-react';
 import type { Project } from '@/types';
-import { Input, TextArea } from '@/components/ui/Input';
+import { Input, Textarea } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { MediaManager } from '@/components/shared/MediaManager';
 import { PROJECT_CONTENT_TYPES, PROJECT_SUBJECT_MATTERS, EDITING_TOOLS_LIST, AI_TOOLS_LIST } from '@/lib/constants';
 import { getVideoMetadata, detectVideoSource } from '@/lib/media-utils';
 
@@ -137,44 +138,40 @@ export default function ProjectCardEditor({
             <div className="p-6 space-y-6">
               
               {/* URL & Thumbnail Row */}
-              <div className="flex flex-col md:flex-row gap-6">
-                <div className="w-full md:w-1/3 aspect-video bg-black rounded-lg border border-zinc-800 overflow-hidden relative flex flex-col items-center justify-center group">
-                  {project.thumbnailUrl ? (
-                    <>
-                      <img src={project.thumbnailUrl} alt="" className="w-full h-full object-cover" />
-                      <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button size="sm" variant="secondary" className="text-xs">
-                          Change Thumbnail
-                        </Button>
-                      </div>
-                      <div className="absolute bottom-2 right-2 bg-black/80 backdrop-blur text-[10px] px-2 py-1 rounded text-zinc-400 font-medium tracking-wider">
-                        {project.aspectRatio || '16:9'}
-                      </div>
-                    </>
-                  ) : (
-                    <div className="text-zinc-600 flex flex-col items-center">
-                      <ImageIcon size={24} className="mb-2 opacity-50" />
-                      <span className="text-xs font-medium">No thumbnail</span>
+              <div className="flex flex-col gap-6">
+                <div>
+                  <label className="text-xs font-medium text-text-muted mb-2 block">Project Media (Video/Image)</label>
+                  <MediaManager
+                    type="project"
+                    currentUrl={project.videoUrl}
+                    allowUrlInput={true}
+                    onUrlSave={(url) => handleFieldChange('videoUrl', url)}
+                    onUploadComplete={(url, thumb) => {
+                      onChange({ ...project, videoUrl: url, thumbnailUrl: thumb || project.thumbnailUrl });
+                    }}
+                    onRemove={() => handleFieldChange('videoUrl', '')}
+                  />
+                  {linkError && <p className="text-xs text-danger mt-1">{linkError}</p>}
+                  {project.videoSource === 'gdrive' && (
+                    <div className="mt-2 p-3 bg-info/10 border border-info/30 rounded-md">
+                      <p className="text-xs text-info">
+                        <strong>Google Drive Link Detected.</strong> Make sure this file is shared with "Anyone with the link can view".
+                      </p>
                     </div>
                   )}
                 </div>
-                
-                <div className="flex-1 space-y-4">
-                  <div className="relative">
-                    <Input
-                      label="Video Link"
-                      placeholder="YouTube, Vimeo, or Cloudinary URL"
-                      value={project.videoUrl || ''}
-                      onChange={(e) => handleFieldChange('videoUrl', e.target.value)}
-                    />
-                    <div className="absolute right-3 top-[38px] text-zinc-500">
-                      {isValidatingLink ? (
-                        <Loader2 size={16} className="animate-spin" />
-                      ) : <LinkIcon size={16} />}
-                    </div>
-                  </div>
-                  {linkError && <p className="text-xs text-red-500 mt-1">{linkError}</p>}
-                  
+
+                <div>
+                  <label className="text-xs font-medium text-text-muted mb-2 block">Custom Thumbnail</label>
+                  <MediaManager
+                    type="thumbnail"
+                    currentUrl={project.thumbnailUrl}
+                    onUploadComplete={(url) => handleFieldChange('thumbnailUrl', url)}
+                    onRemove={() => handleFieldChange('thumbnailUrl', '')}
+                  />
+                </div>
+
+                <div className="space-y-4">
                   <Input
                     label="Project Title"
                     placeholder="e.g. Nike - Just Do It (Director's Cut)"
@@ -217,13 +214,13 @@ export default function ProjectCardEditor({
               </div>
 
               {/* Description */}
-              <TextArea
-                label="Description & Role"
-                placeholder="Briefly describe the project and your specific role in it..."
-                value={project.description || ''}
-                onChange={(e) => handleFieldChange('description', e.target.value)}
-                rows={3}
-              />
+              <Textarea
+              label="Description (Optional)"
+              placeholder="Brief description of the project..."
+              value={project.description || ''}
+              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => onChange({ ...project, description: e.target.value })}
+              rows={3}
+            />
 
               {/* Tools Used (Tag selection) */}
               <div className="space-y-4 pt-4 border-t border-zinc-800">

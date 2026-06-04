@@ -12,12 +12,18 @@
     "test:run": "vitest run"
   },
   "dependencies": {
-    "framer-motion": "^11.5.0",
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "framer-motion": "^11.18.2",
     "lucide-react": "^0.469.0",
+    "qrcode": "^1.5.4",
     "qrcode.react": "^4.0.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-easy-crop": "^5.0.8",
+    "react-hot-toast": "^2.6.0",
+    "react-image-crop": "^11.0.10",
     "react-player": "^3.4.0",
     "react-router-dom": "^6.26.0"
   },
@@ -25,6 +31,7 @@
     "@testing-library/jest-dom": "^6.4.8",
     "@testing-library/react": "^16.0.0",
     "@types/node": "^25.9.1",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",

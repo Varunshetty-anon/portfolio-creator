@@ -61,7 +61,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({ project, onClose }) 
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 20, scale: 0.95 }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          className="relative w-full h-full md:h-auto max-h-full max-w-7xl bg-frames-surface md:rounded-2xl border-frames-border md:border shadow-2xl overflow-hidden flex flex-col md:flex-row"
+          className="relative w-full h-full md:h-auto max-h-full max-w-7xl bg-bg-base md:rounded-2xl border-border md:border shadow-2xl overflow-hidden flex flex-col md:flex-row"
         >
           {/* Close Button */}
           <button 
@@ -89,7 +89,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({ project, onClose }) 
             ) : project.thumbnailUrl ? (
               <img src={project.thumbnailUrl} alt={project.title} className="w-full h-full object-contain" />
             ) : (
-              <div className="text-zinc-600 flex flex-col items-center">
+              <div className="text-text-muted flex flex-col items-center">
                 <PlayCircle size={48} className="mb-4 opacity-50" />
                 <p>No media available</p>
               </div>
@@ -97,29 +97,29 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({ project, onClose }) 
           </div>
 
           {/* Details Area (Right/Bottom) */}
-          <div className="w-full md:w-1/3 lg:w-1/4 bg-frames-surface p-6 md:p-8 overflow-y-auto border-t md:border-t-0 md:border-l border-frames-border">
+          <div className="w-full md:w-1/3 lg:w-1/4 bg-bg-base p-6 md:p-8 overflow-y-auto border-t md:border-t-0 md:border-l border-border">
             
             <div className="flex flex-wrap gap-2 mb-6">
               {typeLabel && (
-                <span className="text-[10px] font-bold uppercase tracking-wider text-accent-gold bg-accent-gold/10 px-2 py-1 rounded">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-accent bg-accent/10 px-2 py-1 rounded">
                   {typeLabel}
                 </span>
               )}
               {subjectLabel && (
-                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 bg-zinc-800 px-2 py-1 rounded">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted bg-bg-raised px-2 py-1 rounded">
                   {subjectLabel}
                 </span>
               )}
             </div>
 
-            <h2 className="text-2xl md:text-3xl font-display font-bold text-white mb-6 leading-tight">
+            <h2 className="text-2xl md:text-3xl font-display font-bold text-text-primary mb-6 leading-tight">
               {project.title}
             </h2>
 
             {project.description && (
               <div className="mb-8">
-                <h4 className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-3">About</h4>
-                <p className="text-zinc-300 text-sm leading-relaxed whitespace-pre-wrap">
+                <h4 className="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-3">About</h4>
+                <p className="text-text-secondary text-sm leading-relaxed whitespace-pre-wrap">
                   {project.description}
                 </p>
               </div>
@@ -127,10 +127,10 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({ project, onClose }) 
 
             {project.softwareUsed && project.softwareUsed.length > 0 && (
               <div className="mb-8">
-                <h4 className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-3">Software Used</h4>
+                <h4 className="text-[10px] font-bold uppercase tracking-widest text-text-muted mb-3">Software Used</h4>
                 <div className="flex flex-wrap gap-2">
                   {project.softwareUsed.map(tool => (
-                    <span key={tool} className="text-xs text-zinc-300 font-medium bg-zinc-800/50 border border-zinc-700/50 px-3 py-1.5 rounded-md">
+                    <span key={tool} className="text-xs text-text-secondary font-medium bg-bg-raised/50 border border-border-strong/50 px-3 py-1.5 rounded-md">
                       {tool}
                     </span>
                   ))}
@@ -140,10 +140,10 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({ project, onClose }) 
             
             {project.aiToolsUsed && project.aiToolsUsed.length > 0 && (
               <div className="mb-8">
-                <h4 className="text-[10px] font-bold uppercase tracking-widest text-accent-gold/70 mb-3">AI Tools</h4>
+                <h4 className="text-[10px] font-bold uppercase tracking-widest text-accent mb-3">AI Tools</h4>
                 <div className="flex flex-wrap gap-2">
                   {project.aiToolsUsed.map(tool => (
-                    <span key={tool} className="text-xs text-accent-gold font-medium bg-accent-gold/10 border border-accent-gold/20 px-3 py-1.5 rounded-md">
+                    <span key={tool} className="text-xs text-accent font-medium bg-accent/10 border border-accent/20 px-3 py-1.5 rounded-md">
                       {tool}
                     </span>
                   ))}

@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/Input';
 import { Eye, EyeOff } from 'lucide-react';
 import { authApi } from '@/lib/api';
 import { BrandLogo } from '@/components/shared/BrandLogo';
+import { toast } from '@/components/ui/ToastProvider';
 
 const AuthPage: React.FC = () => {
   const { isAuthenticated, user, isLoading } = useAuth();
@@ -23,7 +24,6 @@ const AuthPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const { login, signup } = useAuth();
 
@@ -43,7 +43,6 @@ const AuthPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
     setIsProcessing(true);
 
     try {
@@ -54,7 +53,7 @@ const AuthPage: React.FC = () => {
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Authentication failed';
-      setError(message.replace('ApiError:', '').trim());
+      toast.error(message.replace('ApiError:', '').trim());
       setIsProcessing(false);
     }
   };
@@ -183,16 +182,7 @@ const AuthPage: React.FC = () => {
               </button>
             </div>
 
-            {/* Error */}
-            {error && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="p-4 rounded-lg bg-red-500/5 border border-red-500/10"
-              >
-                <p className="text-red-400 text-xs">{error}</p>
-              </motion.div>
-            )}
+
 
             {/* Actions */}
             <div className="pt-8 space-y-4">
@@ -212,7 +202,7 @@ const AuthPage: React.FC = () => {
 
               <Button
                 type="button"
-                variant="outline"
+                variant="secondary"
                 className="w-full py-6 text-sm font-medium border-frames-border text-frames-text-muted hover:bg-white hover:text-black hover:border-white transition-all duration-500 ease-out"
                 onClick={handleGoogleAuth}
                 disabled={isProcessing}

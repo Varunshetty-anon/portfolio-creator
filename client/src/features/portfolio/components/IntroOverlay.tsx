@@ -32,13 +32,13 @@ export const IntroOverlay: React.FC<IntroOverlayProps> = ({ name, role, onComple
     <AnimatePresence>
       {isVisible && (
         <motion.div
-          className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-frames-bg"
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-bg-base"
           exit={{ opacity: 0, y: -20, filter: 'blur(10px)' }}
           transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
         >
           <div className="overflow-hidden">
             <motion.h1
-              className="text-4xl md:text-6xl lg:text-8xl font-display font-bold tracking-tight text-white mb-4"
+              className="text-4xl md:text-6xl lg:text-8xl font-display font-bold tracking-tight text-text-primary mb-4"
               initial={{ y: '100%', opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
@@ -49,7 +49,7 @@ export const IntroOverlay: React.FC<IntroOverlayProps> = ({ name, role, onComple
           
           <div className="overflow-hidden">
             <motion.p
-              className="text-sm md:text-base tracking-[0.3em] uppercase text-zinc-500 font-medium"
+              className="text-sm md:text-base tracking-[0.3em] uppercase text-text-muted font-medium"
               initial={{ y: '-100%', opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ duration: 0.8, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
@@ -59,7 +59,7 @@ export const IntroOverlay: React.FC<IntroOverlayProps> = ({ name, role, onComple
           </div>
 
           <motion.div 
-            className="absolute bottom-12 w-[1px] h-12 bg-gradient-to-b from-zinc-500 to-transparent"
+            className="absolute bottom-12 w-[1px] h-12 bg-gradient-to-b from-text-muted to-transparent"
             initial={{ scaleY: 0, originY: 0 }}
             animate={{ scaleY: 1 }}
             transition={{ duration: 1, delay: 1, ease: 'easeInOut' }}
