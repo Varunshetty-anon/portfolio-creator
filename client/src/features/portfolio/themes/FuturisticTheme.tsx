@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import type { PortfolioData, Project } from '@/types';
 import { ProjectGrid } from '../components/ProjectGrid';
 import { SkillsSection } from '../components/SkillsSection';
-import { VideoPlayer } from '@/components/shared/VideoPlayer';
+import { FramesPlayer } from '@/components/shared/FramesPlayer';
 
 interface FuturisticThemeProps {
   content: PortfolioData;
@@ -65,7 +65,7 @@ export function FuturisticTheme({
           <div className="relative group">
             {content.showreelUrl ? (
               <div className="w-full aspect-video border border-[#00FF9D]/30 relative overflow-hidden bg-zinc-900">
-                <VideoPlayer 
+                <FramesPlayer 
                   url={content.showreelUrl}
                   thumbnail={content.showreelThumbnailUrl}
                   autoplay={introFinished}

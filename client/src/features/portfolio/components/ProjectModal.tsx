@@ -6,7 +6,7 @@
 import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, PlayCircle } from 'lucide-react';
-import { MediaPlayer } from '@/components/shared/MediaPlayer';
+import { FramesPlayer } from '@/components/shared/FramesPlayer';
 import type { Project } from '@/types';
 import { PROJECT_CONTENT_TYPES, PROJECT_SUBJECT_MATTERS } from '@/lib/constants';
 
@@ -78,11 +78,11 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({ project, onClose }) 
                 <div className={`w-full max-h-full shadow-2xl ${
                   project.aspectRatio === '9:16' ? 'max-w-[400px]' : 'max-w-full'
                 }`}>
-                  <MediaPlayer 
-                    url={project.videoUrl} 
-                    thumbnailUrl={project.thumbnailUrl}
-                    aspectRatio={project.aspectRatio}
-                    autoPlay={true}
+                  <FramesPlayer 
+                    url={project.videoUrl!}
+                    thumbnail={project.thumbnailUrl}
+                    aspectRatio={project.aspectRatio as '16:9' | '9:16' | '4:3' | '1:1' || '16:9'}
+                    autoplay={true}
                   />
                 </div>
               </div>

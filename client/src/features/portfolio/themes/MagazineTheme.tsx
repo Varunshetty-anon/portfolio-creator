@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import type { PortfolioData, Project } from '@/types';
 import { ProjectGrid } from '../components/ProjectGrid';
 import { SkillsSection } from '../components/SkillsSection';
-import { VideoPlayer } from '@/components/shared/VideoPlayer';
+import { FramesPlayer } from '@/components/shared/FramesPlayer';
 
 interface MagazineThemeProps {
   content: PortfolioData;
@@ -50,7 +50,7 @@ export function MagazineTheme({
           <div className="lg:col-span-8">
             {content.showreelUrl ? (
               <div className="w-full aspect-[4/3] bg-bg-raised overflow-hidden">
-                <VideoPlayer 
+                <FramesPlayer 
                   url={content.showreelUrl}
                   thumbnail={content.showreelThumbnailUrl}
                   autoplay={introFinished}

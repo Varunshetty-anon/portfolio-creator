@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import type { PortfolioData, Project } from '@/types';
 import { ProjectGrid } from '../components/ProjectGrid';
 import { SkillsSection } from '../components/SkillsSection';
-import { VideoPlayer } from '@/components/shared/VideoPlayer';
+import { FramesPlayer } from '@/components/shared/FramesPlayer';
 
 interface MinimalismThemeProps {
   content: PortfolioData;
@@ -49,7 +49,7 @@ export function MinimalismTheme({
             transition={{ duration: 1, delay: 0.4 }}
             className="w-full aspect-[16/9] lg:aspect-[21/9] rounded-2xl overflow-hidden bg-bg-raised"
           >
-            <VideoPlayer 
+            <FramesPlayer 
               url={content.showreelUrl}
               thumbnail={content.showreelThumbnailUrl}
               autoplay={introFinished}

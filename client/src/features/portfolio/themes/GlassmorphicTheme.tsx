@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import type { PortfolioData, Project } from '@/types';
 import { ProjectGrid } from '../components/ProjectGrid';
 import { SkillsSection } from '../components/SkillsSection';
-import { VideoPlayer } from '@/components/shared/VideoPlayer';
+import { FramesPlayer } from '@/components/shared/FramesPlayer';
 
 interface GlassmorphicThemeProps {
   content: PortfolioData;
@@ -73,7 +73,7 @@ export function GlassmorphicTheme({
             transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
           >
             <div className="w-full aspect-video rounded-2xl overflow-hidden bg-black/50">
-              <VideoPlayer 
+              <FramesPlayer 
                 url={content.showreelUrl}
                 thumbnail={content.showreelThumbnailUrl}
                 autoplay={introFinished}
