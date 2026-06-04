@@ -34,7 +34,22 @@ const __dirname = path.dirname(__filename);
 const app = express();
 
 // ── Core middleware ─────────────────────────────────────────────────
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://www.youtube.com", "https://s.ytimg.com", "https://player.vimeo.com"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        imgSrc: ["'self'", "data:", "blob:", "https://res.cloudinary.com", "https://img.youtube.com", "https://i.ytimg.com", "https://*.googleusercontent.com"],
+        connectSrc: ["'self'", "https://api.cloudinary.com", "https://www.youtube.com", "https://vimeo.com"],
+        frameSrc: ["'self'", "https://www.youtube.com", "https://player.vimeo.com"],
+        mediaSrc: ["'self'", "blob:", "https://res.cloudinary.com"],
+      },
+    },
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  })
+);
 app.use(compression());
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 app.use(cookieParser());
