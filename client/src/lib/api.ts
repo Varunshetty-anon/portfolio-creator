@@ -121,38 +121,68 @@ export const portfolioApi = {
     request('/portfolio/stats'),
 };
 
+import axios, { type AxiosProgressEvent } from 'axios';
+
 // ========================
 // Upload API
 // ========================
 
 export const uploadApi = {
-  profileImage: (file: File, onProgress?: (pct: number) => void) => {
+  profileImage: async (file: File, onProgress?: (e: AxiosProgressEvent) => void, signal?: AbortSignal) => {
     const formData = new FormData();
     formData.append('image', file);
-    // Note: Progress tracking requires XMLHttpRequest; for now use simple fetch
-    return request<{ url: string }>('/upload/profile-image', {
-      method: 'POST',
-      body: formData,
-    });
+    try {
+      const res = await axios.post<{ success: boolean; data: { url: string } }>('/api/v1/upload/profile-image', formData, {
+        withCredentials: true,
+        onUploadProgress: onProgress,
+        signal
+      });
+      return res.data.data;
+    } catch (err: any) {
+      throw new ApiError(err.response?.data?.error || 'Upload failed', err.response?.status || 500);
+    }
   },
 
-  projectMedia: (file: File) => {
+  projectMedia: async (file: File, onProgress?: (e: AxiosProgressEvent) => void, signal?: AbortSignal) => {
     const formData = new FormData();
     formData.append('media', file);
-    return request<{ url: string; thumbnailUrl?: string; aspectRatio?: string }>('/upload/project-media', {
-      method: 'POST',
-      body: formData,
-    });
+    try {
+      const res = await axios.post<{ success: boolean; data: { url: string; thumbnailUrl?: string; aspectRatio?: string } }>('/api/v1/upload/project-media', formData, {
+        withCredentials: true,
+        onUploadProgress: onProgress,
+        signal
+      });
+      return res.data.data;
+    } catch (err: any) {
+      throw new ApiError(err.response?.data?.error || 'Upload failed', err.response?.status || 500);
+    }
   },
 
-  showreel: (file: File) => {
+  showreel: async (file: File, onProgress?: (e: AxiosProgressEvent) => void, signal?: AbortSignal) => {
     const formData = new FormData();
     formData.append('video', file);
-    return request<{ url: string; thumbnailUrl?: string }>('/upload/showreel', {
-      method: 'POST',
-      body: formData,
-    });
+    try {
+      const res = await axios.post<{ success: boolean; data: { url: string; thumbnailUrl?: string } }>('/api/v1/upload/showreel', formData, {
+        withCredentials: true,
+        onUploadProgress: onProgress,
+        signal
+      });
+      return res.data.data;
+    } catch (err: any) {
+      throw new ApiError(err.response?.data?.error || 'Upload failed', err.response?.status || 500);
+    }
   },
+
+  validateDrive: async (url: string) => {
+    try {
+      const res = await axios.post<{ success: boolean; data: { isPrivate: boolean; isValid: boolean } }>('/api/v1/upload/validate-drive', { url }, {
+        withCredentials: true
+      });
+      return res.data.data;
+    } catch (err: any) {
+      throw new ApiError(err.response?.data?.error || 'Validation failed', err.response?.status || 500);
+    }
+  }
 };
 
 // ========================

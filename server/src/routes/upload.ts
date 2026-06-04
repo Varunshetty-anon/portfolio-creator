@@ -175,4 +175,39 @@ router.delete(
   },
 );
 
+// ── POST /validate-drive ──────────────────────────────────────────
+router.post(
+  '/validate-drive',
+  authenticateToken,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { url } = req.body;
+      if (!url) throw new AppError('URL is required', 400);
+
+      const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
+      if (!match) throw new AppError('Invalid Google Drive URL', 400);
+
+      const fileId = match[1];
+      const checkUrl = `https://drive.google.com/uc?id=${fileId}`;
+
+      const response = await fetch(checkUrl, { method: 'HEAD', redirect: 'manual' });
+      
+      const location = response.headers.get('location');
+      const isPrivate = response.status === 403 || 
+                        response.status === 401 || 
+                        (response.status >= 300 && response.status < 400 && location?.includes('ServiceLogin'));
+                        
+      res.json({
+        success: true,
+        data: {
+          isPrivate,
+          isValid: true,
+        }
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
 export default router;

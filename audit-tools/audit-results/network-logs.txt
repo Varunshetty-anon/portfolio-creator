@@ -1,0 +1,2 @@
+[ERROR 500] http://localhost:3000/api/v1/auth/me?_t=1780578216848
+[ERROR 500] http://localhost:3000/api/v1/auth/me?_t=1780578216850

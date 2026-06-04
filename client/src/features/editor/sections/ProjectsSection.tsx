@@ -65,16 +65,16 @@ export default function ProjectsSection({ data, onChange, onAutoSave, projects, 
         }
       >
         {projects.length === 0 ? (
-          <div className="py-16 flex flex-col items-center justify-center text-center border border-dashed border-border-strong rounded-xl bg-bg-raised">
-            <div className="w-12 h-12 rounded-full bg-bg-base flex items-center justify-center mb-3">
-              <Film size={20} className="text-text-muted" />
+          <div className="py-12 flex flex-col items-center justify-center text-center rounded-xl bg-bg-base/50 border border-border/50 shadow-inner">
+            <div className="w-12 h-12 rounded-full bg-bg-floating border border-border-strong flex items-center justify-center mb-4 shadow-sm">
+              <Film size={18} className="text-text-primary" />
             </div>
-            <h3 className="text-sm font-medium text-text-primary mb-1">No projects yet</h3>
-            <p className="text-xs text-text-muted max-w-[200px] mb-4">
-              Add your first project to start building your portfolio grid.
+            <h3 className="text-sm font-semibold text-text-primary mb-1">Your Portfolio Canvas</h3>
+            <p className="text-xs text-text-muted max-w-[220px] mb-6 leading-relaxed">
+              Curate your best work. Upload video files or link directly from YouTube and Vimeo.
             </p>
-            <Button size="sm" onClick={handleAddProject} variant="primary">
-              Create Project
+            <Button size="sm" onClick={handleAddProject} variant="primary" className="rounded-full px-6 shadow-md shadow-accent/20">
+              <Plus size={14} className="mr-1.5" /> New Project
             </Button>
           </div>
         ) : (
