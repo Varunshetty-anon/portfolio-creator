@@ -42,6 +42,11 @@ export default function EditorLayout() {
   const [showShareModal, setShowShareModal] = useState(false);
 
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestDataRef = useRef<{ portfolio: PortfolioData; projects: Project[] }>({ portfolio: INITIAL_PORTFOLIO, projects: [] });
+
+  useEffect(() => {
+    latestDataRef.current = { portfolio, projects };
+  }, [portfolio, projects]);
 
   // Initial Fetch
   useEffect(() => {
@@ -66,14 +71,20 @@ export default function EditorLayout() {
   }, []);
 
   // Auto-Save Logic (Debounced 1.5s)
-  const triggerAutoSave = useCallback((dataToSave: PortfolioData) => {
+  const triggerAutoSave = useCallback(() => {
     setHasUnsavedChanges(true);
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
 
     saveTimeoutRef.current = setTimeout(async () => {
       try {
         setIsSaving(true);
-        await portfolioApi.update(dataToSave);
+        const { portfolio: currentPortfolio, projects: currentProjects } = latestDataRef.current;
+        const res = await portfolioApi.update({ ...currentPortfolio, projects: currentProjects }) as any;
+        
+        // Update IDs of newly created projects
+        if (res.projects) {
+          setProjects(res.projects);
+        }
         setHasUnsavedChanges(false);
       } catch (err) {
         console.error("Auto-save failed:", err);
@@ -85,7 +96,12 @@ export default function EditorLayout() {
 
   const handleChange = (newData: PortfolioData) => {
     setPortfolio(newData);
-    triggerAutoSave(newData);
+    triggerAutoSave();
+  };
+
+  const handleProjectsChange = (newProjects: Project[]) => {
+    setProjects(newProjects);
+    triggerAutoSave();
   };
 
   const handlePublish = async () => {
@@ -93,7 +109,8 @@ export default function EditorLayout() {
       setIsPublishing(true);
       if (hasUnsavedChanges) {
         if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-        await portfolioApi.update(portfolio);
+        const { portfolio: currentPortfolio, projects: currentProjects } = latestDataRef.current;
+        await portfolioApi.update({ ...currentPortfolio, projects: currentProjects });
         setHasUnsavedChanges(false);
       }
       
@@ -290,7 +307,7 @@ export default function EditorLayout() {
                     <ProjectsSection 
                       data={portfolio} 
                       onChange={handleChange} 
-                      onAutoSave={() => triggerAutoSave(portfolio)} 
+                      onAutoSave={() => triggerAutoSave()} 
                       projects={projects}
                       onChangeProjects={setProjects}
                     />

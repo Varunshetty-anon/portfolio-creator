@@ -36,6 +36,7 @@ export const ToastProvider = () => {
 export const toast = {
   success: (message: string) => hotToast.success(message),
   error: (message: string) => hotToast.error(message),
+  warning: (message: string, opts?: any) => hotToast(message, { icon: '⚠️', ...opts }),
   info: (message: string) => hotToast(message, { icon: 'ℹ️' }),
   loading: (message: string) => hotToast.loading(message),
   dismiss: (id?: string) => hotToast.dismiss(id),

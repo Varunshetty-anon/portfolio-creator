@@ -128,49 +128,67 @@ import axios, { type AxiosProgressEvent } from 'axios';
 // ========================
 
 export const uploadApi = {
-  profileImage: async (file: File, onProgress?: (e: AxiosProgressEvent) => void, signal?: AbortSignal) => {
+  // Direct to Cloudinary Upload flow
+  async uploadMediaDirect(
+    file: File, 
+    type: 'image' | 'video',
+    onProgress?: (e: AxiosProgressEvent) => void,
+    cancelToken?: AbortSignal
+  ) {
+    // 1. Get Signature from Render
+    const sigRes = await axios.get(`/api/v1/upload/signature?type=${type}`, { withCredentials: true });
+    const { signature, timestamp, apiKey, cloudName, folder, eager, eagerAsync } = sigRes.data.data;
+
+    // 2. Prepare FormData for Cloudinary
     const formData = new FormData();
-    formData.append('image', file);
-    try {
-      const res = await axios.post<{ success: boolean; data: { url: string } }>('/api/v1/upload/profile-image', formData, {
-        withCredentials: true,
-        onUploadProgress: onProgress,
-        signal
-      });
-      return res.data.data;
-    } catch (err: any) {
-      throw new ApiError(err.response?.data?.error || 'Upload failed', err.response?.status || 500);
+    formData.append('file', file);
+    formData.append('api_key', apiKey);
+    formData.append('timestamp', timestamp.toString());
+    formData.append('signature', signature);
+    formData.append('folder', folder);
+    
+    if (eager) {
+      formData.append('eager', eager);
+      if (eagerAsync) {
+        formData.append('eager_async', 'true');
+      }
     }
+
+    // 3. POST directly to Cloudinary
+    const cloudRes = await axios.post(
+      `https://api.cloudinary.com/v1_1/${cloudName}/${type}/upload`,
+      formData,
+      {
+        onUploadProgress: onProgress,
+        signal: cancelToken,
+      }
+    );
+
+    // 4. Return standard response
+    return {
+      success: true,
+      url: cloudRes.data.secure_url,
+      publicId: cloudRes.data.public_id,
+      thumbnailUrl: cloudRes.data.secure_url.replace(/\.[^/.]+$/, '.jpg'),
+    };
   },
 
-  projectMedia: async (file: File, onProgress?: (e: AxiosProgressEvent) => void, signal?: AbortSignal) => {
-    const formData = new FormData();
-    formData.append('media', file);
-    try {
-      const res = await axios.post<{ success: boolean; data: { url: string; thumbnailUrl?: string; aspectRatio?: string } }>('/api/v1/upload/project-media', formData, {
-        withCredentials: true,
-        onUploadProgress: onProgress,
-        signal
-      });
-      return res.data.data;
-    } catch (err: any) {
-      throw new ApiError(err.response?.data?.error || 'Upload failed', err.response?.status || 500);
-    }
+  profileImage: (file: File, onProgress?: (e: AxiosProgressEvent) => void, cancelToken?: AbortSignal) => {
+    return uploadApi.uploadMediaDirect(file, 'image', onProgress, cancelToken);
   },
 
-  showreel: async (file: File, onProgress?: (e: AxiosProgressEvent) => void, signal?: AbortSignal) => {
-    const formData = new FormData();
-    formData.append('video', file);
-    try {
-      const res = await axios.post<{ success: boolean; data: { url: string; thumbnailUrl?: string } }>('/api/v1/upload/showreel', formData, {
-        withCredentials: true,
-        onUploadProgress: onProgress,
-        signal
-      });
-      return res.data.data;
-    } catch (err: any) {
-      throw new ApiError(err.response?.data?.error || 'Upload failed', err.response?.status || 500);
-    }
+  projectMedia: (file: File, onProgress?: (e: AxiosProgressEvent) => void, cancelToken?: AbortSignal) => {
+    const isVideo = file.type.startsWith('video/');
+    return uploadApi.uploadMediaDirect(file, isVideo ? 'video' : 'image', onProgress, cancelToken);
+  },
+
+  showreel: (file: File, onProgress?: (e: AxiosProgressEvent) => void, cancelToken?: AbortSignal) => {
+    return uploadApi.uploadMediaDirect(file, 'video', onProgress, cancelToken);
+  },
+
+  deleteMedia: async (publicId: string) => {
+    const response = await axios.delete(`/api/v1/upload/${encodeURIComponent(publicId)}`, { withCredentials: true });
+    return response.data;
   },
 
   validateDrive: async (url: string) => {

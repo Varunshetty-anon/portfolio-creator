@@ -54,6 +54,10 @@ export const MediaManager: React.FC<MediaManagerProps> = ({
       return;
     }
 
+    if (file.size > 500 * 1024 * 1024) {
+      toast.warning('Large files may upload slowly. Vimeo or YouTube links are recommended for best performance.', { duration: 5000 });
+    }
+
     setStatus('uploading');
     setProgress(0);
     setSpeedMB(0);

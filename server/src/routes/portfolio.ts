@@ -108,7 +108,48 @@ router.put('/', authenticateToken, async (req: Request, res: Response, next: Nex
     }
 
     await portfolio.save();
-    res.json({ success: true, data: { portfolio } });
+
+    // Sync Projects if provided
+    if (req.body.projects && Array.isArray(req.body.projects)) {
+      // Find existing projects to know what to delete
+      const existingProjects = await Project.find({ portfolioId: portfolio._id });
+      const incomingIds = req.body.projects.map((p: any) => p._id).filter(Boolean);
+      
+      // Delete removed projects
+      const toDelete = existingProjects.filter(p => !incomingIds.includes(p._id.toString()));
+      if (toDelete.length > 0) {
+        await Project.deleteMany({ _id: { $in: toDelete.map(p => p._id) } });
+      }
+
+      // Upsert projects
+      for (const [index, p] of req.body.projects.entries()) {
+        const projectData = {
+          portfolioId: portfolio._id,
+          title: p.title || 'Untitled Project',
+          description: p.description || '',
+          thumbnailUrl: p.thumbnailUrl || '',
+          videoUrl: p.videoUrl || '',
+          videoSource: p.videoSource || 'youtube',
+          aspectRatio: p.aspectRatio || '16:9',
+          contentType: p.contentType || '',
+          subjectMatter: p.subjectMatter || '',
+          softwareUsed: p.softwareUsed || [],
+          aiToolsUsed: p.aiToolsUsed || [],
+          order: p.order ?? index,
+        };
+
+        if (p._id && p._id.length === 24) { // Valid ObjectId
+          await Project.findByIdAndUpdate(p._id, projectData);
+        } else {
+          await Project.create(projectData);
+        }
+      }
+    }
+
+    // Fetch updated projects to return
+    const updatedProjects = await Project.find({ portfolioId: portfolio._id }).sort({ order: 1 });
+
+    res.json({ success: true, data: { portfolio, projects: updatedProjects } });
   } catch (err) {
     next(err);
   }
