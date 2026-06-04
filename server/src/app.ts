@@ -39,15 +39,18 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://www.youtube.com", "https://s.ytimg.com", "https://player.vimeo.com"],
+        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://www.youtube.com", "https://s.ytimg.com", "https://player.vimeo.com", "https://f.vimeocdn.com"],
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-        imgSrc: ["'self'", "data:", "blob:", "https://res.cloudinary.com", "https://img.youtube.com", "https://i.ytimg.com", "https://*.googleusercontent.com"],
-        connectSrc: ["'self'", "https://api.cloudinary.com", "https://www.youtube.com", "https://vimeo.com"],
+        fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
+        imgSrc: ["'self'", "data:", "blob:", "https://res.cloudinary.com", "https://img.youtube.com", "https://i.ytimg.com", "https://i.vimeocdn.com", "https://*.googleusercontent.com"],
+        connectSrc: ["'self'", "https://api.cloudinary.com", "https://www.youtube.com", "https://vimeo.com", "https://*.vimeo.com", "https://*.vimeocdn.com"],
         frameSrc: ["'self'", "https://www.youtube.com", "https://player.vimeo.com"],
-        mediaSrc: ["'self'", "blob:", "https://res.cloudinary.com"],
+        mediaSrc: ["'self'", "blob:", "https://res.cloudinary.com", "https://*.cloudinary.com"],
+        workerSrc: ["'self'", "blob:"],
       },
     },
     crossOriginResourcePolicy: { policy: "cross-origin" },
+    crossOriginEmbedderPolicy: false,
   })
 );
 app.use(compression());
@@ -77,7 +80,7 @@ app.use(passport.initialize());
 // ── Rate limiting ───────────────────────────────────────────────────
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100,
+  max: 500, // Higher limit to support auto-save editor workflows
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, error: 'Too many requests, please try again later.' },

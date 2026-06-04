@@ -4,7 +4,7 @@
 // Main orchestrator for the public portfolio view.
 // Acts as a Theme Router to conditionally render the active theme.
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { portfolioApi, analyticsApi } from '@/lib/api';
 import type { PortfolioData, Project } from '@/types';
@@ -27,19 +27,21 @@ export interface PortfolioLayoutProps {
 export default function PortfolioLayout({ isPreviewMode = false, draftData }: PortfolioLayoutProps) {
   const { username } = useParams<{ username: string }>();
   
-  const [data, setData] = useState<{ portfolio: PortfolioData; projects: Project[] } | null>(null);
+  // Only used for public (non-preview) mode
+  const [fetchedData, setFetchedData] = useState<{ portfolio: PortfolioData; projects: Project[] } | null>(null);
   const [isLoading, setIsLoading] = useState(!isPreviewMode);
   const [error, setError] = useState<string | null>(null);
   
   const [introFinished, setIntroFinished] = useState(isPreviewMode);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
-  // Fetch portfolio data if not in preview mode
+  // In preview mode, use draftData directly (no state copy = no re-render cascade)
+  // In public mode, use fetched data
+  const data = isPreviewMode ? draftData ?? null : fetchedData;
+
+  // Fetch portfolio data only in public mode
   useEffect(() => {
-    if (isPreviewMode) {
-      if (draftData) setData(draftData);
-      return;
-    }
+    if (isPreviewMode) return;
 
     let isMounted = true;
     
@@ -51,7 +53,7 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData }: Po
         const result = await portfolioApi.getPublic(username) as any;
         
         if (isMounted) {
-          setData(result);
+          setFetchedData(result);
           // Track view anonymously
           if (result.portfolio?._id) {
             analyticsApi.trackView(result.portfolio._id).catch(() => {});
@@ -70,7 +72,7 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData }: Po
 
     loadPortfolio();
     return () => { isMounted = false; };
-  }, [username, isPreviewMode, draftData]);
+  }, [username, isPreviewMode]);
 
   // Track clicks on projects
   const handleProjectClick = (project: Project) => {
@@ -145,3 +147,4 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData }: Po
     </>
   );
 }
+

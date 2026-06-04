@@ -70,7 +70,7 @@ export default function EditorLayout() {
     return () => { isMounted = false; };
   }, []);
 
-  // Auto-Save Logic (Debounced 1.5s)
+  // Auto-Save Logic (Debounced 2.5s to reduce API calls during rapid editing)
   const triggerAutoSave = useCallback(() => {
     setHasUnsavedChanges(true);
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -88,10 +88,21 @@ export default function EditorLayout() {
         setHasUnsavedChanges(false);
       } catch (err) {
         console.error("Auto-save failed:", err);
+        // Retry once after 3 seconds on failure
+        setTimeout(async () => {
+          try {
+            const { portfolio: retryPortfolio, projects: retryProjects } = latestDataRef.current;
+            const res = await portfolioApi.update({ ...retryPortfolio, projects: retryProjects }) as any;
+            if (res.projects) setProjects(res.projects);
+            setHasUnsavedChanges(false);
+          } catch (retryErr) {
+            console.error("Auto-save retry failed:", retryErr);
+          }
+        }, 3000);
       } finally {
         setIsSaving(false);
       }
-    }, 1500);
+    }, 2500);
   }, []);
 
   const handleChange = (newData: PortfolioData) => {
