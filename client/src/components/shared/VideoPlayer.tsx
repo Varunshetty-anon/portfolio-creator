@@ -1,13 +1,11 @@
-// ========================
-// FRAMES VideoPlayer Component
-// ========================
-// Multi-platform video player supporting YouTube, Vimeo, and native video.
-// Preserved and improved from the original PortfolioView.tsx.
-
 import React, { useState, useRef, useCallback, useEffect } from 'react';
+import ReactPlayer from 'react-player';
+import screenfull from 'screenfull';
+import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Volume2, VolumeX, Play, AlertCircle } from 'lucide-react';
-import { getYouTubeId, getVimeoId, isNativeVideo, getGoogleDriveId } from '@/lib/media-utils';
+import { getGoogleDriveId } from '@/lib/media-utils';
+
+const Player = ReactPlayer as any;
 
 interface VideoPlayerProps {
   url: string;
@@ -15,9 +13,10 @@ interface VideoPlayerProps {
   aspectRatio?: '16:9' | '9:16' | '4:3' | '1:1';
   autoplay?: boolean;
   muted?: boolean;
-  controls?: boolean;
+  controls?: boolean; // Whether to show custom hover controls
   loop?: boolean;
   className?: string;
+  onClick?: () => void;
 }
 
 const aspectClasses: Record<string, string> = {
@@ -33,188 +32,264 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   aspectRatio = '16:9',
   autoplay = false,
   muted: initialMuted = true,
-  controls = false,
+  controls = true,
   loop = true,
   className = '',
+  onClick,
 }) => {
-  const [isMuted, setIsMuted] = useState(initialMuted);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [playing, setPlaying] = useState(autoplay);
+  const [muted, setMuted] = useState(initialMuted);
+  const [volume, setVolume] = useState(initialMuted ? 0 : 1);
+  const [played, setPlayed] = useState(0);
+  const [loaded, setLoaded] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [isReady, setIsReady] = useState(false);
+  const [isHovering, setIsHovering] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [hasError, setHasError] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
 
-  const youtubeId = getYouTubeId(url);
-  const vimeoId = getVimeoId(url);
+  const playerRef = useRef<any>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Parse GDrive URL to direct download stream to force native video tag
   const gdriveId = getGoogleDriveId(url);
-  const isNative = isNativeVideo(url) || !!gdriveId;
+  const processedUrl = gdriveId 
+    ? `https://drive.google.com/uc?export=download&id=${gdriveId}`
+    : url;
 
-  const toggleMute = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (videoRef.current) {
-      videoRef.current.muted = !isMuted;
-    }
-    setIsMuted(!isMuted);
-  }, [isMuted]);
-
-  // Auto-play native video with AudioContext/Playback error guards
   useEffect(() => {
-    if (isNative && videoRef.current && autoplay) {
-      try {
-        const playPromise = videoRef.current.play();
-        if (playPromise !== undefined) {
-          playPromise.catch((e) => {
-            console.warn('Video auto-play blocked or failed:', e);
-            // Handle specific AudioContext/play errors gracefully
-            if (e.name === 'NotAllowedError') {
-              setIsMuted(true); // Force mute and try again if it was a permissions issue
-            }
-          });
-        }
-      } catch (err) {
-        console.warn('Error starting video playback:', err);
-      }
+    const handleFullscreenChange = () => {
+      setIsFullscreen(screenfull.isFullscreen);
+    };
+    if (screenfull.isEnabled) {
+      screenfull.on('change', handleFullscreenChange);
     }
-  }, [isNative, autoplay]);
+    return () => {
+      if (screenfull.isEnabled) {
+        screenfull.off('change', handleFullscreenChange);
+      }
+    };
+  }, []);
+
+  const handlePlayPause = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setPlaying(!playing);
+  };
+
+  const handleToggleMute = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setMuted(!muted);
+    setVolume(!muted ? 0 : 1);
+  };
+
+  const handleToggleFullscreen = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (screenfull.isEnabled && containerRef.current) {
+      screenfull.toggle(containerRef.current);
+    }
+  };
+
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    e.stopPropagation();
+    const val = parseFloat(e.target.value);
+    setPlayed(val);
+    if (playerRef.current) {
+      playerRef.current.seekTo(val);
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    if (isNaN(seconds)) return '00:00';
+    const date = new Date(seconds * 1000);
+    const hh = date.getUTCHours();
+    const mm = date.getUTCMinutes();
+    const ss = date.getUTCSeconds().toString().padStart(2, '0');
+    if (hh) {
+      return `${hh}:${mm.toString().padStart(2, '0')}:${ss}`;
+    }
+    return `${mm}:${ss}`;
+  };
 
   if (!url) return null;
 
-  const renderPlayer = () => {
-    // YouTube embed
-    if (youtubeId) {
-      const params = new URLSearchParams({
-        autoplay: autoplay ? '1' : '0',
-        mute: isMuted ? '1' : '0',
-        controls: controls ? '1' : '0',
-        loop: loop ? '1' : '0',
-        playlist: youtubeId,
-        playsinline: '1',
-        rel: '0',
-        modestbranding: '1',
-        showinfo: '0',
-      });
-
-      return (
-        <iframe
-          src={`https://www.youtube.com/embed/${youtubeId}?${params.toString()}`}
-          className="absolute inset-0 w-full h-full"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
-          onLoad={() => setIsLoaded(true)}
-          onError={() => setHasError(true)}
-          style={{ pointerEvents: controls ? 'auto' : 'none' }}
-        />
-      );
-    }
-
-    // Vimeo embed
-    if (vimeoId) {
-      const params = new URLSearchParams({
-        autoplay: autoplay ? '1' : '0',
-        muted: isMuted ? '1' : '0',
-        loop: loop ? '1' : '0',
-        background: !controls ? '1' : '0',
-        playsinline: '1',
-      });
-
-      return (
-        <iframe
-          src={`https://player.vimeo.com/video/${vimeoId}?${params.toString()}`}
-          className="absolute inset-0 w-full h-full"
-          allow="autoplay; fullscreen; picture-in-picture"
-          allowFullScreen
-          onLoad={() => setIsLoaded(true)}
-          onError={() => setHasError(true)}
-          style={{ pointerEvents: controls ? 'auto' : 'none' }}
-        />
-      );
-    }
-
-    // Native video
-    if (isNative || url) {
-      let optimizedUrl = url;
-      
-      if (gdriveId) {
-        optimizedUrl = `https://drive.google.com/uc?export=download&id=${gdriveId}`;
-      } else if (url && url.includes('cloudinary.com/video/upload/')) {
-        // Don't inject if it already has transformations (simple check)
-        if (!url.includes('/upload/q_auto') && !url.includes('/upload/f_auto')) {
-          optimizedUrl = url.replace('/upload/', '/upload/q_auto,f_auto/');
-        }
-      }
-
-      return (
-        <video
-          ref={videoRef}
-          src={optimizedUrl}
-          className="absolute inset-0 w-full h-full object-cover"
-          autoPlay={autoplay}
-          muted={isMuted}
-          loop={loop}
-          playsInline
-          controls={controls}
-          onLoadedData={() => setIsLoaded(true)}
-          onError={() => setHasError(true)}
-          preload="metadata"
-        />
-      );
-    }
-
-    return null;
-  };
-
   return (
     <div
-      className={`relative overflow-hidden bg-zinc-950 rounded-xl ${aspectClasses[aspectRatio]} ${className}`}
+      ref={containerRef}
+      className={`relative overflow-hidden bg-[#0A0A0A] group ${
+        !isFullscreen ? aspectClasses[aspectRatio] : 'w-full h-full'
+      } ${className}`}
+      onMouseEnter={() => setIsHovering(true)}
+      onMouseLeave={() => setIsHovering(false)}
+      onClick={onClick || handlePlayPause}
     >
-      {/* Thumbnail background (shown while loading) */}
+      {/* Thumbnail overlay while loading */}
       <AnimatePresence>
-        {!isLoaded && thumbnail && (
+        {!isReady && thumbnail && !hasError && (
           <motion.div
             initial={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.5 }}
+            transition={{ duration: 0.6, ease: 'easeOut' }}
             className="absolute inset-0 z-10"
           >
             <img
               src={thumbnail}
-              alt=""
+              alt="Video Thumbnail"
               className="w-full h-full object-cover filter blur-sm scale-105"
             />
-            <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-              <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center">
-                <Play size={20} className="text-white ml-0.5" />
-              </div>
-            </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Error state */}
+      {/* Error State */}
       {hasError && (
-        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-zinc-950">
-          {thumbnail && (
-            <img src={thumbnail} alt="" className="absolute inset-0 w-full h-full object-cover opacity-20 blur-md" />
-          )}
-          <AlertCircle size={28} className="text-zinc-600 mb-3" />
-          <p className="text-zinc-600 text-xs font-medium">Video unavailable</p>
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-[#0A0A0A]">
+          <AlertCircle size={24} className="text-zinc-600 mb-2" />
+          <p className="text-zinc-500 text-xs font-mono uppercase tracking-widest">Playback Error</p>
         </div>
       )}
 
-      {/* Video player */}
-      {!hasError && renderPlayer()}
+      {/* Unified Player Core */}
+      {!hasError && (
+        <Player
+          ref={playerRef}
+          url={processedUrl}
+          className="absolute inset-0 !w-full !h-full"
+          width="100%"
+          height="100%"
+          playing={playing}
+          muted={muted}
+          volume={volume}
+          loop={loop}
+          playsinline
+          onReady={() => setIsReady(true)}
+          onError={(e: any) => {
+            console.error('VideoPlayer Error:', e);
+            setHasError(true);
+          }}
+          onProgress={(state: any) => {
+            setPlayed(state.played);
+            setLoaded(state.loaded);
+          }}
+          onDuration={(d: number) => setDuration(d)}
+          config={({
+            youtube: {
+              playerVars: { 
+                controls: 0, 
+                modestbranding: 1, 
+                rel: 0, 
+                showinfo: 0,
+                iv_load_policy: 3 
+              }
+            },
+            vimeo: {
+              playerOptions: { 
+                controls: false, 
+                title: false, 
+                byline: false, 
+                portrait: false,
+                background: !controls // If no controls allowed, use background mode
+              }
+            },
+            file: {
+              attributes: {
+                controlsList: 'nodownload',
+                disablePictureInPicture: true,
+                style: { width: '100%', height: '100%', objectFit: 'cover' }
+              }
+            }
+          }) as any}
+        />
+      )}
 
-      {/* Mute toggle */}
-      {!hasError && isLoaded && (isNative || youtubeId) && (
-        <motion.button
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
-          onClick={toggleMute}
-          className="absolute bottom-3 right-3 z-30 w-8 h-8 rounded-full bg-black/60 backdrop-blur-sm flex items-center justify-center text-white/70 hover:text-white hover:bg-black/80 transition-colors"
-          aria-label={isMuted ? 'Unmute' : 'Mute'}
-        >
-          {isMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
-        </motion.button>
+      {/* Custom Precision Minimal Controls */}
+      {controls && !hasError && isReady && (
+        <AnimatePresence>
+          {(isHovering || !playing) && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="absolute inset-0 z-30 flex flex-col justify-between"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Top Gradient */}
+              <div className="w-full h-24 bg-gradient-to-b from-black/60 to-transparent pointer-events-none" />
+
+              {/* Central Play/Pause Button */}
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <button
+                  onClick={handlePlayPause}
+                  className="w-16 h-16 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white hover:bg-white/20 hover:scale-105 transition-all pointer-events-auto"
+                >
+                  {playing ? (
+                    <Pause size={24} className="fill-current" />
+                  ) : (
+                    <Play size={24} className="fill-current ml-1" />
+                  )}
+                </button>
+              </div>
+
+              {/* Bottom Controls Bar */}
+              <div className="w-full px-4 pb-4 pt-12 bg-gradient-to-t from-black/80 to-transparent">
+                <div className="flex items-center gap-3">
+                  <button 
+                    onClick={handlePlayPause}
+                    className="text-white hover:text-white/80 transition-colors"
+                  >
+                    {playing ? <Pause size={16} /> : <Play size={16} />}
+                  </button>
+                  
+                  {/* Hairline Timeline */}
+                  <div className="flex-1 group/slider relative h-1 flex items-center mx-2 cursor-pointer">
+                    <input
+                      type="range"
+                      min={0}
+                      max={0.999999}
+                      step="any"
+                      value={played}
+                      onChange={handleSeek}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                    />
+                    <div className="absolute left-0 right-0 h-1 bg-white/20 rounded-full overflow-hidden">
+                      {/* Loaded buffer */}
+                      <div 
+                        className="absolute top-0 bottom-0 left-0 bg-white/30"
+                        style={{ width: `${loaded * 100}%` }}
+                      />
+                      {/* Played progress */}
+                      <div 
+                        className="absolute top-0 bottom-0 left-0 bg-white"
+                        style={{ width: `${played * 100}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Time */}
+                  <div className="text-white/70 text-[10px] font-mono tracking-widest hidden sm:block">
+                    {formatTime(played * duration)} / {formatTime(duration)}
+                  </div>
+
+                  {/* Audio Toggle */}
+                  <button 
+                    onClick={handleToggleMute}
+                    className="text-white hover:text-white/80 transition-colors ml-2"
+                  >
+                    {muted || volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
+                  </button>
+
+                  {/* Fullscreen Toggle */}
+                  <button 
+                    onClick={handleToggleFullscreen}
+                    className="text-white hover:text-white/80 transition-colors"
+                  >
+                    {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       )}
     </div>
   );
