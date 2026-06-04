@@ -125,6 +125,7 @@ router.put('/', authenticateToken, async (req: Request, res: Response, next: Nex
       for (const [index, p] of req.body.projects.entries()) {
         const projectData = {
           portfolioId: portfolio._id,
+          userId: portfolio.userId,
           title: p.title || 'Untitled Project',
           description: p.description || '',
           thumbnailUrl: p.thumbnailUrl || '',

@@ -171,7 +171,7 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
             setLoaded(state.loaded);
           }}
           onDuration={(d: number) => setDuration(d)}
-          config={({
+          config={{
             youtube: {
               playerVars: { 
                 controls: 0, 
@@ -197,7 +197,7 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
                 style: { width: '100%', height: '100%', objectFit: 'cover' }
               }
             }
-          }) as any}
+          }}
         />
       )}
 
