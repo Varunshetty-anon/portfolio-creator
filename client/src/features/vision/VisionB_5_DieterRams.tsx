@@ -52,7 +52,7 @@ export default function VisionB_5_DieterRams() {
       <div className="w-full max-w-7xl aspect-video bg-[#D9D9D9] rounded-3xl p-8 shadow-[20px_20px_60px_#c8c8c8,-20px_-20px_60px_#ffffff] flex flex-col">
         {/* Device screen */}
         <div className="w-full flex-1 bg-black rounded-xl overflow-hidden relative shadow-inner">
-           <FramesPlayer videoUrl={activeProject.videoUrl} posterUrl={activeProject.posterUrl} autoPlay loop muted />
+           <FramesPlayer url={activeProject.videoUrl} thumbnail={activeProject.posterUrl} autoplay loop muted />
         </div>
         {/* Physical controls */}
         <div className="h-32 mt-8 flex items-center justify-between px-8">

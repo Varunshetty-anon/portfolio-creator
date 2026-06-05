@@ -51,7 +51,7 @@ export default function VisionB_10_Brutalist() {
     <div className="w-screen h-screen bg-white flex flex-col font-sans text-black overflow-hidden border-[16px] border-black box-border">
       <div className="flex-1 flex relative">
          <div className="w-[70%] border-r-[16px] border-black bg-black relative">
-            <FramesPlayer videoUrl={activeProject.videoUrl} posterUrl={activeProject.posterUrl} autoPlay loop muted />
+            <FramesPlayer url={activeProject.videoUrl} thumbnail={activeProject.posterUrl} autoplay loop muted />
          </div>
          <div className="w-[30%] flex flex-col bg-yellow-400">
             <div className="p-8 border-b-[16px] border-black">

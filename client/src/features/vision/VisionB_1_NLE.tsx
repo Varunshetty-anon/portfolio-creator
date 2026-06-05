@@ -61,7 +61,7 @@ export default function VisionB_1_NLE() {
       {/* Player Area */}
       <div className="flex-1 relative bg-black p-4 flex items-center justify-center">
         <div className="relative w-full h-full max-w-6xl max-h-full border border-zinc-800 shadow-2xl">
-          <FramesPlayer videoUrl={activeProject.videoUrl} posterUrl={activeProject.posterUrl} autoPlay loop muted />
+          <FramesPlayer url={activeProject.videoUrl} thumbnail={activeProject.posterUrl} autoplay loop muted />
         </div>
       </div>
       {/* Timeline Queue */}

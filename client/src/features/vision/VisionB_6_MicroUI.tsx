@@ -50,7 +50,7 @@ export default function VisionB_6_MicroUI() {
   return (
     <div className="w-screen h-screen bg-black flex flex-col font-sans text-white overflow-hidden relative group">
       <div className="absolute inset-4 lg:inset-8 xl:inset-12 z-0">
-         <FramesPlayer videoUrl={activeProject.videoUrl} posterUrl={activeProject.posterUrl} autoPlay loop muted />
+         <FramesPlayer url={activeProject.videoUrl} thumbnail={activeProject.posterUrl} autoplay loop muted />
       </div>
       <div className="absolute bottom-0 w-full h-12 bg-black/90 backdrop-blur-md z-50 flex items-center px-12 border-t border-zinc-800 text-[10px] tracking-[0.2em] uppercase justify-between translate-y-full group-hover:translate-y-0 transition-transform duration-500">
          <div className="flex gap-12">

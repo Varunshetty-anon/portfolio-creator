@@ -52,7 +52,7 @@ export default function VisionB_7_Broadcast() {
       <div className="flex-1 relative p-8">
         <div className="absolute inset-8 border-2 border-dashed border-zinc-800 pointer-events-none z-50"></div>
         <div className="absolute inset-20 border border-dotted border-zinc-800 pointer-events-none z-50"></div>
-        <FramesPlayer videoUrl={activeProject.videoUrl} posterUrl={activeProject.posterUrl} autoPlay loop muted />
+        <FramesPlayer url={activeProject.videoUrl} thumbnail={activeProject.posterUrl} autoplay loop muted />
       </div>
       <div className="w-96 bg-[#111] border-l border-zinc-800 flex flex-col">
          <div className="h-48 bg-black flex">

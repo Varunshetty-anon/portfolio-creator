@@ -58,7 +58,7 @@ export default function VisionB_8_Editorial() {
          </div>
       </div>
       <div className="flex-1 relative bg-black shadow-2xl">
-         <FramesPlayer videoUrl={activeProject.videoUrl} posterUrl={activeProject.posterUrl} autoPlay loop muted />
+         <FramesPlayer url={activeProject.videoUrl} thumbnail={activeProject.posterUrl} autoplay loop muted />
       </div>
       <div className="h-40 mt-12 flex gap-8">
          {MOCK_PROJECTS.map((p, i) => (

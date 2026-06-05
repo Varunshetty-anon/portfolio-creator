@@ -65,7 +65,7 @@ export default function VisionB_3_SwissGrid() {
 
         {/* Video Area */}
         <div className="col-span-12 row-span-4 border-b border-white relative bg-zinc-900">
-          <FramesPlayer videoUrl={activeProject.videoUrl} posterUrl={activeProject.posterUrl} autoPlay loop muted />
+          <FramesPlayer url={activeProject.videoUrl} thumbnail={activeProject.posterUrl} autoplay loop muted />
         </div>
 
         {/* Queue */}

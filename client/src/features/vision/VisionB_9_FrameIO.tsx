@@ -64,7 +64,7 @@ export default function VisionB_9_FrameIO() {
       <div className="flex-1 flex p-6 gap-6">
          {/* Main Player */}
          <div className="flex-[3] bg-black rounded-xl overflow-hidden border border-[#2A2E37] relative shadow-2xl">
-            <FramesPlayer videoUrl={activeProject.videoUrl} posterUrl={activeProject.posterUrl} autoPlay loop muted />
+            <FramesPlayer url={activeProject.videoUrl} thumbnail={activeProject.posterUrl} autoplay loop muted />
          </div>
          {/* Sidebar Sidebar */}
          <div className="flex-1 bg-[#1C1F26] rounded-xl border border-[#2A2E37] p-4 flex flex-col">

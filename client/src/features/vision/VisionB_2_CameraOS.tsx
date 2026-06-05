@@ -59,7 +59,7 @@ export default function VisionB_2_CameraOS() {
       
       {/* Video */}
       <div className="absolute inset-0">
-        <FramesPlayer videoUrl={activeProject.videoUrl} posterUrl={activeProject.posterUrl} autoPlay loop muted />
+        <FramesPlayer url={activeProject.videoUrl} thumbnail={activeProject.posterUrl} autoplay loop muted />
         <div className="absolute inset-0 bg-black/20"></div>
       </div>
 
