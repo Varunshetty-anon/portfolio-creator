@@ -51,7 +51,7 @@ export default function VisionB_4_Terminal() {
     <div className="w-screen h-screen bg-black flex flex-col font-mono text-green-500 overflow-hidden p-4">
       <div className="flex-1 border border-green-900 relative flex flex-col">
         <div className="border-b border-green-900 p-2 text-xs">
-          > ./frames-os execute --project "{activeProject.id}" --mode "playback"
+          {'>'} ./frames-os execute --project "{activeProject.id}" --mode "playback"
         </div>
         <div className="flex-1 flex">
           <div className="flex-1 relative bg-black border-r border-green-900">
@@ -68,7 +68,7 @@ export default function VisionB_4_Terminal() {
                 <div>[YEAR]: {activeProject.year}</div>
              </div>
              <div className="flex-1 flex flex-col gap-2">
-                <div>> QUEUE:</div>
+                <div>{'>'} QUEUE:</div>
                 {MOCK_PROJECTS.map((p, i) => (
                   <button key={p.id} onClick={() => setActiveProject(p)} className={`text-left p-2 border ${activeProject.id === p.id ? 'border-green-500 bg-green-900/30' : 'border-green-900/50 hover:border-green-500/50'}`}>
                     [{i}] {p.title}
