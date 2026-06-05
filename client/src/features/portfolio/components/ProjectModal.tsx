@@ -1,6 +1,6 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X } from 'lucide-react';
+import { X, Info } from 'lucide-react';
 import type { Project } from '@/types';
 import { FramesPlayer } from '@/components/shared/FramesPlayer';
 
@@ -10,10 +10,13 @@ interface ProjectModalProps {
 }
 
 export const ProjectModal: React.FC<ProjectModalProps> = ({ project, onClose }) => {
+  const [showInfo, setShowInfo] = useState(false);
+
   // Lock body scroll when modal is open
   useEffect(() => {
     if (project) {
       document.body.style.overflow = 'hidden';
+      setShowInfo(false); // reset info state
     } else {
       document.body.style.overflow = 'unset';
     }
@@ -34,123 +37,139 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({ project, onClose }) 
   return (
     <AnimatePresence>
       {project && (
-        <>
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-            className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-xl"
-            onClick={onClose}
-          />
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          className="fixed inset-0 z-[100] bg-black text-white flex flex-col items-center justify-center overflow-hidden"
+        >
+          {/* Edge-to-Edge Background Player Layer */}
+          <div className="absolute inset-0 z-0 pointer-events-none">
+            <FramesPlayer
+              url={project.videoUrl}
+              thumbnail={project.thumbnailUrl}
+              aspectRatio="16:9"
+              controls={false}
+              autoplay={true}
+              muted={false}
+              loop={true}
+            />
+          </div>
 
-          {/* Modal Container */}
-          <div className="fixed inset-0 z-[100] pointer-events-none flex flex-col items-center justify-center p-0 sm:p-6 lg:p-12 overflow-y-auto custom-scrollbar">
-            
-            {/* Close Button - Fixed Top Right */}
-            <motion.button
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ delay: 0.2, duration: 0.4 }}
-              onClick={onClose}
-              className="fixed top-6 right-6 z-[110] p-4 text-white/50 hover:text-white pointer-events-auto transition-colors"
-              aria-label="Close modal"
-            >
-              <div className="flex items-center gap-3 group">
-                <span className="font-display text-[10px] tracking-[0.2em] uppercase opacity-0 group-hover:opacity-100 transition-opacity -translate-x-4 group-hover:translate-x-0 duration-300">Close</span>
-                <X size={24} strokeWidth={1} />
-              </div>
-            </motion.button>
+          {/* Gradient Overlays for Readability */}
+          <div className="absolute inset-x-0 top-0 h-48 bg-gradient-to-b from-black/80 to-transparent pointer-events-none z-10" />
+          <div className="absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-black/90 via-black/50 to-transparent pointer-events-none z-10" />
 
-            {/* Modal Content */}
-            <motion.div
-              initial={{ opacity: 0, y: 40, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 20, scale: 0.98 }}
-              transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-              className="relative w-full max-w-7xl bg-bg-base border border-border/50 pointer-events-auto flex flex-col my-auto shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Top Banner (Film Strip Meta) */}
-              <div className="w-full bg-bg-raised border-b border-border flex items-center justify-between px-6 py-3">
-                <span className="font-display text-[10px] tracking-[0.2em] text-text-subtle uppercase">
-                  {project.contentType || 'Project'}
+          {/* Top Navigation */}
+          <div className="absolute top-0 inset-x-0 z-20 flex items-center justify-between p-6 md:p-12 pointer-events-auto">
+            <span className="font-mono text-xs tracking-widest uppercase text-white/60">
+              FRM-{project._id?.slice(-4).toUpperCase() || 'NEW'}
+            </span>
+
+            <div className="flex items-center gap-6">
+              <button
+                onClick={() => setShowInfo(!showInfo)}
+                className="group flex items-center gap-3 text-white/60 hover:text-white transition-colors"
+              >
+                <span className="font-mono text-[10px] tracking-widest uppercase opacity-0 group-hover:opacity-100 transition-opacity hidden md:inline-block">
+                  {showInfo ? 'Hide Details' : 'Show Details'}
                 </span>
-                <span className="font-mono text-[10px] tracking-widest text-text-subtle">
-                  FRM-{project._id?.slice(-4).toUpperCase() || 'NEW'}
+                <Info size={24} strokeWidth={1.5} />
+              </button>
+
+              <button
+                onClick={onClose}
+                className="group flex items-center gap-3 text-white/60 hover:text-white transition-colors"
+              >
+                <span className="font-mono text-[10px] tracking-widest uppercase opacity-0 group-hover:opacity-100 transition-opacity hidden md:inline-block">
+                  Close
                 </span>
-              </div>
+                <X size={28} strokeWidth={1} />
+              </button>
+            </div>
+          </div>
 
-              {/* Player Area */}
-              <div className="w-full bg-black">
-                <div className="w-full aspect-video">
-                  <FramesPlayer
-                    url={project.videoUrl}
-                    thumbnail={project.thumbnailUrl}
-                    aspectRatio="16:9" // Modals force 16:9 player box for consistency, letterboxing internal video if needed
-                  />
-                </div>
-              </div>
+          {/* Bottom Title Bar */}
+          <div className="absolute bottom-0 inset-x-0 z-20 p-6 md:p-12 pointer-events-none flex flex-col md:flex-row md:items-end justify-between gap-8">
+            <div className="flex-1">
+              <h2 className="font-display font-bold uppercase tracking-tight text-4xl md:text-7xl text-white leading-none">
+                {project.title || 'Untitled'}
+              </h2>
+              <p className="font-mono text-xs tracking-widest uppercase text-white/60 mt-4">
+                {project.contentType || 'Project'}
+              </p>
+            </div>
+          </div>
 
-              {/* Project Meta Info */}
-              <div className="p-8 md:p-12 lg:p-16">
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8">
+          {/* Expanded Metadata Overlay */}
+          <AnimatePresence>
+            {showInfo && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 20 }}
+                transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+                className="absolute inset-0 z-30 bg-black/80 backdrop-blur-xl flex flex-col justify-end p-6 md:p-12 pointer-events-auto"
+                onClick={() => setShowInfo(false)}
+              >
+                <div 
+                  className="w-full max-w-4xl cursor-default"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <h3 className="font-display font-bold uppercase tracking-tight text-3xl md:text-5xl text-white mb-8">
+                    {project.title}
+                  </h3>
                   
-                  {/* Left Column: Title & Description */}
-                  <div className="lg:col-span-8">
-                    <h2 className="text-3xl sm:text-4xl md:text-5xl font-display font-bold tracking-tight text-text-primary mb-6">
-                      {project.title || 'Untitled'}
-                    </h2>
-                    {project.description && (
-                      <p className="text-base sm:text-lg text-text-muted leading-relaxed whitespace-pre-wrap max-w-3xl">
-                        {project.description}
-                      </p>
-                    )}
-                  </div>
+                  {project.description && (
+                    <p className="text-lg md:text-xl text-white/80 font-light leading-relaxed mb-12 max-w-2xl">
+                      {project.description}
+                    </p>
+                  )}
 
-                  {/* Right Column: Metadata List */}
-                  <div className="lg:col-span-4 flex flex-col gap-8 lg:pl-8 lg:border-l lg:border-border">
-                    {/* Subject Matter */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-8 border-t border-white/20 pt-8">
                     {project.subjectMatter && (
                       <div>
-                        <h4 className="text-[10px] font-display font-bold tracking-[0.2em] text-text-subtle uppercase mb-2">Subject</h4>
-                        <p className="text-text-primary">{project.subjectMatter}</p>
+                        <h4 className="font-mono text-[10px] tracking-widest uppercase text-white/40 mb-3">Subject</h4>
+                        <p className="text-sm text-white/90">{project.subjectMatter}</p>
+                      </div>
+                    )}
+                    
+                    {project.aspectRatio && (
+                      <div>
+                        <h4 className="font-mono text-[10px] tracking-widest uppercase text-white/40 mb-3">Format</h4>
+                        <p className="text-sm text-white/90">{project.aspectRatio}</p>
                       </div>
                     )}
 
-                    {/* Software Used */}
                     {project.softwareUsed && project.softwareUsed.length > 0 && (
                       <div>
-                        <h4 className="text-[10px] font-display font-bold tracking-[0.2em] text-text-subtle uppercase mb-2">Tools</h4>
-                        <div className="flex flex-wrap gap-2">
+                        <h4 className="font-mono text-[10px] tracking-widest uppercase text-white/40 mb-3">Tools</h4>
+                        <div className="flex flex-col gap-2">
                           {project.softwareUsed.map(tool => (
-                            <span key={tool} className="text-sm text-text-primary">{tool}</span>
+                            <span key={tool} className="text-sm text-white/90">{tool}</span>
                           ))}
                         </div>
                       </div>
                     )}
 
-                    {/* AI Tools Used */}
                     {project.aiToolsUsed && project.aiToolsUsed.length > 0 && (
                       <div>
-                        <h4 className="text-[10px] font-display font-bold tracking-[0.2em] text-text-subtle uppercase mb-2">AI Implementation</h4>
-                        <div className="flex flex-wrap gap-2">
+                        <h4 className="font-mono text-[10px] tracking-widest uppercase text-white/40 mb-3">AI</h4>
+                        <div className="flex flex-col gap-2">
                           {project.aiToolsUsed.map(tool => (
-                            <span key={tool} className="text-sm text-text-primary">{tool}</span>
+                            <span key={tool} className="text-sm text-white/90">{tool}</span>
                           ))}
                         </div>
                       </div>
                     )}
                   </div>
-
                 </div>
-              </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-            </motion.div>
-          </div>
-        </>
+        </motion.div>
       )}
     </AnimatePresence>
   );

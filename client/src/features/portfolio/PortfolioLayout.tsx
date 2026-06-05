@@ -58,6 +58,9 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
   const projects = data.projects || [];
   const hoveredProject = projects.find(p => (p._id || p.id) === hoveredProjectId);
 
+  const defaultVideoUrl = data.showreelUrl || projects[0]?.videoUrl;
+  const currentBackgroundVideoUrl = hoveredProject?.videoUrl || defaultVideoUrl;
+
   return (
     <div className="relative min-h-screen bg-bg-base text-text-primary overflow-hidden selection:bg-white selection:text-black">
       {/* Intro Overlay */}
@@ -69,24 +72,25 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
         />
       )}
 
-      {/* Global Background Layer */}
-      <div className="fixed inset-0 z-0 pointer-events-none bg-black">
-        <AnimatePresence>
-          {hoveredProject?.videoUrl && (
+      {/* Global Background Layer (Desktop Only) */}
+      <div className="hidden md:block fixed inset-0 z-0 pointer-events-none bg-black">
+        <AnimatePresence mode="wait">
+          {currentBackgroundVideoUrl && (
             <motion.div
-              key={hoveredProject._id || hoveredProject.id}
+              key={currentBackgroundVideoUrl}
               initial={{ opacity: 0, scale: 1.05 }}
-              animate={{ opacity: 0.4, scale: 1 }} // 40% opacity so text is still perfectly readable
+              animate={{ opacity: 0.4, scale: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.8, ease: "easeInOut" }}
               className="absolute inset-0 object-cover"
             >
-              <div className="w-full h-full scale-[1.5]"> {/* Overscale to hide player UI if any */}
+              <div className="w-full h-full scale-[1.5]">
                 <FramesPlayer 
-                  url={hoveredProject.videoUrl} 
+                  url={currentBackgroundVideoUrl} 
                   controls={false} 
                   autoplay={true} 
                   muted={true} 
+                  loop={true}
                 />
               </div>
               <div className="absolute inset-0 bg-gradient-to-t from-bg-base via-transparent to-transparent" />
@@ -133,8 +137,8 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
         </header>
 
         {/* The Cinematic Index */}
-        <main className="w-full px-6 md:px-16 pb-32">
-          <ul className="w-full border-t border-white/20 group/list">
+        <main className="w-full px-0 md:px-16 pb-16 md:pb-32">
+          <ul className="w-full border-t border-white/10 md:border-white/20 group/list flex flex-col">
             {projects.map((project, index) => (
               <motion.li 
                 key={project._id || project.id}
@@ -145,16 +149,40 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
                 onMouseEnter={() => setHoveredProjectId(project._id || project.id as string)}
                 onMouseLeave={() => setHoveredProjectId(null)}
                 onClick={() => setSelectedProjectId(project._id || project.id as string)}
-                className="group relative flex items-center justify-between py-8 md:py-12 border-b border-white/10 cursor-pointer transition-colors duration-500 hover:border-white/40"
+                className="group relative flex flex-col md:flex-row md:items-center md:justify-between py-6 md:py-12 border-b border-white/10 cursor-pointer transition-colors duration-500 hover:border-white/40"
               >
-                <div className="flex items-center gap-8 md:gap-16">
-                  <span className="text-sm md:text-base font-mono text-white/30 group-hover:text-white/60 transition-colors duration-500">
+                {/* Mobile/Tablet Card Preview */}
+                <div className="w-full aspect-video mb-6 block md:hidden relative overflow-hidden bg-black/50">
+                  {project.videoUrl && (
+                    <div className="absolute inset-0 pointer-events-none">
+                      <FramesPlayer 
+                        url={project.videoUrl} 
+                        thumbnail={project.thumbnailUrl}
+                        controls={false} 
+                        autoplay={true} 
+                        muted={true}
+                        loop={true}
+                      />
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex items-end p-4">
+                     <span className="text-xs font-mono tracking-widest uppercase text-white/80 border border-white/20 px-2 py-1 bg-black/40 backdrop-blur-md">
+                        {project.contentType || 'Project'}
+                     </span>
+                  </div>
+                </div>
+
+                {/* Desktop/Mobile Title Row */}
+                <div className="flex items-center gap-4 md:gap-16 px-6 md:px-0">
+                  <span className="text-xs md:text-base font-mono text-white/30 group-hover:text-white/60 transition-colors duration-500">
                     {(index + 1).toString().padStart(2, '0')}
                   </span>
-                  <h2 className="font-display font-bold uppercase tracking-tight text-4xl md:text-7xl text-white/40 group-hover:text-white transition-all duration-500 group-hover:translate-x-4">
+                  <h2 className="font-display font-bold uppercase tracking-tight text-3xl sm:text-5xl md:text-7xl text-white/80 md:text-white/40 group-hover:text-white transition-all duration-500 md:group-hover:translate-x-4">
                     {project.title}
                   </h2>
                 </div>
+
+                {/* Desktop Meta Data */}
                 <div className="hidden md:flex items-center gap-12 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
                   <span className="text-sm tracking-widest uppercase text-white/60">
                     {project.contentType}
@@ -167,6 +195,17 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
             ))}
           </ul>
         </main>
+
+        {/* Terminal Footer */}
+        <footer className="w-full min-h-[50vh] flex flex-col items-center justify-center border-t border-white/10 mt-auto py-24 px-6 relative z-20 bg-bg-base">
+          <p className="font-mono text-sm tracking-[0.2em] uppercase text-text-subtle mb-8">Ready to collaborate</p>
+          <a 
+            href={`mailto:${data.contactEmail || data.socials?.email || ''}`}
+            className="font-display font-bold uppercase tracking-tighter text-[10vw] leading-none text-white hover:text-white/70 transition-colors"
+          >
+            LET'S TALK
+          </a>
+        </footer>
 
       </div>
 
