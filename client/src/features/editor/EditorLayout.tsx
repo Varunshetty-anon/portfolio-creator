@@ -208,7 +208,7 @@ export default function EditorLayout() {
       {/* ── Main Canvas (Live Preview) ── */}
       <main className="flex-1 relative bg-bg-raised flex flex-col min-w-0">
         {/* Floating Top Header */}
-        <header className="absolute top-4 left-4 right-4 z-10 flex items-center justify-between pointer-events-none">
+        <header className="absolute top-4 left-4 right-4 z-50 flex items-center justify-between pointer-events-none">
           
           {/* Status Indicator */}
           <div className="bg-bg-floating/80 backdrop-blur-md border border-border px-4 py-2 rounded-full shadow-sm pointer-events-auto flex items-center gap-2 text-xs font-medium uppercase tracking-widest">

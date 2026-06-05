@@ -29,17 +29,24 @@ async function runAudit() {
     results.performance.initialLoadMs = Date.now() - loadStart;
     
     console.log('Registering test user...');
-    await page.click('button:has-text("Start for Free")');
+    await page.click('button:has-text("Create Account")'); // Click the tab
     await page.fill('input[type="email"]', TEST_EMAIL);
     await page.fill('input[type="password"]', TEST_PASS);
+    await page.fill('input[placeholder="Your name"]', 'Test User');
     await page.click('button[type="submit"]');
 
-    // Onboarding
+    // Onboarding - Step 0: Name
     await page.waitForURL('**/onboarding');
-    await page.fill('input[name="name"]', 'Christopher Nolan');
-    await page.fill('input[name="username"]', TEST_USER);
-    await page.fill('input[name="role"]', 'Director');
-    await page.click('button[type="submit"]');
+    await page.fill('input[placeholder="Your full name"]', 'Christopher Nolan');
+    await page.click('button:has-text("Continue")');
+    
+    // Onboarding - Step 1: Username
+    await page.fill('input[placeholder="yourname"]', TEST_USER);
+    await page.click('button:has-text("Continue")');
+
+    // Onboarding - Step 2: Role
+    await page.click('button:has-text("Director")');
+    await page.click('button:has-text("Create Portfolio")');
     
     // Editor Load
     await page.waitForURL('**/editor');
@@ -53,12 +60,18 @@ async function runAudit() {
 
     // Add a project to test the live layout
     console.log('Adding test project...');
-    await page.click('button:has-text("Add Project")');
-    await page.fill('input[name="title"]', 'Inception');
-    // Test video URL
-    await page.fill('input[name="videoUrl"]', 'https://www.youtube.com/watch?v=Jm-upHSP9KU');
-    await page.click('button:has-text("Create Project")');
-    await page.waitForTimeout(1000); // Wait for save debounce
+    await page.click('button[title="Projects"]');
+    await page.click('button:has-text("New Project")');
+    await page.click('button:has-text("Paste Link")');
+    await page.fill('input[placeholder="YouTube, Vimeo, or direct link..."]', 'https://www.youtube.com/watch?v=Jm-upHSP9KU');
+    await page.click('button:has-text("Save")');
+    
+    await page.fill('input[placeholder*="Nike"]', 'Inception');
+    await page.waitForTimeout(1000); 
+    
+    // Publish changes
+    await page.click('button:has-text("Publish")');
+    await page.waitForTimeout(2000); // Wait for publish to complete
     results.upload.projectCreation = 'Success';
 
     // 3. ARCHITECTURE & DESIGN (Live Portfolio Check)
