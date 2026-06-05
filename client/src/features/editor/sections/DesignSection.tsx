@@ -76,28 +76,7 @@ export default function DesignSection({ data, onChange }: DesignSectionProps) {
         )}
       </PanelSection>
 
-      <PanelSection title="Aesthetic Theme" description="Choose the visual atmosphere for your portfolio.">
-        <div className="grid grid-cols-1 gap-3">
-          {[
-            { id: 'minimalism', label: 'Minimalism', desc: 'Apple-inspired, whitespace-driven.' },
-            { id: 'magazine', label: 'Magazine', desc: 'Editorial, storytelling, large typography.' },
-            { id: 'futuristic', label: 'Futuristic', desc: 'Modern, motion-oriented, creative-tech.' },
-            { id: 'glassmorphic', label: 'Glassmorphic', desc: 'Layered depth, premium glass treatment.' }
-          ].map(theme => (
-            <button
-              key={theme.id}
-              onClick={() => onChange({ ...data, theme: theme.id as any })}
-              className={`flex flex-col text-left p-3 rounded-lg border transition-all ${data.theme === theme.id ? 'bg-bg-floating border-accent' : 'bg-bg-raised border-border-strong hover:border-border'}`}
-            >
-              <div className="flex items-center justify-between w-full mb-1">
-                <span className={`text-sm font-medium ${data.theme === theme.id ? 'text-text-primary' : 'text-text-primary'}`}>{theme.label}</span>
-                {data.theme === theme.id && <div className="w-2 h-2 rounded-full bg-accent" />}
-              </div>
-              <span className="text-xs text-text-muted">{theme.desc}</span>
-            </button>
-          ))}
-        </div>
-      </PanelSection>
+
 
       <PanelSection title="Software Stack" description="Select the software you use. Star your primary tool.">
         <ToolSelector

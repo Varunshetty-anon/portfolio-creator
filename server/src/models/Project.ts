@@ -44,7 +44,7 @@ const projectSchema = new Schema<IProject>(
     videoUrl: { type: String },
     videoSource: {
       type: String,
-      enum: ['cloudinary', 'youtube', 'vimeo'],
+      enum: ['cloudinary', 'youtube', 'vimeo', 'gdrive', 'direct'],
     },
     aspectRatio: {
       type: String,

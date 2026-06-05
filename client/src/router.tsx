@@ -12,6 +12,7 @@ const AuthPage = lazy(() => import('@/features/auth/AuthPage'));
 const EditorLayout = lazy(() => import('@/features/editor/EditorLayout'));
 const OnboardingFlow = lazy(() => import('@/features/onboarding/OnboardingFlow'));
 const PortfolioLayout = lazy(() => import('@/features/portfolio/PortfolioLayout'));
+const TestPlayerPage = lazy(() => import('@/features/portfolio/TestPlayerPage'));
 
 const SuspenseWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <Suspense fallback={<LoadingScreen message="Loading..." />}>
@@ -55,6 +56,14 @@ export const router = createBrowserRouter([
         <PortfolioLayout />
       </SuspenseWrapper>
     ),
+  },
+  {
+    path: '/audit-player',
+    element: (
+      <SuspenseWrapper>
+        <TestPlayerPage />
+      </SuspenseWrapper>
+    )
   },
   // Alias: /@username → /portfolio/username
   // React Router v6 doesn't support partial dynamic segments (/@:username)

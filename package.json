@@ -10,5 +10,10 @@
     "install": "npm install --prefix client && npm install --prefix server",
     "build": "npm run build --prefix client && npm run build --prefix server",
     "start": "npm start --prefix server"
+  },
+  "dependencies": {
+    "@playwright/test": "^1.60.0",
+    "node-fetch": "^3.3.2",
+    "playwright": "^1.60.0"
   }
 }

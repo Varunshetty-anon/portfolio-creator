@@ -26,7 +26,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, usernam
         width: 300,
         margin: 2,
         color: {
-          dark: '#FFFFFF',
+          dark: '#F2F0EC',
           light: '#00000000', // Transparent
         }
       })
@@ -60,50 +60,50 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, usernam
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            initial={{ opacity: 0, scale: 0.98, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+            exit={{ opacity: 0, scale: 0.98, y: 10 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden relative"
+            className="bg-bg-raised border border-border-strong shadow-2xl w-full max-w-md overflow-hidden relative rounded-none"
           >
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-display font-bold text-white flex items-center gap-2">
-                  <QrCode size={20} className="text-accent-gold" />
+            <div className="p-6 md:p-8">
+              <div className="flex justify-between items-center mb-8">
+                <h3 className="text-sm font-display font-bold text-text-primary uppercase tracking-[0.2em] flex items-center gap-3">
+                  <QrCode size={16} className="text-accent" />
                   Share Portfolio
                 </h3>
                 <button 
                   onClick={onClose}
-                  className="p-2 bg-zinc-800 hover:bg-zinc-700 rounded-full transition-colors text-zinc-400 hover:text-white"
+                  className="p-2 -mr-2 bg-transparent hover:bg-bg-floating transition-colors text-text-muted hover:text-text-primary"
                 >
-                  <X size={16} />
+                  <X size={18} strokeWidth={1.5} />
                 </button>
               </div>
 
               {/* QR Code */}
               <div className="flex justify-center mb-8">
-                <div className="p-4 bg-zinc-950 rounded-2xl border border-zinc-800 shadow-inner">
+                <div className="p-6 bg-bg-base border border-border shadow-inner">
                   {qrCodeUrl ? (
                     <img src={qrCodeUrl} alt="Portfolio QR Code" className="w-48 h-48" />
                   ) : (
-                    <div className="w-48 h-48 flex items-center justify-center bg-zinc-900/50 rounded-xl">
-                      <QrCode size={48} className="text-zinc-600 opacity-50" />
+                    <div className="w-48 h-48 flex items-center justify-center bg-bg-floating">
+                      <QrCode size={48} className="text-text-muted opacity-30" />
                     </div>
                   )}
                 </div>
               </div>
 
               {/* Link Copy */}
-              <div className="mb-6">
-                <label className="block text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2">Direct Link</label>
+              <div className="mb-8">
+                <label className="block text-[10px] font-display font-bold text-text-subtle uppercase tracking-[0.2em] mb-3">Direct Link</label>
                 <div className="flex items-center gap-2">
-                  <div className="flex-1 bg-black/50 border border-zinc-800 rounded-lg px-3 py-2.5 flex items-center gap-2 overflow-hidden">
-                    <LinkIcon size={14} className="text-zinc-500 shrink-0" />
-                    <span className="text-sm text-zinc-300 font-mono truncate select-all">{url}</span>
+                  <div className="flex-1 bg-bg-base border border-border px-4 py-3 flex items-center gap-3 overflow-hidden">
+                    <LinkIcon size={14} className="text-text-muted shrink-0" />
+                    <span className="text-sm text-text-primary font-mono truncate select-all">{url}</span>
                   </div>
-                  <Button onClick={copyToClipboard} variant={copied ? "primary" : "secondary"} className="shrink-0">
+                  <Button onClick={copyToClipboard} variant={copied ? "primary" : "secondary"} className="shrink-0 h-[46px] rounded-none px-6">
                     {copied ? <Check size={16} /> : <Copy size={16} />}
                   </Button>
                 </div>
@@ -111,13 +111,13 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, usernam
 
               {/* Social Share */}
               <div>
-                <label className="block text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2">Share On</label>
+                <label className="block text-[10px] font-display font-bold text-text-subtle uppercase tracking-[0.2em] mb-3">Share On</label>
                 <div className="flex gap-3">
-                  <button onClick={shareOnTwitter} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg bg-[#1DA1F2]/10 text-[#1DA1F2] hover:bg-[#1DA1F2]/20 transition-colors font-medium text-sm">
-                    <Twitter size={16} /> Twitter
+                  <button onClick={shareOnTwitter} className="flex-1 flex items-center justify-center gap-2 py-3 bg-bg-base border border-border text-text-muted hover:text-text-primary hover:border-border-strong transition-colors text-sm">
+                    <Twitter size={14} /> Twitter
                   </button>
-                  <button onClick={shareOnLinkedIn} className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg bg-[#0A66C2]/10 text-[#0A66C2] hover:bg-[#0A66C2]/20 transition-colors font-medium text-sm">
-                    <Linkedin size={16} /> LinkedIn
+                  <button onClick={shareOnLinkedIn} className="flex-1 flex items-center justify-center gap-2 py-3 bg-bg-base border border-border text-text-muted hover:text-text-primary hover:border-border-strong transition-colors text-sm">
+                    <Linkedin size={14} /> LinkedIn
                   </button>
                 </div>
               </div>

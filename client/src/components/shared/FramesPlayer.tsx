@@ -1,7 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import ReactPlayer from 'react-player';
-import screenfull from 'screenfull';
-import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, AlertCircle } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, AlertCircle, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getGoogleDriveId } from '@/lib/media-utils';
 
@@ -17,6 +16,8 @@ interface FramesPlayerProps {
   loop?: boolean;
   className?: string;
   onClick?: () => void;
+  onTheatreToggle?: () => void;
+  isTheatre?: boolean;
 }
 
 const aspectClasses: Record<string, string> = {
@@ -36,65 +37,202 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
   loop = true,
   className = '',
   onClick,
+  onTheatreToggle,
+  isTheatre = false,
 }) => {
   const [playing, setPlaying] = useState(autoplay);
-  const [muted, setMuted] = useState(initialMuted);
-  const [volume, setVolume] = useState(initialMuted ? 0 : 1);
+  const [muted, setMuted] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('frames_player_muted');
+      if (saved !== null) return JSON.parse(saved);
+    }
+    return initialMuted;
+  });
+  const [volume, setVolume] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('frames_player_volume');
+      if (saved !== null) return parseFloat(saved);
+    }
+    return initialMuted ? 0 : 1;
+  });
   const [played, setPlayed] = useState(0);
   const [loaded, setLoaded] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isReady, setIsReady] = useState(false);
+  const [isBuffering, setIsBuffering] = useState(false);
   const [isHovering, setIsHovering] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [hasError, setHasError] = useState(false);
+  const [isScrubbing, setIsScrubbing] = useState(false);
 
   const playerRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const hideControlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastTapRef = useRef<{ time: number; clientX: number }>({ time: 0, clientX: 0 });
 
-  // Parse GDrive URL to direct download stream to force native video tag
-  const gdriveId = getGoogleDriveId(url);
-  const processedUrl = gdriveId 
-    ? `https://drive.google.com/uc?export=download&id=${gdriveId}`
-    : url;
+  // Persist volume settings
+  useEffect(() => {
+    localStorage.setItem('frames_player_muted', JSON.stringify(muted));
+  }, [muted]);
 
   useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(screenfull.isFullscreen);
-    };
-    if (screenfull.isEnabled) {
-      screenfull.on('change', handleFullscreenChange);
+    localStorage.setItem('frames_player_volume', volume.toString());
+  }, [volume]);
+
+  // Parse GDrive URL to use iframe preview embed instead of direct stream
+  const gdriveId = getGoogleDriveId(url);
+  const processedUrl = url;
+
+  useEffect(() => {
+    if (gdriveId) {
+      // GDrive iframe doesn't need to 'ready' the same way ReactPlayer does
+      setIsReady(true);
     }
+  }, [gdriveId]);
+
+  // --- FULLSCREEN HANDLING ---
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => {
-      if (screenfull.isEnabled) {
-        screenfull.off('change', handleFullscreenChange);
-      }
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
     };
   }, []);
 
+  const toggleFullscreen = useCallback(async (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!containerRef.current) return;
+
+    try {
+      if (!document.fullscreenElement) {
+        if (containerRef.current.requestFullscreen) {
+          await containerRef.current.requestFullscreen();
+        } else if ((containerRef.current as any).webkitRequestFullscreen) {
+          await (containerRef.current as any).webkitRequestFullscreen();
+        }
+      } else {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        } else if ((document as any).webkitExitFullscreen) {
+          await (document as any).webkitExitFullscreen();
+        }
+      }
+    } catch (err) {
+      console.error('Error attempting to toggle fullscreen:', err);
+    }
+  }, []);
+
+  // --- CONTROLS IDLE LOGIC ---
+  const showControls = useCallback(() => {
+    setIsHovering(true);
+    if (hideControlsTimeoutRef.current) {
+      clearTimeout(hideControlsTimeoutRef.current);
+    }
+    // Only auto-hide if playing
+    if (playing) {
+      hideControlsTimeoutRef.current = setTimeout(() => {
+        if (!isScrubbing) setIsHovering(false);
+      }, 2500);
+    }
+  }, [playing, isScrubbing]);
+
+  const handleMouseMove = useCallback(() => {
+    showControls();
+  }, [showControls]);
+
+  const handleMouseLeave = useCallback(() => {
+    if (playing && !isScrubbing) {
+      setIsHovering(false);
+    }
+  }, [playing, isScrubbing]);
+
+  useEffect(() => {
+    if (!playing) {
+      setIsHovering(true); // Always show controls when paused
+      if (hideControlsTimeoutRef.current) clearTimeout(hideControlsTimeoutRef.current);
+    } else {
+      showControls();
+    }
+    return () => {
+      if (hideControlsTimeoutRef.current) clearTimeout(hideControlsTimeoutRef.current);
+    };
+  }, [playing, showControls]);
+
+  // --- KEYBOARD ACCESSIBILITY ---
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    // Only handle global keys if fullscreen, otherwise only if the container has focus
+    const isFocused = document.activeElement === containerRef.current || containerRef.current?.contains(document.activeElement);
+    if (!isFullscreen && !isFocused) return;
+
+    switch (e.key) {
+      case ' ':
+      case 'k':
+        e.preventDefault();
+        setPlaying(p => !p);
+        showControls();
+        break;
+      case 'ArrowRight':
+        e.preventDefault();
+        if (playerRef.current) {
+          const current = playerRef.current.getCurrentTime() || 0;
+          playerRef.current.seekTo(current + 5, 'seconds');
+          showControls();
+        }
+        break;
+      case 'ArrowLeft':
+        e.preventDefault();
+        if (playerRef.current) {
+          const current = playerRef.current.getCurrentTime() || 0;
+          playerRef.current.seekTo(current - 5, 'seconds');
+          showControls();
+        }
+        break;
+      case 'm':
+        e.preventDefault();
+        setMuted((m: boolean) => !m);
+        setVolume((v: number) => v === 0 ? 1 : 0);
+        showControls();
+        break;
+      case 'f':
+        e.preventDefault();
+        toggleFullscreen();
+        break;
+    }
+  }, [isFullscreen, showControls, toggleFullscreen]);
+
+  useEffect(() => {
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
+
+  // --- ACTIONS ---
   const handlePlayPause = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    setPlaying(!playing);
+    setPlaying(p => !p);
   };
 
   const handleToggleMute = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setMuted(!muted);
-    setVolume(!muted ? 0 : 1);
+    setMuted((m: boolean) => !m);
+    setVolume(muted ? 1 : 0);
   };
 
-  const handleToggleFullscreen = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (screenfull.isEnabled && containerRef.current) {
-      screenfull.toggle(containerRef.current);
-    }
-  };
-
-  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSeekMouseDown = () => setIsScrubbing(true);
+  
+  const handleSeekChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     e.stopPropagation();
     const val = parseFloat(e.target.value);
     setPlayed(val);
+  };
+
+  const handleSeekMouseUp = (e: React.SyntheticEvent<HTMLInputElement>) => {
+    e.stopPropagation();
+    setIsScrubbing(false);
     if (playerRef.current) {
-      playerRef.current.seekTo(val);
+      const val = parseFloat(e.currentTarget.value);
+      playerRef.current.seekTo(val, 'fraction');
     }
   };
 
@@ -115,26 +253,82 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
   return (
     <div
       ref={containerRef}
-      className={`relative overflow-hidden bg-black group ${
+      className={`relative overflow-hidden bg-black group focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50 ${
         !isFullscreen ? aspectClasses[aspectRatio] : 'w-full h-full'
       } ${className}`}
-      onMouseEnter={() => setIsHovering(true)}
-      onMouseLeave={() => setIsHovering(false)}
-      onClick={onClick || handlePlayPause}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      onClick={(e) => {
+        if (onClick) {
+          onClick();
+          return;
+        }
+
+        const now = Date.now();
+        const timeSinceLastTap = now - lastTapRef.current.time;
+        
+        // Double-tap detection for mobile
+        if (timeSinceLastTap < 300 && window.innerWidth < 768) {
+          if (containerRef.current && playerRef.current) {
+            const { left, width } = containerRef.current.getBoundingClientRect();
+            const clickX = e.clientX - left;
+            const current = playerRef.current.getCurrentTime() || 0;
+            
+            if (clickX < width / 2) {
+              playerRef.current.seekTo(Math.max(current - 10, 0), 'seconds');
+            } else {
+              playerRef.current.seekTo(current + 10, 'seconds');
+            }
+            showControls();
+          }
+          lastTapRef.current.time = 0; // Reset tap tracker
+        } else {
+          lastTapRef.current = { time: now, clientX: e.clientX };
+          // Mobile single tap toggles controls, desktop clicking pauses
+          if (window.innerWidth < 768) {
+            if (isHovering && playing) setIsHovering(false);
+            else showControls();
+          } else {
+            handlePlayPause(e);
+          }
+        }
+      }}
+      tabIndex={0}
+      role="region"
+      aria-label="Video Player"
     >
-      {/* Thumbnail overlay while loading */}
+      {/* Thumbnail Overlay */}
       <AnimatePresence>
         {!isReady && thumbnail && !hasError && (
           <motion.div
             initial={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.6, ease: 'easeOut' }}
-            className="absolute inset-0 z-10"
+            transition={{ duration: 0.8, ease: 'easeOut' }}
+            className="absolute inset-0 z-10 bg-black"
           >
             <img
               src={thumbnail}
               alt="Video Thumbnail"
-              className="w-full h-full object-cover filter blur-sm scale-105"
+              className="w-full h-full object-cover opacity-60 scale-105 blur-sm"
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Loading State */}
+      <AnimatePresence>
+        {isBuffering && !hasError && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none"
+          >
+            {/* Branded minimalistic frame loader */}
+            <motion.div 
+              animate={{ rotate: 90 }}
+              transition={{ duration: 0.8, repeat: Infinity, ease: "easeInOut" }}
+              className="w-8 h-8 border-[1.5px] border-white/70 shadow-[0_0_15px_rgba(255,255,255,0.1)]"
             />
           </motion.div>
         )}
@@ -142,14 +336,31 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
 
       {/* Error State */}
       {hasError && (
-        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black">
-          <AlertCircle size={24} className="text-zinc-600 mb-2" />
-          <p className="text-zinc-500 text-xs font-mono uppercase tracking-widest">Playback Error</p>
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-zinc-950">
+          <AlertCircle className="w-8 h-8 text-zinc-600 mb-3" />
+          <p className="text-zinc-500 text-xs font-mono uppercase tracking-widest">Media Unavailable</p>
         </div>
       )}
 
-      {/* Unified Player Core */}
-      {!hasError && (
+      {/* React Player Core or GDrive Iframe */}
+      {!hasError && gdriveId ? (
+        <div className="absolute inset-0 w-full h-full z-10 bg-black">
+          {playing ? (
+            <iframe
+              src={`https://drive.google.com/file/d/${gdriveId}/preview?autoplay=1`}
+              className="absolute inset-0 w-full h-full border-0"
+              allow="autoplay; fullscreen"
+              onLoad={() => { setIsReady(true); setIsBuffering(false); }}
+            />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center cursor-pointer pointer-events-auto" onClick={(e) => { e.stopPropagation(); setPlaying(true); }}>
+               <div className="w-20 h-20 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-white/90 hover:scale-105 transition-transform shadow-2xl border border-white/20">
+                 <Play className="w-8 h-8 fill-current ml-2" />
+               </div>
+            </div>
+          )}
+        </div>
+      ) : !hasError && (
         <Player
           ref={playerRef}
           url={processedUrl}
@@ -167,12 +378,16 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
               setDuration(playerRef.current.getDuration() || 0);
             }
           }}
+          onStart={() => setIsBuffering(false)}
+          onBuffer={() => setIsBuffering(true)}
+          onBufferEnd={() => setIsBuffering(false)}
           onError={(e: any) => {
             console.error('FramesPlayer Error:', e);
             setHasError(true);
+            setIsBuffering(false);
           }}
           onProgress={(state: any) => {
-            setPlayed(state.played);
+            if (!isScrubbing) setPlayed(state.played);
             setLoaded(state.loaded);
             if (playerRef.current) {
               const d = playerRef.current.getDuration();
@@ -181,120 +396,118 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
           }}
           config={{
             youtube: {
-              playerVars: { 
-                controls: 0, 
-                modestbranding: 1, 
-                rel: 0, 
-                showinfo: 0,
-                iv_load_policy: 3 
-              }
+              playerVars: { controls: 0, modestbranding: 1, rel: 0, showinfo: 0, iv_load_policy: 3, fs: 0 }
             },
             vimeo: {
-              playerOptions: { 
-                controls: false, 
-                title: false, 
-                byline: false, 
-                portrait: false,
-                background: false
-              }
+              playerOptions: { controls: false, title: false, byline: false, portrait: false, background: true, dnt: true }
             },
             file: {
-              attributes: {
-                controlsList: 'nodownload',
-                disablePictureInPicture: true,
-                style: { width: '100%', height: '100%', objectFit: 'cover' }
-              }
+              attributes: { controlsList: 'nodownload', disablePictureInPicture: true }
             }
           }}
         />
       )}
 
-      {/* Custom Precision Minimal Controls */}
-      {controls && !hasError && isReady && (
+      {/* Minimalistic Cinematic Controls overlay */}
+      {controls && !hasError && isReady && !gdriveId && (
         <AnimatePresence>
-          {(isHovering || !playing) && (
+          {isHovering && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="absolute inset-0 z-30 flex flex-col justify-between"
-              onClick={(e) => e.stopPropagation()}
+              transition={{ duration: 0.3, ease: 'easeInOut' }}
+              className="absolute inset-0 z-30 flex flex-col justify-end"
             >
-              {/* Top Gradient */}
-              <div className="w-full h-24 bg-gradient-to-b from-black/60 to-transparent pointer-events-none" />
+              {/* Bottom Gradient for Contrast */}
+              <div className="absolute bottom-0 w-full h-32 bg-gradient-to-t from-black/80 via-black/30 to-transparent pointer-events-none" />
 
-              {/* Central Play/Pause Button */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <button
-                  onClick={handlePlayPause}
-                  className="w-16 h-16 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white hover:bg-white/20 hover:scale-105 transition-all pointer-events-auto shadow-2xl"
-                >
-                  {playing ? (
-                    <Pause size={24} className="fill-current" />
-                  ) : (
-                    <Play size={24} className="fill-current ml-1" />
-                  )}
-                </button>
-              </div>
+              {/* Central Play/Pause (only visible when paused, purely aesthetic) */}
+              {!playing && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="w-16 h-16 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-white/90">
+                    <Play className="w-6 h-6 fill-current ml-1" />
+                  </div>
+                </div>
+              )}
 
-              {/* Bottom Controls Bar */}
-              <div className="w-full px-4 pb-4 pt-12 bg-gradient-to-t from-black/80 to-transparent pointer-events-auto">
-                <div className="flex items-center gap-3">
-                  <button 
-                    onClick={handlePlayPause}
-                    className="text-white hover:text-white/80 transition-colors"
-                  >
-                    {playing ? <Pause size={16} className="fill-current" /> : <Play size={16} className="fill-current" />}
-                  </button>
+              {/* Controls Bar */}
+              <div 
+                className="relative z-40 w-full px-6 pb-6 pt-12 flex flex-col gap-4 pointer-events-auto"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Hairline Scrub Bar */}
+                <div className="w-full relative h-3 group/slider flex items-center cursor-pointer">
+                  <input
+                    type="range"
+                    min={0}
+                    max={0.999999}
+                    step="any"
+                    value={played}
+                    onMouseDown={handleSeekMouseDown}
+                    onTouchStart={handleSeekMouseDown}
+                    onChange={handleSeekChange}
+                    onMouseUp={handleSeekMouseUp}
+                    onTouchEnd={handleSeekMouseUp}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                    aria-label="Seek Video"
+                  />
+                  <div className="w-full h-[2px] bg-white/20 rounded-full relative transition-all group-hover/slider:h-1">
+                    {/* Loaded Buffer */}
+                    <div className="absolute top-0 bottom-0 left-0 bg-white/40 rounded-full" style={{ width: `${loaded * 100}%` }} />
+                    {/* Current Progress */}
+                    <div className="absolute top-0 bottom-0 left-0 bg-white rounded-full" style={{ width: `${played * 100}%` }} />
+                  </div>
+                </div>
+
+                {/* Bottom Row */}
+                <div className="flex items-center justify-between">
                   
-                  {/* Hairline Timeline */}
-                  <div className="flex-1 group/slider relative h-1.5 flex items-center mx-2 cursor-pointer">
-                    <input
-                      type="range"
-                      min={0}
-                      max={0.999999}
-                      step="any"
-                      value={played}
-                      onChange={handleSeek}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                    />
-                    <div className="absolute left-0 right-0 h-1 bg-white/20 rounded-full overflow-hidden transition-all group-hover/slider:h-1.5">
-                      {/* Loaded buffer */}
-                      <div 
-                        className="absolute top-0 bottom-0 left-0 bg-white/30"
-                        style={{ width: `${loaded * 100}%` }}
-                      />
-                      {/* Played progress */}
-                      <div 
-                        className="absolute top-0 bottom-0 left-0 bg-white"
-                        style={{ width: `${played * 100}%` }}
-                      />
-                    </div>
+                  <div className="flex items-center gap-6 text-white/90">
+                    <button 
+                      onClick={handlePlayPause}
+                      className="hover:text-white hover:scale-110 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-white rounded"
+                      aria-label={playing ? "Pause" : "Play"}
+                    >
+                      {playing ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current" />}
+                    </button>
+
+                    <button 
+                      onClick={handleToggleMute}
+                      className="hover:text-white hover:scale-110 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-white rounded"
+                      aria-label={muted || volume === 0 ? "Unmute" : "Mute"}
+                    >
+                      {muted || volume === 0 ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+                    </button>
+
+                    <span className="text-xs font-mono tracking-widest opacity-70 hidden sm:block select-none">
+                      {formatTime(played * duration)} <span className="opacity-50 mx-1">/</span> {formatTime(duration)}
+                    </span>
                   </div>
 
-                  {/* Time */}
-                  <div className="text-white/70 text-[10px] font-mono tracking-widest hidden sm:block">
-                    {formatTime(played * duration)} / {formatTime(duration)}
+                  <div className="flex items-center gap-6 text-white/90">
+                    {onTheatreToggle && (
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); onTheatreToggle(); }}
+                        className="text-xs font-medium uppercase tracking-widest hover:text-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white rounded hidden md:block"
+                        aria-label="Toggle Theatre Mode"
+                      >
+                        {isTheatre ? 'Standard' : 'Theatre'}
+                      </button>
+                    )}
+                    
+                    <button 
+                      onClick={toggleFullscreen}
+                      className="hover:text-white hover:scale-110 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-white rounded"
+                      aria-label={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+                    >
+                      {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
+                    </button>
                   </div>
 
-                  {/* Audio Toggle */}
-                  <button 
-                    onClick={handleToggleMute}
-                    className="text-white hover:text-white/80 transition-colors ml-2"
-                  >
-                    {muted || volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
-                  </button>
-
-                  {/* Fullscreen Toggle */}
-                  <button 
-                    onClick={handleToggleFullscreen}
-                    className="text-white hover:text-white/80 transition-colors"
-                  >
-                    {isFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
-                  </button>
                 </div>
               </div>
+
             </motion.div>
           )}
         </AnimatePresence>

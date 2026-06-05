@@ -23,6 +23,7 @@ interface ProjectCardEditorProps {
   onChange: (project: Project) => void;
   onDelete: () => void;
   onAutoSave: () => void;
+  isDeleting?: boolean;
 }
 
 export default function ProjectCardEditor({
@@ -32,7 +33,8 @@ export default function ProjectCardEditor({
   onToggleExpand,
   onChange,
   onDelete,
-  onAutoSave
+  onAutoSave,
+  isDeleting = false
 }: ProjectCardEditorProps) {
   const [isValidatingLink, setIsValidatingLink] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
@@ -302,10 +304,12 @@ export default function ProjectCardEditor({
                   variant="danger" 
                   size="sm"
                   onClick={onDelete}
-                  className="bg-danger/5 border border-danger/20 text-danger hover:bg-danger hover:text-white transition-colors"
+                  className={isDeleting 
+                    ? "bg-danger border border-danger text-white transition-colors" 
+                    : "bg-danger/5 border border-danger/20 text-danger hover:bg-danger hover:text-white transition-colors"}
                 >
                   <Trash2 size={14} className="mr-2" />
-                  Remove Project
+                  {isDeleting ? "Confirm Delete?" : "Remove Project"}
                 </Button>
               </div>
 

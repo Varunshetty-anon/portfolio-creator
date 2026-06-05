@@ -17,6 +17,7 @@ interface ProjectsSectionProps {
 
 export default function ProjectsSection({ data, onChange, onAutoSave, projects, onChangeProjects }: ProjectsSectionProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const handleAddProject = () => {
     const newId = `temp_${Date.now()}`;
@@ -39,10 +40,16 @@ export default function ProjectsSection({ data, onChange, onAutoSave, projects, 
   };
 
   const handleDeleteProject = (projectId: string) => {
-    if (window.confirm('Are you sure you want to delete this project?')) {
+    if (deletingId === projectId) {
       onChangeProjects(projects.filter(p => p._id !== projectId));
       if (expandedId === projectId) setExpandedId(null);
+      setDeletingId(null);
       onAutoSave();
+    } else {
+      setDeletingId(projectId);
+      setTimeout(() => {
+        setDeletingId(null);
+      }, 3000);
     }
   };
 
@@ -95,6 +102,7 @@ export default function ProjectsSection({ data, onChange, onAutoSave, projects, 
                     project={project}
                     index={index}
                     isExpanded={expandedId === project._id}
+                    isDeleting={deletingId === project._id}
                     onToggleExpand={() => setExpandedId(expandedId === project._id ? null : project._id!)}
                     onChange={handleUpdateProject}
                     onDelete={() => handleDeleteProject(project._id!)}

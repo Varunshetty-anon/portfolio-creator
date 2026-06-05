@@ -42,7 +42,6 @@ export interface PortfolioData {
   languages: string;
   contactEmail: string;
   profileImageUrl: string;
-  theme?: 'magazine' | 'futuristic' | 'glassmorphic' | 'minimalism';
 
   // Showreel
   showreelUrl: string;
@@ -136,5 +135,4 @@ export const INITIAL_PORTFOLIO: PortfolioData = {
   tools: [],
   aiTools: [],
   projects: [],
-  theme: 'minimalism',
 };

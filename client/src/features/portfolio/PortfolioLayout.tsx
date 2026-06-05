@@ -2,22 +2,19 @@
 // FRAMES PortfolioLayout (Public View)
 // ========================
 // Main orchestrator for the public portfolio view.
-// Acts as a Theme Router to conditionally render the active theme.
+// Uses the single flagship FRAMES design language.
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { portfolioApi, analyticsApi } from '@/lib/api';
 import type { PortfolioData, Project } from '@/types';
 
 import { IntroOverlay } from './components/IntroOverlay';
 import { ProjectModal } from './components/ProjectModal';
+import { ProfileSidebar } from './components/ProfileSidebar';
+import { ProjectGrid } from './components/ProjectGrid';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
-
-// Themes
-import { MinimalismTheme } from './themes/MinimalismTheme';
-import { MagazineTheme } from './themes/MagazineTheme';
-import { FuturisticTheme } from './themes/FuturisticTheme';
-import { GlassmorphicTheme } from './themes/GlassmorphicTheme';
+import { FramesPlayer } from '@/components/shared/FramesPlayer';
 
 export interface PortfolioLayoutProps {
   isPreviewMode?: boolean;
@@ -27,7 +24,6 @@ export interface PortfolioLayoutProps {
 export default function PortfolioLayout({ isPreviewMode = false, draftData }: PortfolioLayoutProps) {
   const { username } = useParams<{ username: string }>();
   
-  // Only used for public (non-preview) mode
   const [fetchedData, setFetchedData] = useState<{ portfolio: PortfolioData; projects: Project[] } | null>(null);
   const [isLoading, setIsLoading] = useState(!isPreviewMode);
   const [error, setError] = useState<string | null>(null);
@@ -35,11 +31,8 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData }: Po
   const [introFinished, setIntroFinished] = useState(isPreviewMode);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
-  // In preview mode, use draftData directly (no state copy = no re-render cascade)
-  // In public mode, use fetched data
   const data = isPreviewMode ? draftData ?? null : fetchedData;
 
-  // Fetch portfolio data only in public mode
   useEffect(() => {
     if (isPreviewMode) return;
 
@@ -54,7 +47,6 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData }: Po
         
         if (isMounted) {
           setFetchedData(result);
-          // Track view anonymously
           if (result.portfolio?._id) {
             analyticsApi.trackView(result.portfolio._id).catch(() => {});
           }
@@ -74,7 +66,6 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData }: Po
     return () => { isMounted = false; };
   }, [username, isPreviewMode]);
 
-  // Track clicks on projects
   const handleProjectClick = (project: Project) => {
     setSelectedProject(project);
     if (data?.portfolio?._id && !isPreviewMode) {
@@ -99,35 +90,11 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData }: Po
   }
 
   const { portfolio, projects } = data;
-  const content = portfolio.liveContent || portfolio; // Use live content if available, fallback to draft
-  const activeTheme = content.theme || 'minimalism';
-
-  // Render the selected theme
-  const renderTheme = () => {
-    const props = {
-      content: content as PortfolioData,
-      projects,
-      isPreviewMode,
-      onProjectClick: handleProjectClick,
-      introFinished,
-    };
-
-    switch (activeTheme) {
-      case 'magazine':
-        return <MagazineTheme {...props} />;
-      case 'futuristic':
-        return <FuturisticTheme {...props} />;
-      case 'glassmorphic':
-        return <GlassmorphicTheme {...props} />;
-      case 'minimalism':
-      default:
-        return <MinimalismTheme {...props} />;
-    }
-  };
+  const content = (portfolio.liveContent || portfolio) as PortfolioData;
 
   return (
-    <>
-      {/* Intro Cinematic (Only on live site, skips on preview) */}
+    <div className="min-h-screen bg-bg-base text-text-primary font-body selection:bg-white/10 selection:text-white">
+      {/* Intro Cinematic */}
       {!isPreviewMode && !introFinished && (
         <IntroOverlay 
           name={content.name || username || 'Portfolio'} 
@@ -136,15 +103,59 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData }: Po
         />
       )}
 
-      {/* Main Theme Render */}
-      {renderTheme()}
+      {/* Main Layout */}
+      <div className={`transition-opacity duration-1000 ${introFinished ? 'opacity-100' : 'opacity-0'}`}>
+        <div className="flex flex-col lg:flex-row min-h-screen">
+          
+          {/* Fixed Sidebar Component */}
+          <ProfileSidebar data={content} isPreviewMode={isPreviewMode} />
+
+          {/* Main Content Area */}
+          <main className="flex-1 lg:ml-[360px] xl:ml-[400px] min-h-screen">
+            <div className="max-w-7xl mx-auto p-4 sm:p-8 lg:p-12 xl:p-16">
+              
+              {/* Showreel Section */}
+              {content.showreelUrl && (
+                <section className="mb-16 sm:mb-24">
+                  <header className="mb-6">
+                    <h2 className="text-[11px] font-display font-bold tracking-[0.2em] text-text-subtle uppercase">Showreel</h2>
+                  </header>
+                  <div className="rounded-none overflow-hidden bg-bg-raised shadow-2xl border border-border">
+                    <FramesPlayer
+                      url={content.showreelUrl}
+                      thumbnail={content.showreelThumbnailUrl}
+                      aspectRatio="16:9"
+                    />
+                  </div>
+                </section>
+              )}
+
+              {/* Projects Grid Section */}
+              {projects.length > 0 && (
+                <section>
+                  <header className="mb-8">
+                    <h2 className="text-[11px] font-display font-bold tracking-[0.2em] text-text-subtle uppercase">Selected Work</h2>
+                  </header>
+                  <ProjectGrid projects={projects} onProjectClick={handleProjectClick} />
+                </section>
+              )}
+
+              {/* Empty State */}
+              {projects.length === 0 && !content.showreelUrl && (
+                <div className="py-32 text-center">
+                  <p className="text-text-muted">No projects available to display.</p>
+                </div>
+              )}
+            </div>
+          </main>
+        </div>
+      </div>
 
       {/* Global Project Detail Modal */}
       <ProjectModal 
         project={selectedProject} 
         onClose={() => setSelectedProject(null)} 
       />
-    </>
+    </div>
   );
 }
-
