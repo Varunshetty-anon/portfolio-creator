@@ -1,8 +1,8 @@
 import { chromium } from 'playwright';
 import fetch from 'node-fetch';
 
-const BASE_URL = 'https://frames-aivg.onrender.com';
-const TEST_USER = `audit_${Date.now()}`;
+const BASE_URL = process.env.BASE_URL || 'https://frames-aivg.onrender.com';
+const TEST_USER = `audit${Date.now()}`;
 const TEST_EMAIL = `${TEST_USER}@frames.com`;
 const TEST_PASS = 'Frames!123';
 
@@ -23,6 +23,21 @@ async function runAudit() {
   };
 
   try {
+    // Listen to network to debug API
+    page.on('response', async (response) => {
+      const req = response.request();
+      if (response.url().includes('/api/v1/portfolio')) {
+        console.log(`\n[API REQ] ${req.method()} ${response.url()}`);
+        if (req.postData()) {
+          console.log(`[REQ BODY] ${req.postData()?.substring(0, 5000)}`);
+        }
+        try {
+          const body = await response.text();
+          console.log(`[API RESP] ${body.substring(0, 800)}`);
+        } catch (e) {}
+      }
+    });
+
     // 1. PERFORMANCE & LOAD (Register / Login)
     const loadStart = Date.now();
     await page.goto(`${BASE_URL}/`, { waitUntil: 'networkidle' });
@@ -77,6 +92,18 @@ async function runAudit() {
     // 3. ARCHITECTURE & DESIGN (Live Portfolio Check)
     console.log('Checking Live Portfolio Layout...');
     const livePage = await context.newPage();
+    
+    livePage.on('response', async (response) => {
+      const req = response.request();
+      if (response.url().includes('/api/v1/portfolio')) {
+        console.log(`\n[LIVE PAGE API REQ] ${req.method()} ${response.url()}`);
+        try {
+          const body = await response.text();
+          console.log(`[LIVE PAGE API RESP] ${body.substring(0, 1000)}`);
+        } catch (e) {}
+      }
+    });
+
     const liveLoadStart = Date.now();
     await livePage.goto(`${BASE_URL}/portfolio/${TEST_USER}`, { waitUntil: 'networkidle' });
     results.performance.portfolioLoadMs = Date.now() - liveLoadStart;
@@ -90,8 +117,12 @@ async function runAudit() {
     results.architecture.cinematicIndexPresent = hasIndexList;
     results.architecture.heroPresent = hasMassiveHero;
 
+    // Dump DOM for debugging
+    const html = await livePage.evaluate(() => document.body.innerHTML);
+    console.log(`\n[LIVE PAGE DOM]\n${html.substring(0, 2000)}...\n`);
+
     // Hover interaction
-    await livePage.hover('li:has-text("Inception")');
+    await livePage.hover('li:has-text("Inception")', { timeout: 10000 });
     await livePage.waitForTimeout(500); // wait for crossfade
     
     // Check Project Modal

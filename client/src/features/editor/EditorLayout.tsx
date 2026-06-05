@@ -121,12 +121,21 @@ export default function EditorLayout() {
       if (hasUnsavedChanges) {
         if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
         const { portfolio: currentPortfolio, projects: currentProjects } = latestDataRef.current;
-        await portfolioApi.update({ ...currentPortfolio, projects: currentProjects });
+        const updateRes = await portfolioApi.update({ ...currentPortfolio, projects: currentProjects }) as any;
         setHasUnsavedChanges(false);
+        if (updateRes.success && updateRes.data) {
+          setPortfolio(updateRes.data.portfolio);
+          if (updateRes.data.projects) {
+            setProjects(updateRes.data.projects);
+          }
+        }
       }
       
       const res = await portfolioApi.publish() as any;
-      setPortfolio({ ...INITIAL_PORTFOLIO, ...res.portfolio });
+      if (res.success) {
+        const publishedPortfolio = res.data?.portfolio || res.data;
+        setPortfolio(publishedPortfolio);
+      }
       
       setPublishStatus('success');
       setTimeout(() => setPublishStatus('idle'), 3000);
