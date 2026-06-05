@@ -57,9 +57,24 @@ export const router = createBrowserRouter([
     ),
   },
   // Alias: /@username → /portfolio/username
+  // React Router v6 doesn't support partial dynamic segments (/@:username)
   {
-    path: '/@:username',
-    loader: ({ params }) => redirect(`/portfolio/${params.username}`),
+    path: '/:handle',
+    loader: ({ params }) => {
+      const handle = params.handle || '';
+      if (handle.startsWith('@')) {
+        return redirect(`/portfolio/${handle.slice(1)}`);
+      }
+      // If it doesn't start with @, let it fall through to 404 (by throwing or returning null)
+      // Actually loader can't easily fallback to the next route in v6 if matched.
+      // We should throw a 404 Response.
+      throw new Response('Not Found', { status: 404 });
+    },
+    errorElement: (
+      <SuspenseWrapper>
+        <NotFound />
+      </SuspenseWrapper>
+    ),
   },
   // Legacy route support: /v/username → /portfolio/username
   {

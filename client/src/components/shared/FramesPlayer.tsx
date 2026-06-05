@@ -160,8 +160,13 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
           muted={muted}
           volume={volume}
           loop={loop}
-          playsinline
-          onReady={() => setIsReady(true)}
+          playsInline
+          onReady={() => {
+            setIsReady(true);
+            if (playerRef.current) {
+              setDuration(playerRef.current.getDuration() || 0);
+            }
+          }}
           onError={(e: any) => {
             console.error('FramesPlayer Error:', e);
             setHasError(true);
@@ -169,8 +174,11 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
           onProgress={(state: any) => {
             setPlayed(state.played);
             setLoaded(state.loaded);
+            if (playerRef.current) {
+              const d = playerRef.current.getDuration();
+              if (d > 0 && d !== duration) setDuration(d);
+            }
           }}
-          onDuration={(d: number) => setDuration(d)}
           config={{
             youtube: {
               playerVars: { 
