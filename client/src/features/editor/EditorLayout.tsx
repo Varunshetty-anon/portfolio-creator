@@ -140,7 +140,7 @@ export default function EditorLayout() {
   const handleLogout = async () => {
     try {
       await logout();
-      navigate('/login');
+      navigate('/', { replace: true });
     } catch (err) {
       console.error(err);
     }

@@ -44,6 +44,9 @@ export interface IPortfolio extends Document {
   socials?: ISocials;
   availability?: IAvailability;
   theme?: 'magazine' | 'futuristic' | 'glassmorphic' | 'minimalism';
+  primaryTool?: string;
+  tools?: string[];
+  aiTools?: string[];
   draftContent?: Record<string, unknown>;
   liveContent?: Record<string, unknown>;
   createdAt: Date;
@@ -92,6 +95,9 @@ const portfolioSchema = new Schema<IPortfolio>(
       link: { type: String },
     },
     theme: { type: String, enum: ['magazine', 'futuristic', 'glassmorphic', 'minimalism'], default: 'minimalism' },
+    primaryTool: { type: String, trim: true },
+    tools: [{ type: String, trim: true }],
+    aiTools: [{ type: String, trim: true }],
     draftContent: { type: Schema.Types.Mixed },
     liveContent: { type: Schema.Types.Mixed },
   },

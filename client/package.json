@@ -12,9 +12,6 @@
     "test:run": "vitest run"
   },
   "dependencies": {
-    "@dnd-kit/core": "^6.3.1",
-    "@dnd-kit/sortable": "^10.0.0",
-    "@dnd-kit/utilities": "^3.2.2",
     "@types/screenfull": "^4.0.0",
     "axios": "^1.17.0",
     "framer-motion": "^11.18.2",
@@ -25,7 +22,6 @@
     "react-dom": "^18.3.1",
     "react-easy-crop": "^5.0.8",
     "react-hot-toast": "^2.6.0",
-    "react-image-crop": "^11.0.10",
     "react-player": "^3.4.0",
     "react-router-dom": "^6.26.0",
     "screenfull": "^6.0.2"

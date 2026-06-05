@@ -3,7 +3,7 @@
 // ========================
 
 import React, { Suspense, lazy } from 'react';
-import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { createBrowserRouter, Navigate, redirect } from 'react-router-dom';
 import { ProtectedRoute } from '@/components/layout/ProtectedRoute';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 
@@ -59,18 +59,12 @@ export const router = createBrowserRouter([
   // Alias: /@username → /portfolio/username
   {
     path: '/@:username',
-    element: <Navigate to="/portfolio/:username" replace />,
-    loader: ({ params }) => {
-      return null; // Handled by Navigate
-    },
+    loader: ({ params }) => redirect(`/portfolio/${params.username}`),
   },
   // Legacy route support: /v/username → /portfolio/username
   {
     path: '/v/:username',
-    loader: ({ params }) => {
-      return null;
-    },
-    element: <RedirectToPortfolio />,
+    loader: ({ params }) => redirect(`/portfolio/${params.username}`),
   },
   // 404
   {
@@ -83,13 +77,7 @@ export const router = createBrowserRouter([
   },
 ]);
 
-// Redirect helper for legacy /v/ routes
-function RedirectToPortfolio() {
-  const params = new URL(window.location.href);
-  const pathParts = params.pathname.split('/');
-  const username = pathParts[pathParts.length - 1];
-  return <Navigate to={`/portfolio/${username}`} replace />;
-}
+
 
 // Simple 404 page
 function NotFound() {

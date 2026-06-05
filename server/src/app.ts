@@ -25,7 +25,7 @@ import authRoutes from './routes/auth.js';
 import portfolioRoutes from './routes/portfolio.js';
 import uploadRoutes from './routes/upload.js';
 import analyticsRoutes from './routes/analytics.js';
-import adminRoutes from './routes/admin.js';
+
 
 // ── dirname polyfill for ESM ────────────────────────────────────────
 const __filename = fileURLToPath(import.meta.url);
@@ -70,7 +70,7 @@ app.use('/api', (_req, res, next) => {
 
 app.use(
   cors({
-    origin: process.env.CLIENT_URL ?? 'http://localhost:5173',
+    origin: process.env.CLIENT_URL ?? 'http://localhost:3000',
     credentials: true,
   }),
 );
@@ -100,7 +100,7 @@ app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/portfolio', portfolioRoutes);
 app.use('/api/v1/upload', uploadRoutes);
 app.use('/api/v1/analytics', analyticsRoutes);
-app.use('/api/v1/admin', adminRoutes);
+
 
 // ── Production: serve static SPA ────────────────────────────────────
 const clientDist = path.resolve(__dirname, '../../client/dist');

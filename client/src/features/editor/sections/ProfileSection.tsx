@@ -67,6 +67,26 @@ export default function ProfileSection({ data, onChange }: ProfileSectionProps) 
         />
       </PanelSection>
 
+      <PanelSection title="Showreel" description="Your main hero video">
+        <Input
+          label="Showreel Video URL"
+          placeholder="https://youtube.com/... or Vimeo link"
+          value={data.showreelUrl || ''}
+          onChange={(e) => handleInputChange('showreelUrl', e.target.value)}
+        />
+        <div className="mt-4">
+          <label className="block text-xs font-medium text-text-primary mb-2 uppercase tracking-wider">
+            Custom Thumbnail
+          </label>
+          <MediaManager
+            type="thumbnail"
+            currentUrl={data.showreelThumbnailUrl}
+            onUploadComplete={(url) => handleInputChange('showreelThumbnailUrl', url)}
+            onRemove={data.showreelThumbnailUrl ? () => handleInputChange('showreelThumbnailUrl', '') : undefined}
+          />
+        </div>
+      </PanelSection>
+
       <PanelSection title="Details" description="Contact and location">
         <Input
           label="Location"

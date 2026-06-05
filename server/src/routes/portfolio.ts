@@ -99,6 +99,7 @@ router.put('/', authenticateToken, async (req: Request, res: Response, next: Nex
       'name', 'role', 'bio', 'location', 'languages', 'contactEmail',
       'profileImageUrl', 'showreelUrl', 'showreelThumbnailUrl',
       'socials', 'availability', 'theme', 'draftContent',
+      'primaryTool', 'tools', 'aiTools',
     ] as const;
 
     for (const field of editable) {
@@ -251,6 +252,9 @@ router.get(
             socials: portfolio.socials,
             availability: portfolio.availability,
             theme: portfolio.theme,
+            primaryTool: portfolio.primaryTool,
+            tools: portfolio.tools,
+            aiTools: portfolio.aiTools,
             liveContent: portfolio.liveContent,
             publishedAt: portfolio.publishedAt,
           },
