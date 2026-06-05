@@ -20,6 +20,19 @@ const VisionB = lazy(() => import('@/features/vision/VisionB'));
 const VisionC = lazy(() => import('@/features/vision/VisionC'));
 const VisionCompare = lazy(() => import('@/features/vision/VisionCompare'));
 
+// The 10 executions of Vision B
+const VisionB_1 = lazy(() => import('@/features/vision/VisionB_1_NLE'));
+const VisionB_2 = lazy(() => import('@/features/vision/VisionB_2_CameraOS'));
+const VisionB_3 = lazy(() => import('@/features/vision/VisionB_3_SwissGrid'));
+const VisionB_4 = lazy(() => import('@/features/vision/VisionB_4_Terminal'));
+const VisionB_5 = lazy(() => import('@/features/vision/VisionB_5_DieterRams'));
+const VisionB_6 = lazy(() => import('@/features/vision/VisionB_6_MicroUI'));
+const VisionB_7 = lazy(() => import('@/features/vision/VisionB_7_Broadcast'));
+const VisionB_8 = lazy(() => import('@/features/vision/VisionB_8_Editorial'));
+const VisionB_9 = lazy(() => import('@/features/vision/VisionB_9_FrameIO'));
+const VisionB_10 = lazy(() => import('@/features/vision/VisionB_10_Brutalist'));
+const Vision10Compare = lazy(() => import('@/features/vision/Vision10Compare'));
+
 const SuspenseWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <Suspense fallback={<LoadingScreen message="Loading..." />}>
     {children}
@@ -119,6 +132,17 @@ export const router = createBrowserRouter([
       </SuspenseWrapper>
     )
   },
+  { path: '/vision-b-1', element: <SuspenseWrapper><VisionB_1 /></SuspenseWrapper> },
+  { path: '/vision-b-2', element: <SuspenseWrapper><VisionB_2 /></SuspenseWrapper> },
+  { path: '/vision-b-3', element: <SuspenseWrapper><VisionB_3 /></SuspenseWrapper> },
+  { path: '/vision-b-4', element: <SuspenseWrapper><VisionB_4 /></SuspenseWrapper> },
+  { path: '/vision-b-5', element: <SuspenseWrapper><VisionB_5 /></SuspenseWrapper> },
+  { path: '/vision-b-6', element: <SuspenseWrapper><VisionB_6 /></SuspenseWrapper> },
+  { path: '/vision-b-7', element: <SuspenseWrapper><VisionB_7 /></SuspenseWrapper> },
+  { path: '/vision-b-8', element: <SuspenseWrapper><VisionB_8 /></SuspenseWrapper> },
+  { path: '/vision-b-9', element: <SuspenseWrapper><VisionB_9 /></SuspenseWrapper> },
+  { path: '/vision-b-10', element: <SuspenseWrapper><VisionB_10 /></SuspenseWrapper> },
+  { path: '/vision-10-compare', element: <SuspenseWrapper><Vision10Compare /></SuspenseWrapper> },
   // Alias: /@username → /portfolio/username
   // React Router v6 doesn't support partial dynamic segments (/@:username)
   {

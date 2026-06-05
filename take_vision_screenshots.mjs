@@ -14,7 +14,7 @@ async function takeScreenshots() {
   const page = await context.newPage();
   
   const baseUrl = 'https://frames-aivg.onrender.com';
-  const routes = ['/vision-compare'];
+  const routes = ['/vision-10-compare'];
   
   let report = '# Evidence Audit Report\n\n';
 
