@@ -42,7 +42,7 @@ app.use(
         scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://www.youtube.com", "https://s.ytimg.com", "https://player.vimeo.com", "https://f.vimeocdn.com"],
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
-        imgSrc: ["'self'", "data:", "blob:", "https://res.cloudinary.com", "https://img.youtube.com", "https://i.ytimg.com", "https://i.vimeocdn.com", "https://*.googleusercontent.com"],
+        imgSrc: ["'self'", "data:", "blob:", "https://res.cloudinary.com", "https://img.youtube.com", "https://i.ytimg.com", "https://i.vimeocdn.com", "https://*.googleusercontent.com", "https://images.unsplash.com"],
         connectSrc: ["'self'", "https://api.cloudinary.com", "https://www.youtube.com", "https://vimeo.com", "https://*.vimeo.com", "https://*.vimeocdn.com"],
         frameSrc: ["'self'", "https://www.youtube.com", "https://player.vimeo.com"],
         mediaSrc: ["'self'", "blob:", "https://res.cloudinary.com", "https://*.cloudinary.com"],
