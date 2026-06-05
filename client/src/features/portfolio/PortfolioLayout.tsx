@@ -32,10 +32,10 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
     if (username) {
       portfolioApi.getPublic(username)
         .then((res: any) => {
-          if (res.data?.portfolio) {
-            setData({ ...res.data.portfolio, projects: res.data.projects });
+          if (res.portfolio) {
+            setData({ ...res.portfolio, projects: res.projects });
           } else {
-            setData(res.data);
+            setData(res);
           }
           setLoading(false);
         })
