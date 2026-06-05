@@ -15,6 +15,9 @@ const PortfolioLayout = lazy(() => import('@/features/portfolio/PortfolioLayout'
 const TestPlayerPage = lazy(() => import('@/features/portfolio/TestPlayerPage'));
 const AuditPortfolio = lazy(() => import('@/features/portfolio/AuditPortfolio'));
 const VisionPrototype = lazy(() => import('@/features/vision/VisionPrototype'));
+const VisionA = lazy(() => import('@/features/vision/VisionA'));
+const VisionB = lazy(() => import('@/features/vision/VisionB'));
+const VisionC = lazy(() => import('@/features/vision/VisionC'));
 
 const SuspenseWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <Suspense fallback={<LoadingScreen message="Loading..." />}>
@@ -80,6 +83,30 @@ export const router = createBrowserRouter([
     element: (
       <SuspenseWrapper>
         <VisionPrototype />
+      </SuspenseWrapper>
+    )
+  },
+  {
+    path: '/vision-a',
+    element: (
+      <SuspenseWrapper>
+        <VisionA />
+      </SuspenseWrapper>
+    )
+  },
+  {
+    path: '/vision-b',
+    element: (
+      <SuspenseWrapper>
+        <VisionB />
+      </SuspenseWrapper>
+    )
+  },
+  {
+    path: '/vision-c',
+    element: (
+      <SuspenseWrapper>
+        <VisionC />
       </SuspenseWrapper>
     )
   },
