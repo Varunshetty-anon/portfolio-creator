@@ -38,11 +38,11 @@ export default function Vision10Compare() {
             <div key={v.id} className="flex flex-col gap-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-xl font-medium">{v.label}</h3>
-                <a href={\`/vision-b-${v.id}\`} target="_blank" rel="noreferrer" className="text-sm text-blue-400 hover:text-blue-300">Open Fullscreen ↗</a>
+                <a href={`/vision-b-${v.id}`} target="_blank" rel="noreferrer" className="text-sm text-blue-400 hover:text-blue-300">Open Fullscreen ↗</a>
               </div>
               <div className="relative w-full aspect-[16/10] bg-zinc-900 rounded-lg overflow-hidden border border-zinc-800 shadow-2xl">
                 <iframe 
-                  src={\`/vision-b-${v.id}\`} 
+                  src={`/vision-b-${v.id}`} 
                   className="absolute inset-0 w-full h-full border-none"
                   title={v.label}
                 />
@@ -63,11 +63,11 @@ export default function Vision10Compare() {
             <div key={v.id} className="flex flex-col gap-4 opacity-80 hover:opacity-100 transition-opacity">
               <div className="flex items-center justify-between">
                 <h3 className="text-xl font-medium">{v.label}</h3>
-                <a href={\`/vision-b-${v.id}\`} target="_blank" rel="noreferrer" className="text-sm text-blue-400 hover:text-blue-300">Open Fullscreen ↗</a>
+                <a href={`/vision-b-${v.id}`} target="_blank" rel="noreferrer" className="text-sm text-blue-400 hover:text-blue-300">Open Fullscreen ↗</a>
               </div>
               <div className="relative w-full aspect-[16/10] bg-zinc-900 rounded-lg overflow-hidden border border-zinc-800 shadow-xl">
                 <iframe 
-                  src={\`/vision-b-${v.id}\`} 
+                  src={`/vision-b-${v.id}`} 
                   className="absolute inset-0 w-full h-full border-none pointer-events-none"
                   title={v.label}
                 />
