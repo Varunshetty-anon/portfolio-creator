@@ -18,6 +18,7 @@ const VisionPrototype = lazy(() => import('@/features/vision/VisionPrototype'));
 const VisionA = lazy(() => import('@/features/vision/VisionA'));
 const VisionB = lazy(() => import('@/features/vision/VisionB'));
 const VisionC = lazy(() => import('@/features/vision/VisionC'));
+const VisionCompare = lazy(() => import('@/features/vision/VisionCompare'));
 
 const SuspenseWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <Suspense fallback={<LoadingScreen message="Loading..." />}>
@@ -107,6 +108,14 @@ export const router = createBrowserRouter([
     element: (
       <SuspenseWrapper>
         <VisionC />
+      </SuspenseWrapper>
+    )
+  },
+  {
+    path: '/vision-compare',
+    element: (
+      <SuspenseWrapper>
+        <VisionCompare />
       </SuspenseWrapper>
     )
   },
