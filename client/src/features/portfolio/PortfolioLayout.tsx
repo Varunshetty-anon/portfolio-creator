@@ -32,7 +32,11 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
     if (username) {
       portfolioApi.getPublic(username)
         .then((res: any) => {
-          setData(res.data);
+          if (res.data?.portfolio) {
+            setData({ ...res.data.portfolio, projects: res.data.projects });
+          } else {
+            setData(res.data);
+          }
           setLoading(false);
         })
         .catch((err: any) => {
@@ -52,7 +56,7 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
   if (loading || !data) return null;
 
   const projects = data.projects || [];
-  const hoveredProject = projects.find(p => p.id === hoveredProjectId);
+  const hoveredProject = projects.find(p => (p._id || p.id) === hoveredProjectId);
 
   return (
     <div className="relative min-h-screen bg-bg-base text-text-primary overflow-hidden selection:bg-white selection:text-black">
@@ -70,7 +74,7 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
         <AnimatePresence>
           {hoveredProject?.videoUrl && (
             <motion.div
-              key={hoveredProject.id}
+              key={hoveredProject._id || hoveredProject.id}
               initial={{ opacity: 0, scale: 1.05 }}
               animate={{ opacity: 0.4, scale: 1 }} // 40% opacity so text is still perfectly readable
               exit={{ opacity: 0 }}
@@ -133,14 +137,14 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
           <ul className="w-full border-t border-white/20 group/list">
             {projects.map((project, index) => (
               <motion.li 
-                key={project.id}
+                key={project._id || project.id}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-10%" }}
                 transition={{ duration: 0.6, delay: index * 0.1 }}
-                onMouseEnter={() => setHoveredProjectId(project.id)}
+                onMouseEnter={() => setHoveredProjectId(project._id || project.id as string)}
                 onMouseLeave={() => setHoveredProjectId(null)}
-                onClick={() => setSelectedProjectId(project.id)}
+                onClick={() => setSelectedProjectId(project._id || project.id as string)}
                 className="group relative flex items-center justify-between py-8 md:py-12 border-b border-white/10 cursor-pointer transition-colors duration-500 hover:border-white/40"
               >
                 <div className="flex items-center gap-8 md:gap-16">
@@ -170,7 +174,7 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
       <AnimatePresence>
         {selectedProjectId && (
           <ProjectModal
-            project={projects.find(p => p.id === selectedProjectId)!}
+            project={projects.find(p => (p._id || p.id) === selectedProjectId)!}
             onClose={() => setSelectedProjectId(null)}
           />
         )}

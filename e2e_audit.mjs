@@ -121,6 +121,11 @@ async function runAudit() {
     const html = await livePage.evaluate(() => document.body.innerHTML);
     console.log(`\n[LIVE PAGE DOM]\n${html.substring(0, 2000)}...\n`);
 
+    livePage.on('console', msg => {
+      if (msg.type() === 'error') console.log(`[BROWSER ERROR] ${msg.text()}`);
+    });
+    livePage.on('pageerror', err => console.log(`[PAGE ERROR] ${err.message}`));
+
     // Hover interaction
     await livePage.hover('li:has-text("Inception")', { timeout: 10000 });
     await livePage.waitForTimeout(500); // wait for crossfade
