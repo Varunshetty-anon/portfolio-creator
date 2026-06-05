@@ -14,6 +14,7 @@ const OnboardingFlow = lazy(() => import('@/features/onboarding/OnboardingFlow')
 const PortfolioLayout = lazy(() => import('@/features/portfolio/PortfolioLayout'));
 const TestPlayerPage = lazy(() => import('@/features/portfolio/TestPlayerPage'));
 const AuditPortfolio = lazy(() => import('@/features/portfolio/AuditPortfolio'));
+const VisionPrototype = lazy(() => import('@/features/vision/VisionPrototype'));
 
 const SuspenseWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <Suspense fallback={<LoadingScreen message="Loading..." />}>
@@ -71,6 +72,14 @@ export const router = createBrowserRouter([
     element: (
       <SuspenseWrapper>
         <AuditPortfolio />
+      </SuspenseWrapper>
+    )
+  },
+  {
+    path: '/vision',
+    element: (
+      <SuspenseWrapper>
+        <VisionPrototype />
       </SuspenseWrapper>
     )
   },
