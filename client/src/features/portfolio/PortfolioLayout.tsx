@@ -30,12 +30,12 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
     }
 
     if (username) {
-      portfolioApi.getPortfolio(username)
-        .then(res => {
+      portfolioApi.getPublic(username)
+        .then((res: any) => {
           setData(res.data);
           setLoading(false);
         })
-        .catch(err => {
+        .catch((err: any) => {
           console.error(err);
           navigate('/404');
         });
@@ -51,7 +51,7 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
 
   if (loading || !data) return null;
 
-  const { portfolio, projects } = data;
+  const projects = data.projects || [];
   const hoveredProject = projects.find(p => p.id === hoveredProjectId);
 
   return (
@@ -59,8 +59,8 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
       {/* Intro Overlay */}
       {!introComplete && (
         <IntroOverlay 
-          name={portfolio.name || 'Creative'} 
-          role={portfolio.role || 'Portfolio'} 
+          name={data.name || 'Creative'} 
+          role={data.role || 'Portfolio'} 
           onComplete={() => setIntroComplete(true)} 
         />
       )}
@@ -105,18 +105,18 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
             transition={{ duration: 1, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
           >
             <h1 className="font-display font-bold uppercase tracking-tighter text-[12vw] leading-[0.85] text-white">
-              {portfolio.name}
+              {data.name}
             </h1>
             <div className="mt-8 flex flex-col md:flex-row md:items-end justify-between gap-8 border-t border-white/20 pt-8">
               <div className="max-w-xl">
                 <p className="text-xl md:text-2xl text-text-muted font-light leading-relaxed">
-                  {portfolio.bio}
+                  {data.bio}
                 </p>
               </div>
               <div className="flex flex-col text-sm tracking-widest uppercase text-text-muted space-y-2 text-left md:text-right">
-                <span className="text-white font-medium">{portfolio.role}</span>
-                {portfolio.location && <span>{portfolio.location}</span>}
-                {portfolio.languages && <span>{portfolio.languages}</span>}
+                <span className="text-white font-medium">{data.role}</span>
+                {data.location && <span>{data.location}</span>}
+                {data.languages && <span>{data.languages}</span>}
                 <div className="pt-4">
                   <span className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full text-white text-xs backdrop-blur-sm">
                     <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
@@ -172,7 +172,6 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
           <ProjectModal
             project={projects.find(p => p.id === selectedProjectId)!}
             onClose={() => setSelectedProjectId(null)}
-            portfolioName={portfolio.name || ''}
           />
         )}
       </AnimatePresence>

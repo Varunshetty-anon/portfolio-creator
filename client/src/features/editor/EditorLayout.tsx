@@ -275,7 +275,7 @@ export default function EditorLayout() {
           <div className="w-full h-full overflow-y-auto scrollbar-hide">
             <PortfolioLayout 
               isPreviewMode 
-              draftData={{ portfolio, projects }} 
+              draftData={{ ...portfolio, projects }} 
             />
           </div>
         </div>
