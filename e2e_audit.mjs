@@ -71,7 +71,7 @@ async function runAudit() {
     
     // Publish changes
     await page.click('button:has-text("Publish")');
-    await page.waitForTimeout(2000); // Wait for publish to complete
+    await page.waitForSelector('button:has-text("Published")'); // Wait for publish to complete
     results.upload.projectCreation = 'Success';
 
     // 3. ARCHITECTURE & DESIGN (Live Portfolio Check)

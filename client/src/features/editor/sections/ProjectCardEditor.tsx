@@ -40,34 +40,41 @@ export default function ProjectCardEditor({
   const [linkError, setLinkError] = useState<string | null>(null);
   const [isDrivePrivate, setIsDrivePrivate] = useState<boolean>(false);
 
+  const latestProjectRef = React.useRef(project);
+  useEffect(() => {
+    latestProjectRef.current = project;
+  }, [project]);
+
   // Auto-extract metadata when videoUrl changes
   useEffect(() => {
     const fetchMetadata = async () => {
-      if (!project.videoUrl) return;
+      const currentProject = latestProjectRef.current;
+      if (!currentProject.videoUrl) return;
       
-      const source = detectVideoSource(project.videoUrl) as string;
+      const source = detectVideoSource(currentProject.videoUrl) as string;
       setIsDrivePrivate(false);
       
-      if (source !== 'unknown' && (!project.thumbnailUrl || project.videoSource !== source)) {
+      if (source !== 'unknown' && (!currentProject.thumbnailUrl || currentProject.videoSource !== source)) {
         setIsValidatingLink(true);
         setLinkError(null);
         
         try {
           if (source === 'gdrive') {
-            const driveMeta = await uploadApi.validateDrive(project.videoUrl);
+            const driveMeta = await uploadApi.validateDrive(currentProject.videoUrl);
             if (driveMeta.isPrivate) {
               setIsDrivePrivate(true);
             }
           }
           
-          const meta = await getVideoMetadata(project.videoUrl);
+          const meta = await getVideoMetadata(currentProject.videoUrl);
+          const latest = latestProjectRef.current;
           
           if (meta) {
             onChange({
-              ...project,
+              ...latest,
               videoSource: source as any,
-              thumbnailUrl: meta.thumbnail || project.thumbnailUrl,
-              aspectRatio: meta.aspectRatio || project.aspectRatio,
+              thumbnailUrl: meta.thumbnail || latest.thumbnailUrl,
+              aspectRatio: meta.aspectRatio || latest.aspectRatio,
             });
           } else {
             setLinkError("Could not extract video details. Check link.");
@@ -80,7 +87,7 @@ export default function ProjectCardEditor({
       } else if (source === 'gdrive') {
         // Just check privacy if metadata is already populated
         try {
-          const driveMeta = await uploadApi.validateDrive(project.videoUrl);
+          const driveMeta = await uploadApi.validateDrive(currentProject.videoUrl);
           if (driveMeta.isPrivate) setIsDrivePrivate(true);
         } catch {}
       }
@@ -92,7 +99,7 @@ export default function ProjectCardEditor({
   }, [project.videoUrl]); // Intentionally only run on URL change
 
   const handleFieldChange = (field: keyof Project, value: any) => {
-    onChange({ ...project, [field]: value });
+    onChange({ ...latestProjectRef.current, [field]: value });
   };
 
   const handleMultiSelect = (field: 'softwareUsed' | 'aiToolsUsed', value: string) => {
