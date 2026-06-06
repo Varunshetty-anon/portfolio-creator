@@ -6,6 +6,7 @@ import { PortfolioData } from '@/types';
 import { IntroOverlay } from './components/IntroOverlay';
 import { ProjectModal } from './components/ProjectModal';
 import { FramesPlayer } from '@/components/shared/FramesPlayer';
+import { Instagram, Twitter, Linkedin } from 'lucide-react';
 
 interface PortfolioLayoutProps {
   isPreviewMode?: boolean;
@@ -115,9 +116,9 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
             <h1 className="font-display font-bold uppercase tracking-tighter text-[12vw] leading-[0.85] text-white">
               {data.name}
             </h1>
-            <div className="mt-8 flex flex-col md:flex-row md:items-end justify-between gap-8 border-t border-white/20 pt-8">
+            <div className="mt-8 flex flex-col md:flex-row md:items-end justify-between gap-8 border-t border-white/10 pt-8">
               <div className="max-w-xl">
-                <p className="text-xl md:text-2xl text-text-muted font-light leading-relaxed">
+                <p className="text-xl md:text-2xl text-text-muted opacity-100 md:opacity-70 font-light leading-relaxed">
                   {data.bio}
                 </p>
               </div>
@@ -174,9 +175,12 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
 
                 {/* Desktop/Mobile Title Row */}
                 <div className="flex items-center gap-4 md:gap-16 px-6 md:px-0">
-                  <span className="text-xs md:text-base font-mono text-white/30 group-hover:text-white/60 transition-colors duration-500">
-                    {(index + 1).toString().padStart(2, '0')}
-                  </span>
+                  <div className="relative pb-1">
+                    <span className="text-xs md:text-base font-mono text-white/30 group-hover:text-white/60 transition-colors duration-500">
+                      {(index + 1).toString().padStart(2, '0')}
+                    </span>
+                    <div className="absolute bottom-0 w-full h-px bg-accent scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
+                  </div>
                   <h2 className="font-display font-bold uppercase tracking-tight text-3xl sm:text-5xl md:text-7xl text-white/80 md:text-white/40 group-hover:text-white transition-all duration-500 md:group-hover:translate-x-4">
                     {project.title}
                   </h2>
@@ -198,6 +202,7 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
 
         {/* Terminal Footer */}
         <footer className="w-full min-h-[50vh] flex flex-col items-center justify-center border-t border-white/10 mt-auto py-24 px-6 relative z-20 bg-bg-base">
+          <div className="w-16 h-px bg-white/20 mb-8" />
           <p className="font-mono text-sm tracking-[0.2em] uppercase text-text-subtle mb-8">Ready to collaborate</p>
           <a 
             href={`mailto:${data.contactEmail || data.socials?.email || ''}`}
@@ -205,6 +210,25 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
           >
             LET'S TALK
           </a>
+          {data.socials && (
+            <div className="mt-12 flex items-center gap-6">
+              {data.socials.linkedin && (
+                <a href={data.socials.linkedin} target="_blank" rel="noopener noreferrer" className="w-10 h-10 flex items-center justify-center text-text-muted hover:text-white transition-colors">
+                  <Linkedin size={20} />
+                </a>
+              )}
+              {data.socials.instagram && (
+                <a href={data.socials.instagram} target="_blank" rel="noopener noreferrer" className="w-10 h-10 flex items-center justify-center text-text-muted hover:text-white transition-colors">
+                  <Instagram size={20} />
+                </a>
+              )}
+              {data.socials.twitter && (
+                <a href={data.socials.twitter} target="_blank" rel="noopener noreferrer" className="w-10 h-10 flex items-center justify-center text-text-muted hover:text-white transition-colors">
+                  <Twitter size={20} />
+                </a>
+              )}
+            </div>
+          )}
         </footer>
 
       </div>
@@ -214,7 +238,9 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
         {selectedProjectId && (
           <ProjectModal
             project={projects.find(p => (p._id || p.id) === selectedProjectId)!}
+            allProjects={projects}
             onClose={() => setSelectedProjectId(null)}
+            onSelectProject={(id: string) => setSelectedProjectId(id)}
           />
         )}
       </AnimatePresence>

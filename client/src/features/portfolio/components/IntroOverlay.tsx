@@ -40,10 +40,11 @@ export const IntroOverlay: React.FC<IntroOverlayProps> = ({ name, role, onComple
     }
   });
 
-  if (hasSeen) {
-    useEffect(() => onComplete(), [onComplete]);
-    return null;
-  }
+  useEffect(() => {
+    if (hasSeen) onComplete();
+  }, [hasSeen, onComplete]);
+
+  if (hasSeen) return null;
 
   // Viewfinder path length for animation
   const drawLine = {

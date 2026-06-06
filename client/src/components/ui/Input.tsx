@@ -32,7 +32,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
         {label && (
           <label
             htmlFor={inputId}
-            className="text-xs uppercase tracking-wider text-text-muted mb-1"
+            className="font-mono text-[10px] uppercase tracking-[0.15em] text-text-subtle mb-1"
           >
             {label}
           </label>
@@ -46,7 +46,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
           <input
             ref={ref}
             id={inputId}
-            className={`w-full bg-transparent border-0 border-b border-border text-text-primary placeholder:text-text-muted focus:ring-0 focus:outline-none focus:border-b-2 focus:border-accent transition-colors duration-fast ease-out ${
+            className={`w-full bg-transparent border-0 border-b border-white/10 text-text-primary placeholder:text-text-muted focus:ring-0 focus:outline-none focus:border-b focus:border-[#C0A36E] transition-colors duration-fast ease-out ${
               leftIcon ? 'pl-8' : 'pl-0'
             } ${rightElement ? 'pr-10' : 'pr-0'} ${
               size === 'sm' ? 'py-1 text-sm' : 'py-2 text-base'
@@ -84,7 +84,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
         {label && (
           <label
             htmlFor={textareaId}
-            className="text-xs uppercase tracking-wider text-text-muted mb-1"
+            className="font-mono text-[10px] uppercase tracking-[0.15em] text-text-subtle mb-1"
           >
             {label}
           </label>
@@ -92,7 +92,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
         <textarea
           ref={ref}
           id={textareaId}
-          className={`w-full bg-transparent border-0 border-b border-border text-text-primary placeholder:text-text-muted focus:ring-0 focus:outline-none focus:border-b-2 focus:border-accent transition-colors duration-fast ease-out py-2 text-base min-h-[80px] resize-y ${
+          className={`w-full bg-transparent border-0 border-b border-white/10 text-text-primary placeholder:text-text-muted focus:ring-0 focus:outline-none focus:border-b focus:border-[#C0A36E] transition-colors duration-fast ease-out py-2 text-base min-h-[80px] resize-y ${
             error ? 'border-danger focus:border-danger' : ''
           } ${className}`}
           {...props}

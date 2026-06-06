@@ -18,12 +18,11 @@ export const PanelSection = ({
   children: ReactNode;
   headerAction?: ReactNode;
 }) => (
-  <section className="flex flex-col gap-4 py-4 border-b border-border/50 last:border-0">
+  <section className="flex flex-col gap-4 py-6">
     {(title || description || headerAction) && (
-      <header className="flex justify-between items-start">
+      <header className="flex justify-between items-center pb-2 border-b border-white/[0.06]">
         <div className="flex flex-col gap-1">
-          {title && <h3 className="text-sm font-medium text-text-primary uppercase tracking-wider">{title}</h3>}
-          {description && <p className="text-xs text-text-muted">{description}</p>}
+          {title && <h3 className="font-mono text-[10px] uppercase tracking-[0.2em] text-text-subtle">{title}</h3>}
         </div>
         {headerAction && <div>{headerAction}</div>}
       </header>

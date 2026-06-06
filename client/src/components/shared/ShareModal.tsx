@@ -5,7 +5,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Copy, Check, QrCode, Link as LinkIcon, Twitter, Linkedin } from 'lucide-react';
-import QRCode from 'qrcode';
+import { QRCodeCanvas } from 'qrcode.react';
+import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
 
 interface ShareModalProps {
@@ -16,28 +17,23 @@ interface ShareModalProps {
 
 export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, username }) => {
   const [copied, setCopied] = useState(false);
-  const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
+  const qrRef = React.useRef<HTMLCanvasElement>(null);
 
   const url = `${window.location.origin}/portfolio/${username}`;
 
-  useEffect(() => {
-    if (isOpen && username) {
-      QRCode.toDataURL(url, {
-        width: 300,
-        margin: 2,
-        color: {
-          dark: '#F2F0EC',
-          light: '#00000000', // Transparent
-        }
-      })
-      .then(url => {
-        setQrCodeUrl(url);
-      })
-      .catch(err => {
-        console.error('QR code generation failed', err);
-      });
-    }
-  }, [isOpen, username, url]);
+  const downloadQRCode = () => {
+    const canvas = qrRef.current;
+    if (!canvas) return;
+    
+    const pngUrl = canvas.toDataURL("image/png");
+    const downloadLink = document.createElement("a");
+    downloadLink.href = pngUrl;
+    downloadLink.download = `frames-qr-${username}.png`;
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+    toast.success("QR Code Downloaded");
+  };
 
   const copyToClipboard = async () => {
     try {
@@ -83,16 +79,31 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, usernam
               </div>
 
               {/* QR Code */}
-              <div className="flex justify-center mb-8">
-                <div className="p-6 bg-bg-base border border-border shadow-inner">
-                  {qrCodeUrl ? (
-                    <img src={qrCodeUrl} alt="Portfolio QR Code" className="w-48 h-48" />
-                  ) : (
-                    <div className="w-48 h-48 flex items-center justify-center bg-bg-floating">
-                      <QrCode size={48} className="text-text-muted opacity-30" />
-                    </div>
-                  )}
+              <div className="flex flex-col items-center mb-8">
+                <div className="p-6 bg-bg-base border border-border shadow-inner mb-4 flex items-center justify-center">
+                  <QRCodeCanvas 
+                    value={url}
+                    size={192}
+                    bgColor={"#050505"}
+                    fgColor={"#F2F0EC"}
+                    level={"H"}
+                    marginSize={2}
+                  />
+                  <div className="hidden">
+                    <QRCodeCanvas 
+                      ref={qrRef}
+                      value={url}
+                      size={1024}
+                      bgColor={"#050505"}
+                      fgColor={"#F2F0EC"}
+                      level={"H"}
+                      marginSize={2}
+                    />
+                  </div>
                 </div>
+                <button onClick={downloadQRCode} className="flex items-center text-[10px] font-mono text-text-muted hover:text-white transition-colors tracking-widest uppercase">
+                  Download QR Code
+                </button>
               </div>
 
               {/* Link Copy */}

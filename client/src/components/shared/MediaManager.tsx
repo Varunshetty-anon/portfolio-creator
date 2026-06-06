@@ -4,6 +4,7 @@ import { Button } from '../ui/Button';
 import { toast } from '../ui/ToastProvider';
 import { uploadApi } from '@/lib/api';
 import axios, { type AxiosProgressEvent } from 'axios';
+import { ImageCropper } from './ImageCropper';
 
 type MediaType = 'profile' | 'thumbnail' | 'project';
 
@@ -44,11 +45,16 @@ export const MediaManager: React.FC<MediaManagerProps> = ({
   const [processStage, setProcessStage] = useState('');
   const lastTimeRef = useRef(Date.now());
   const lastLoadedRef = useRef(0);
+  
+  const [cropData, setCropData] = useState<{ url: string, file: File } | null>(null);
 
   const config = CONSTANTS[type];
   const maxBytes = config.maxMB * 1024 * 1024;
+  
+  const aspectParts = config.aspect.split(':');
+  const cropAspectRatio = parseInt(aspectParts[0], 10) / parseInt(aspectParts[1], 10);
 
-  const handleFile = async (file: File) => {
+  const processUpload = async (file: File) => {
     if (file.size > maxBytes) {
       toast.error(`File too large. Maximum size is ${config.maxMB}MB.`);
       return;
@@ -122,12 +128,45 @@ export const MediaManager: React.FC<MediaManagerProps> = ({
         toast.error('Upload cancelled.');
       } else {
         console.error(err);
-        toast.error('Upload failed. Please try again.');
+        const errorMessage = err.response?.data?.error || err.response?.data?.message || err.message || 'Upload failed. Please try again.';
+        toast.error(`Upload failed: ${errorMessage}`);
       }
       setStatus('error');
     } finally {
       abortControllerRef.current = null;
     }
+  };
+
+  const handleFile = async (file: File) => {
+    if (file.size > maxBytes) {
+      toast.error(`File too large. Maximum size is ${config.maxMB}MB.`);
+      return;
+    }
+
+    if (file.type.startsWith('image/')) {
+       const url = URL.createObjectURL(file);
+       setCropData({ url, file });
+       return;
+    }
+
+    processUpload(file);
+  };
+
+  const handleCropComplete = async (croppedBlob: Blob) => {
+     if (!cropData) return;
+     const ext = cropData.file.name.split('.').pop() || 'jpg';
+     const fileName = cropData.file.name.replace(`.${ext}`, `_cropped.jpg`);
+     const newFile = new File([croppedBlob], fileName, { type: 'image/jpeg' });
+     
+     URL.revokeObjectURL(cropData.url);
+     setCropData(null);
+     processUpload(newFile);
+  };
+
+  const handleCropCancel = () => {
+     if (cropData) URL.revokeObjectURL(cropData.url);
+     setCropData(null);
+     setStatus('idle');
   };
 
   const cancelUpload = () => {
@@ -222,6 +261,15 @@ export const MediaManager: React.FC<MediaManagerProps> = ({
 
   return (
     <div className="w-full">
+      {cropData && (
+        <ImageCropper 
+          imageSrc={cropData.url}
+          aspectRatio={cropAspectRatio}
+          onCropComplete={handleCropComplete}
+          onCancel={handleCropCancel}
+        />
+      )}
+
       <input
         type="file"
         ref={fileInputRef}

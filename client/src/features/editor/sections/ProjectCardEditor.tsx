@@ -114,7 +114,7 @@ export default function ProjectCardEditor({
   return (
     <motion.div 
       layout
-      className="bg-bg-raised border border-border rounded-xl overflow-hidden shadow-sm"
+      className="bg-[#111111] border border-white/[0.06] hover:border-white/10 rounded-xl overflow-hidden transition-colors"
     >
       {/* ── Collapsed Header ── */}
       <div 
@@ -160,7 +160,7 @@ export default function ProjectCardEditor({
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.3, ease: 'easeInOut' }}
-            className="border-t border-border bg-bg-base"
+            className="border-t border-white/[0.06] bg-[#111111]"
           >
             <div className="p-6 space-y-8">
               

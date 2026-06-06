@@ -22,6 +22,12 @@ async function startServer(): Promise<void> {
     const server = app.listen(PORT, () => {
       console.log(`🚀 FRAMES server running on port ${PORT}`);
       console.log(`   Environment: ${process.env.NODE_ENV ?? 'development'}`);
+      
+      // Check Cloudinary Config
+      if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+        console.warn('\n⚠️  WARNING: Cloudinary credentials are not set in the environment variables.');
+        console.warn('   Uploads will silently fail unless these are configured.\n');
+      }
     });
 
     // ── Graceful shutdown ───────────────────────────────────────────

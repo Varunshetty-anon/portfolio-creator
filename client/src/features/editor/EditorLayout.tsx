@@ -166,17 +166,17 @@ export default function EditorLayout() {
   ] as const;
 
   return (
-    <div className="flex h-screen bg-bg-base text-text-primary font-body overflow-hidden">
+    <div className="flex h-screen bg-[#080808] text-text-primary font-body overflow-hidden">
       
-      {/* ── Slim Left Sidebar (Navigation) ── */}
-      <aside className="w-16 md:w-[72px] border-r border-border bg-bg-floating flex flex-col items-center py-4 z-20 shrink-0">
-        <div className="mb-8">
+      {/* ── Left Sidebar (Navigation) ── */}
+      <aside className="hidden md:flex w-64 border-r border-white/[0.06] bg-[#050505] flex-col py-6 z-20 shrink-0">
+        <div className="mb-12 px-6 flex items-center gap-3">
           <Logo />
+          <span className="font-mono text-xs tracking-[0.2em] text-white">FRAMES</span>
         </div>
 
-        <nav className="flex-1 w-full flex flex-col gap-3 px-3">
+        <nav className="flex-1 w-full flex flex-col gap-2 px-2">
           {tabs.map((tab) => {
-            const Icon = tab.icon;
             const isActive = activeTab === tab.id;
             return (
               <button
@@ -186,16 +186,15 @@ export default function EditorLayout() {
                   setIsRightSidebarOpen(true);
                 }}
                 className={`
-                  relative flex items-center justify-center w-full aspect-square rounded-xl transition-all group
-                  ${isActive ? 'bg-bg-raised text-text-primary' : 'text-text-muted hover:bg-bg-raised/50 hover:text-text-primary'}
+                  relative flex items-center w-full px-6 py-3 transition-colors group
+                  ${isActive ? 'text-white' : 'text-text-subtle hover:text-text-muted'}
                 `}
-                title={tab.label}
               >
-                <Icon size={20} className={isActive ? 'text-accent' : ''} strokeWidth={isActive ? 2.5 : 2} />
+                <span className="font-mono text-xs uppercase tracking-[0.15em] relative z-10">{tab.label}</span>
                 {isActive && (
                   <motion.div 
                     layoutId="activeTabIndicator"
-                    className="absolute left-0 top-1/4 bottom-1/4 w-[3px] bg-accent rounded-r-full"
+                    className="absolute left-0 top-0 bottom-0 w-[2px] bg-accent"
                   />
                 )}
               </button>
@@ -203,76 +202,77 @@ export default function EditorLayout() {
           })}
         </nav>
 
-        <div className="mt-auto px-3 w-full">
+        <div className="mt-auto px-6 w-full flex flex-col gap-6">
+          {portfolio.isPublished && portfolio.username && (
+            <a 
+              href={`/portfolio/${portfolio.username}`}
+              target="_blank"
+              rel="noreferrer"
+              className="font-mono text-[10px] uppercase tracking-widest text-text-subtle hover:text-white transition-colors block text-center"
+            >
+              View Live
+            </a>
+          )}
+          
           <button 
-            onClick={handleLogout}
-            className="w-full flex items-center justify-center aspect-square text-text-muted hover:text-danger hover:bg-danger/10 transition-colors rounded-xl"
-            title="Log out"
+            onClick={handlePublish}
+            disabled={isPublishing}
+            className="w-full py-3 border border-white/20 hover:border-white/60 hover:bg-white/5 text-white text-[10px] uppercase tracking-widest font-mono transition-all disabled:opacity-50"
           >
-            <LogOut size={20} />
+            {publishStatus === 'success' ? 'Published' : isPublishing ? 'Publishing...' : 'Publish'}
           </button>
         </div>
       </aside>
 
+      {/* Mobile Sidebar Toggle (Fallback) */}
+      <aside className="md:hidden w-16 border-r border-white/[0.06] bg-[#050505] flex flex-col items-center py-4 z-20 shrink-0">
+        <div className="mb-8"><Logo /></div>
+        <nav className="flex-1 w-full flex flex-col gap-3 px-3">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => { setActiveTab(tab.id as TabType); setIsRightSidebarOpen(true); }}
+                className={`relative flex items-center justify-center w-full aspect-square rounded-xl transition-all group ${isActive ? 'text-white bg-white/5' : 'text-text-subtle'}`}
+              >
+                <Icon size={20} className={isActive ? 'text-accent' : ''} />
+              </button>
+            );
+          })}
+        </nav>
+      </aside>
       {/* ── Main Canvas (Live Preview) ── */}
       <main className="flex-1 relative bg-bg-raised flex flex-col min-w-0">
         {/* Floating Top Header */}
         <header className="absolute top-4 left-4 right-4 z-50 flex items-center justify-between pointer-events-none">
           
           {/* Status Indicator */}
-          <div className="bg-bg-floating/80 backdrop-blur-md border border-border px-4 py-2 rounded-full shadow-sm pointer-events-auto flex items-center gap-2 text-xs font-medium uppercase tracking-widest">
+          <div className="pointer-events-auto flex items-center gap-2">
             {isSaving ? (
-              <>
-                <Loader2 size={12} className="animate-spin text-text-muted" />
-                <span className="text-text-muted">Saving...</span>
-              </>
+              <span className="font-mono text-[10px] tracking-widest text-text-subtle">● SAVING...</span>
             ) : hasUnsavedChanges ? (
-              <>
-                <div className="w-1.5 h-1.5 rounded-full bg-warning animate-pulse" />
-                <span className="text-warning">Unsaved</span>
-              </>
+              <span className="font-mono text-[10px] tracking-widest text-text-subtle">● UNSAVED</span>
             ) : (
-              <>
-                <Check size={12} className="text-success" />
-                <span className="text-text-muted">Saved</span>
-              </>
+              <span className="font-mono text-[10px] tracking-widest text-text-subtle">✓ SAVED</span>
             )}
           </div>
 
           {/* Actions */}
-          <div className="flex items-center gap-3 bg-bg-floating/80 backdrop-blur-md border border-border p-1.5 rounded-full shadow-sm pointer-events-auto">
+          <div className="flex items-center gap-3 pointer-events-auto">
             {portfolio.isPublished && portfolio.username && (
-              <>
-                <button
-                  onClick={() => window.open(`/portfolio/${portfolio.username}`, '_blank')}
-                  className="p-2 text-text-muted hover:text-text-primary transition-colors rounded-full hover:bg-bg-raised"
-                  title="Open Live Site"
-                >
-                  <ExternalLink size={16} />
-                </button>
-                <button
-                  onClick={() => setShowShareModal(true)}
-                  className="p-2 text-text-muted hover:text-accent transition-colors rounded-full hover:bg-bg-raised"
-                  title="Share Portfolio"
-                >
-                  <Share2 size={16} />
-                </button>
-                <div className="w-px h-4 bg-border mx-1" />
-              </>
+              <button
+                onClick={() => setShowShareModal(true)}
+                className="font-mono text-[10px] uppercase tracking-widest text-text-subtle hover:text-white transition-colors"
+              >
+                Share
+              </button>
             )}
-            
-            <Button 
-              size="sm" 
-              onClick={handlePublish}
-              loading={isPublishing}
-              className={`rounded-full px-5 ${publishStatus === 'success' ? 'bg-success text-white' : 'bg-text-primary text-bg-base hover:bg-text-primary/90'}`}
-            >
-              {publishStatus === 'success' ? 'Published' : 'Publish'}
-            </Button>
             
             <button
               onClick={() => setIsRightSidebarOpen(!isRightSidebarOpen)}
-              className="p-2 ml-1 text-text-muted hover:text-text-primary transition-colors rounded-full hover:bg-bg-raised md:hidden"
+              className="p-2 ml-1 text-text-subtle hover:text-white transition-colors"
             >
               {isRightSidebarOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
             </button>
@@ -297,10 +297,10 @@ export default function EditorLayout() {
             initial={{ width: 0, opacity: 0 }}
             animate={{ width: 380, opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
-            className="w-full max-w-[380px] shrink-0 border-l border-border bg-bg-floating flex flex-col z-20"
+            className="w-full max-w-[380px] shrink-0 border-l border-white/[0.06] bg-[#111111] flex flex-col z-20"
           >
-            <div className="h-14 border-b border-border flex items-center justify-between px-5 shrink-0">
-              <h2 className="text-sm font-medium capitalize text-text-primary">
+            <div className="h-14 border-b border-white/[0.06] flex items-center justify-between px-5 shrink-0">
+              <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-text-subtle">
                 {activeTab} Properties
               </h2>
               <button 

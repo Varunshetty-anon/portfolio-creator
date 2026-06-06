@@ -22,6 +22,15 @@ router.get(
       const timestamp = Math.round(new Date().getTime() / 1000);
       const isVideo = req.query.type === 'video';
       
+      console.log('--- Upload Route Hit: Checking Cloudinary Config ---');
+      console.log('CLOUDINARY_CLOUD_NAME:', process.env.CLOUDINARY_CLOUD_NAME ? 'set' : 'undefined');
+      console.log('CLOUDINARY_API_KEY:', process.env.CLOUDINARY_API_KEY ? 'set' : 'undefined');
+      console.log('CLOUDINARY_API_SECRET:', process.env.CLOUDINARY_API_SECRET ? 'set' : 'undefined');
+
+      if (!process.env.CLOUDINARY_API_SECRET) {
+        throw new AppError('Server is missing Cloudinary API Secret. Upload cannot proceed.', 500);
+      }
+      
       const paramsToSign: Record<string, any> = {
         timestamp,
         folder: isVideo ? 'frames/projects/videos' : 'frames/projects/images',

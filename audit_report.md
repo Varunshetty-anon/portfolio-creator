@@ -1,8 +1,8 @@
 # Evidence Audit Report
 
-## Route: /vision-compare
+## Route: /vision-10-compare
 - **HTTP Status:** 200
-- **Full Screenshot:** Saved to screenshots_vision-compare_full.png
+- **Full Screenshot:** Saved to screenshots_vision-10-compare_full.png
 
 ---
 
