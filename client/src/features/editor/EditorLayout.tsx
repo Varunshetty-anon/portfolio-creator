@@ -132,9 +132,8 @@ export default function EditorLayout() {
       }
       
       const res = await portfolioApi.publish() as any;
-      if (res.success) {
-        const publishedPortfolio = res.data?.portfolio || res.data;
-        setPortfolio(publishedPortfolio);
+      if (res && res.portfolio) {
+        setPortfolio(res.portfolio);
       }
       
       setPublishStatus('success');
