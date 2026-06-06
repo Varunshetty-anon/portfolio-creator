@@ -144,6 +144,11 @@ export const MediaManager: React.FC<MediaManagerProps> = ({
     }
 
     if (file.type.startsWith('image/')) {
+       if (type === 'project') {
+         // Bypass cropper for project media to maintain original aspect ratio
+         processUpload(file);
+         return;
+       }
        const url = URL.createObjectURL(file);
        setCropData({ url, file });
        return;

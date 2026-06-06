@@ -167,16 +167,29 @@ export default function ProjectCardEditor({
               {/* URL & Thumbnail Row */}
               <div className="flex flex-col gap-6">
                 <div>
-                  <label className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-2 block">Project Media</label>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-2 block">Project Media (Video or Image)</label>
                   <MediaManager
                     type="project"
-                    currentUrl={project.videoUrl}
+                    currentUrl={project.videoUrl || project.imageUrl}
                     allowUrlInput={true}
-                    onUrlSave={(url) => handleFieldChange('videoUrl', url)}
-                    onUploadComplete={(url, thumb) => {
-                      onChange({ ...project, videoUrl: url, thumbnailUrl: thumb || project.thumbnailUrl });
+                    onUrlSave={(url) => {
+                      const isImg = url.match(/\.(jpeg|jpg|gif|png|webp)$/i) != null;
+                      handleFieldChange(isImg ? 'imageUrl' : 'videoUrl', url);
+                      if (isImg) handleFieldChange('videoUrl', '');
+                      else handleFieldChange('imageUrl', '');
                     }}
-                    onRemove={() => handleFieldChange('videoUrl', '')}
+                    onUploadComplete={(url, thumb) => {
+                      const isImg = url.match(/\.(jpeg|jpg|gif|png|webp)$/i) != null;
+                      onChange({ 
+                        ...project, 
+                        videoUrl: isImg ? '' : url,
+                        imageUrl: isImg ? url : '',
+                        thumbnailUrl: thumb || project.thumbnailUrl 
+                      });
+                    }}
+                    onRemove={() => {
+                      onChange({ ...project, videoUrl: '', imageUrl: '' });
+                    }}
                   />
                   {linkError && <p className="text-xs text-danger mt-2 font-medium">{linkError}</p>}
                   {project.videoSource === 'gdrive' && (

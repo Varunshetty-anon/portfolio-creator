@@ -91,14 +91,14 @@ const AuthPage: React.FC = () => {
             transition={{ duration: 1, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
             className="text-frames-text-muted text-xl font-light leading-relaxed max-w-md"
           >
-            Built exclusively for video editors and motion designers to showcase their work without compromise.
+            Built for all creatives—from photographers to motion designers—to showcase their work without compromise.
           </motion.p>
         </div>
 
         {/* Footer */}
         <div className="flex gap-6 text-[10px] font-display font-bold uppercase tracking-[0.2em] text-frames-text-subtle">
           <span>© FRAMES STUDIO</span>
-          <span>CRAFTED FOR EDITORS</span>
+          <span>CRAFTED FOR CREATIVES</span>
         </div>
       </div>
 
@@ -157,7 +157,7 @@ const AuthPage: React.FC = () => {
             <Input
               label="Email"
               type="email"
-              placeholder="editor@example.com"
+              placeholder="creative@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required

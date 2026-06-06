@@ -18,8 +18,9 @@ export interface Project {
   description: string;
   thumbnailUrl: string;
   videoUrl: string;
+  imageUrl?: string;
   videoSource: 'cloudinary' | 'youtube' | 'vimeo' | 'gdrive' | 'direct';
-  aspectRatio: '16:9' | '9:16' | '4:3' | '1:1';
+  aspectRatio: string;
   contentType: string;
   subjectMatter: string;
   softwareUsed: string[];
@@ -104,6 +105,7 @@ export const INITIAL_PROJECT: Omit<Project, 'id' | 'order'> = {
   description: '',
   thumbnailUrl: '',
   videoUrl: '',
+  imageUrl: '',
   videoSource: 'youtube',
   aspectRatio: '16:9',
   contentType: 'Brand Trailer',

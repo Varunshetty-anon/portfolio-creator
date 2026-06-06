@@ -14,8 +14,9 @@ export interface IProject extends Document {
   description?: string;
   thumbnailUrl?: string;
   videoUrl?: string;
-  videoSource?: 'cloudinary' | 'youtube' | 'vimeo';
-  aspectRatio?: '16:9' | '9:16' | '4:3' | '1:1';
+  imageUrl?: string;
+  videoSource?: 'cloudinary' | 'youtube' | 'vimeo' | 'gdrive' | 'direct';
+  aspectRatio?: string;
   contentType?: string;
   subjectMatter?: string;
   softwareUsed?: string[];
@@ -42,13 +43,13 @@ const projectSchema = new Schema<IProject>(
     description: { type: String, trim: true },
     thumbnailUrl: { type: String },
     videoUrl: { type: String },
+    imageUrl: { type: String },
     videoSource: {
       type: String,
       enum: ['cloudinary', 'youtube', 'vimeo', 'gdrive', 'direct'],
     },
     aspectRatio: {
       type: String,
-      enum: ['16:9', '9:16', '4:3', '1:1'],
       default: '16:9',
     },
     contentType: { type: String, trim: true },

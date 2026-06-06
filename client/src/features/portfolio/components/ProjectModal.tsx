@@ -92,16 +92,24 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({ project, allProjects
             {/* Left: Media Player (65%) */}
             <div className="w-full md:w-[65%] h-[35vh] md:h-full bg-black relative shrink-0">
               <div className="absolute inset-0">
-                <FramesPlayer
-                  key={project.videoUrl}
-                  url={project.videoUrl}
-                  thumbnail={project.thumbnailUrl}
-                  aspectRatio="16:9"
-                  controls={true}
-                  autoplay={true}
-                  muted={false}
-                  loop={true}
-                />
+                {project.imageUrl ? (
+                  <img 
+                    src={project.imageUrl} 
+                    alt={project.title} 
+                    className="w-full h-full object-contain"
+                  />
+                ) : (
+                  <FramesPlayer
+                    key={project.videoUrl}
+                    url={project.videoUrl}
+                    thumbnail={project.thumbnailUrl}
+                    aspectRatio={project.aspectRatio as any || "16:9"}
+                    controls={true}
+                    autoplay={true}
+                    muted={false}
+                    loop={true}
+                  />
+                )}
               </div>
             </div>
 

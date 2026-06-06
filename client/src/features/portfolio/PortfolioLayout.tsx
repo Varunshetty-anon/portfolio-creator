@@ -6,7 +6,7 @@ import { PortfolioData } from '@/types';
 import { IntroOverlay } from './components/IntroOverlay';
 import { ProjectModal } from './components/ProjectModal';
 import { FramesPlayer } from '@/components/shared/FramesPlayer';
-import { Instagram, Twitter, Linkedin } from 'lucide-react';
+import { Instagram, Twitter, Linkedin, Mail } from 'lucide-react';
 
 interface PortfolioLayoutProps {
   isPreviewMode?: boolean;
@@ -57,179 +57,154 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
   if (loading || !data) return null;
 
   const projects = data.projects || [];
-  const hoveredProject = projects.find(p => (p._id || p.id) === hoveredProjectId);
-
-  const defaultVideoUrl = data.showreelUrl || projects[0]?.videoUrl;
-  const currentBackgroundVideoUrl = hoveredProject?.videoUrl || defaultVideoUrl;
 
   return (
-    <div className="relative min-h-screen bg-bg-base text-text-primary overflow-hidden selection:bg-white selection:text-black">
+    <div className="relative min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-[#161616] via-[#0a0a0a] to-[#050505] text-white overflow-hidden selection:bg-white selection:text-black">
       {/* Intro Overlay */}
       {!introComplete && (
         <IntroOverlay 
           name={data.name || 'Creative'} 
           role={data.role || 'Portfolio'} 
+          profileImageUrl={data.profileImageUrl}
           onComplete={() => setIntroComplete(true)} 
         />
       )}
 
-      {/* Global Background Layer (Desktop Only) */}
-      <div className="hidden md:block fixed inset-0 z-0 pointer-events-none bg-black">
-        <AnimatePresence mode="wait">
-          {currentBackgroundVideoUrl && (
-            <motion.div
-              key={currentBackgroundVideoUrl}
-              initial={{ opacity: 0, scale: 1.05 }}
-              animate={{ opacity: 0.4, scale: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.8, ease: "easeInOut" }}
-              className="absolute inset-0 object-cover"
-            >
-              <div className="w-full h-full scale-[1.5]">
-                <FramesPlayer 
-                  url={currentBackgroundVideoUrl} 
-                  controls={false} 
-                  autoplay={true} 
-                  muted={true} 
-                  loop={true}
-                />
-              </div>
-              <div className="absolute inset-0 bg-gradient-to-t from-bg-base via-transparent to-transparent" />
-            </motion.div>
-          )}
-        </AnimatePresence>
-        
-        {/* Persistent Grain */}
-        <div className="absolute inset-0 opacity-20 pointer-events-none mix-blend-overlay" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E")' }} />
-      </div>
+      {/* Subtle Noise Background */}
+      <div className="fixed inset-0 pointer-events-none opacity-[0.04] mix-blend-overlay z-0" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.8%22 numOctaves=%224%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E")' }} />
 
       {/* Foreground Content */}
-      <div className="relative z-10 w-full min-h-screen flex flex-col h-screen overflow-y-auto overflow-x-hidden no-scrollbar">
+      <div className="relative z-10 w-full h-screen overflow-y-auto overflow-x-hidden no-scrollbar">
         
-        {/* Massive Hero Section */}
-        <header className="w-full min-h-[85vh] flex flex-col justify-end px-6 md:px-16 pb-24">
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: introComplete ? 1 : 0, y: introComplete ? 0 : 40 }}
-            transition={{ duration: 1, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 md:px-8 pt-16 sm:pt-24 pb-40">
+          
+          {/* Header Block */}
+          <motion.header 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: introComplete ? 1 : 0, y: introComplete ? 0 : 20 }}
+            transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
+            className="flex flex-col md:flex-row md:items-start gap-8 sm:gap-12 mb-20 sm:mb-28"
           >
-            <h1 className="font-display font-bold uppercase tracking-tighter text-[12vw] leading-[0.85] text-white">
-              {data.name}
-            </h1>
-            <div className="mt-8 flex flex-col md:flex-row md:items-end justify-between gap-8 border-t border-white/10 pt-8">
-              <div className="max-w-xl">
-                <p className="text-xl md:text-2xl text-text-muted opacity-100 md:opacity-70 font-light leading-relaxed">
+             <div className="shrink-0">
+                {data.profileImageUrl ? (
+                   <img src={data.profileImageUrl} alt={data.name} className="w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40 rounded-full object-cover border border-white/10 shadow-2xl" />
+                ) : (
+                   <div className="w-24 h-24 sm:w-32 sm:h-32 md:w-40 md:h-40 rounded-full bg-white/5 border border-white/10 shadow-2xl" />
+                )}
+             </div>
+             <div className="flex-1 pt-2">
+                <h1 className="text-3xl sm:text-4xl md:text-5xl font-semibold text-white tracking-tight mb-4">
+                  {data.name}
+                </h1>
+                <div className="text-base sm:text-lg text-white/60 font-light max-w-2xl leading-relaxed mb-8">
                   {data.bio}
-                </p>
-              </div>
-              <div className="flex flex-col text-sm tracking-widest uppercase text-text-muted space-y-2 text-left md:text-right">
-                <span className="text-white font-medium">{data.role}</span>
-                {data.location && <span>{data.location}</span>}
-                {data.languages && <span>{data.languages}</span>}
-                <div className="pt-4">
-                  <span className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full text-white text-xs backdrop-blur-sm">
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                    Available for Work
-                  </span>
                 </div>
-              </div>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-3 text-xs sm:text-sm font-medium uppercase tracking-widest text-white/40">
+                   {data.role && <span>{data.role}</span>}
+                   {data.role && data.location && <span className="w-1 h-1 rounded-full bg-white/20" />}
+                   {data.location && <span>{data.location}</span>}
+                   {(data.role || data.location) && <span className="w-1 h-1 rounded-full bg-white/20" />}
+                   <span className="flex items-center gap-2 text-white/80 border border-white/10 px-3 py-1.5 rounded-full bg-white/5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                      Available for work
+                   </span>
+                </div>
+             </div>
+          </motion.header>
+
+          {/* Bento Projects Grid */}
+          <main>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+               {projects.map((project, idx) => (
+                 <motion.div
+                    key={project._id || project.id}
+                    className="group relative aspect-[4/5] sm:aspect-square overflow-hidden rounded-2xl bg-[#111111] border border-white/5 cursor-pointer"
+                    onClick={() => setSelectedProjectId(project._id || project.id as string)}
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, margin: "50px" }}
+                    transition={{ duration: 0.5, delay: idx * 0.05 }}
+                    onMouseEnter={() => setHoveredProjectId(project._id || project.id as string)}
+                    onMouseLeave={() => setHoveredProjectId(null)}
+                  >
+                     {/* Media Layer */}
+                     <div className="absolute inset-0 w-full h-full bg-black/20">
+                       {project.imageUrl ? (
+                         <img src={project.imageUrl} alt={project.title} className="absolute inset-0 w-full h-full object-cover scale-[1.02] group-hover:scale-105 transition-transform duration-700" />
+                       ) : project.videoUrl && hoveredProjectId === (project._id || project.id) ? (
+                         <div className="absolute inset-0 w-full h-full scale-[1.02] group-hover:scale-105 transition-transform duration-700">
+                           <FramesPlayer 
+                             url={project.videoUrl} 
+                             thumbnail={project.thumbnailUrl}
+                             controls={false} 
+                             autoplay={true} 
+                             muted={true} 
+                             loop={true} 
+                           />
+                         </div>
+                       ) : project.thumbnailUrl ? (
+                         <img src={project.thumbnailUrl} alt={project.title} className="absolute inset-0 w-full h-full object-cover scale-[1.02] group-hover:scale-105 transition-transform duration-700" />
+                       ) : project.videoUrl ? (
+                         <div className="absolute inset-0 w-full h-full scale-[1.02] group-hover:scale-105 transition-transform duration-700">
+                           <FramesPlayer 
+                             url={project.videoUrl} 
+                             controls={false} 
+                             autoplay={false} 
+                             muted={true} 
+                           />
+                         </div>
+                       ) : null}
+                     </div>
+
+                     {/* Gradient overlay */}
+                     <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent opacity-80 group-hover:opacity-100 transition-opacity duration-300" />
+
+                     {/* Meta content */}
+                     <div className="absolute inset-0 p-6 flex flex-col justify-end pointer-events-none">
+                        <div className="translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+                           <span className="text-[10px] font-mono tracking-widest uppercase text-white/50 block mb-2">{project.contentType || 'Project'}</span>
+                           <h3 className="text-xl sm:text-2xl font-semibold text-white tracking-tight">{project.title}</h3>
+                        </div>
+                     </div>
+                  </motion.div>
+               ))}
             </div>
-          </motion.div>
-        </header>
+          </main>
 
-        {/* The Cinematic Index */}
-        <main className="w-full px-0 md:px-16 pb-16 md:pb-32">
-          <ul className="w-full border-t border-white/10 md:border-white/20 group/list flex flex-col">
-            {projects.map((project, index) => (
-              <motion.li 
-                key={project._id || project.id}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-10%" }}
-                transition={{ duration: 0.6, delay: index * 0.1 }}
-                onMouseEnter={() => setHoveredProjectId(project._id || project.id as string)}
-                onMouseLeave={() => setHoveredProjectId(null)}
-                onClick={() => setSelectedProjectId(project._id || project.id as string)}
-                className="group relative flex flex-col md:flex-row md:items-center md:justify-between py-6 md:py-12 border-b border-white/10 cursor-pointer transition-colors duration-500 hover:border-white/40"
-              >
-                {/* Mobile/Tablet Card Preview */}
-                <div className="w-full aspect-video mb-6 block md:hidden relative overflow-hidden bg-black/50">
-                  {project.videoUrl && (
-                    <div className="absolute inset-0 pointer-events-none">
-                      <FramesPlayer 
-                        url={project.videoUrl} 
-                        thumbnail={project.thumbnailUrl}
-                        controls={false} 
-                        autoplay={true} 
-                        muted={true}
-                        loop={true}
-                      />
-                    </div>
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent flex items-end p-4">
-                     <span className="text-xs font-mono tracking-widest uppercase text-white/80 border border-white/20 px-2 py-1 bg-black/40 backdrop-blur-md">
-                        {project.contentType || 'Project'}
-                     </span>
-                  </div>
-                </div>
+        </div>
 
-                {/* Desktop/Mobile Title Row */}
-                <div className="flex items-center gap-4 md:gap-16 px-6 md:px-0">
-                  <div className="relative pb-1">
-                    <span className="text-xs md:text-base font-mono text-white/30 group-hover:text-white/60 transition-colors duration-500">
-                      {(index + 1).toString().padStart(2, '0')}
-                    </span>
-                    <div className="absolute bottom-0 w-full h-px bg-accent scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left" />
-                  </div>
-                  <h2 className="font-display font-bold uppercase tracking-tight text-3xl sm:text-5xl md:text-7xl text-white/80 md:text-white/40 group-hover:text-white transition-all duration-500 md:group-hover:translate-x-4">
-                    {project.title}
-                  </h2>
-                </div>
-
-                {/* Desktop Meta Data */}
-                <div className="hidden md:flex items-center gap-12 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-                  <span className="text-sm tracking-widest uppercase text-white/60">
-                    {project.contentType}
-                  </span>
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-white transform -rotate-45 group-hover:rotate-0 transition-transform duration-500">
-                    <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </div>
-              </motion.li>
-            ))}
-          </ul>
-        </main>
-
-        {/* Terminal Footer */}
-        <footer className="w-full min-h-[50vh] flex flex-col items-center justify-center border-t border-white/10 mt-auto py-24 px-6 relative z-20 bg-bg-base">
-          <div className="w-16 h-px bg-white/20 mb-8" />
-          <p className="font-mono text-sm tracking-[0.2em] uppercase text-text-subtle mb-8">Ready to collaborate</p>
-          <a 
-            href={`mailto:${data.contactEmail || data.socials?.email || ''}`}
-            className="font-display font-bold uppercase tracking-tighter text-[10vw] leading-none text-white hover:text-white/70 transition-colors"
-          >
-            LET'S TALK
-          </a>
-          {data.socials && (
-            <div className="mt-12 flex items-center gap-6">
-              {data.socials.linkedin && (
-                <a href={data.socials.linkedin} target="_blank" rel="noopener noreferrer" className="w-10 h-10 flex items-center justify-center text-text-muted hover:text-white transition-colors">
-                  <Linkedin size={20} />
-                </a>
-              )}
-              {data.socials.instagram && (
-                <a href={data.socials.instagram} target="_blank" rel="noopener noreferrer" className="w-10 h-10 flex items-center justify-center text-text-muted hover:text-white transition-colors">
-                  <Instagram size={20} />
-                </a>
-              )}
-              {data.socials.twitter && (
-                <a href={data.socials.twitter} target="_blank" rel="noopener noreferrer" className="w-10 h-10 flex items-center justify-center text-text-muted hover:text-white transition-colors">
-                  <Twitter size={20} />
-                </a>
-              )}
-            </div>
-          )}
-        </footer>
+        {/* Floating Bottom Nav */}
+        <motion.div 
+          initial={{ y: 100, opacity: 0 }}
+          animate={{ y: introComplete ? 0 : 100, opacity: introComplete ? 1 : 0 }}
+          transition={{ duration: 0.6, delay: 0.8 }}
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 pointer-events-none w-full px-4 flex justify-center"
+        >
+          <div className="pointer-events-auto bg-[#111111]/80 backdrop-blur-xl border border-white/10 p-2 rounded-full shadow-2xl flex items-center gap-2">
+             <a 
+               href={`mailto:${data.contactEmail || data.socials?.email || ''}`} 
+               className="bg-white text-black hover:bg-white/90 px-6 py-3 rounded-full text-xs font-semibold uppercase tracking-widest transition-colors flex items-center gap-2"
+             >
+               <Mail size={14} />
+               Let's Talk
+             </a>
+             {data.socials?.twitter && (
+               <a href={data.socials.twitter} target="_blank" rel="noreferrer" className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/70 hover:text-white transition-colors">
+                  <Twitter size={16} />
+               </a>
+             )}
+             {data.socials?.instagram && (
+               <a href={data.socials.instagram} target="_blank" rel="noreferrer" className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/70 hover:text-white transition-colors">
+                  <Instagram size={16} />
+               </a>
+             )}
+             {data.socials?.linkedin && (
+               <a href={data.socials.linkedin} target="_blank" rel="noreferrer" className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/70 hover:text-white transition-colors">
+                  <Linkedin size={16} />
+               </a>
+             )}
+          </div>
+        </motion.div>
 
       </div>
 
