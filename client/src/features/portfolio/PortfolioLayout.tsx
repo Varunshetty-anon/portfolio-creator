@@ -137,18 +137,10 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
 
         <div className="relative z-10 w-full max-w-[1600px] mx-auto">
           {/* ROW 1 */}
-          <div className="flex items-end gap-6 mb-6">
-            {data.profileImageUrl && (
-              <img
-                src={data.profileImageUrl}
-                alt={data.name}
-                className="w-[72px] h-[72px] object-cover flex-shrink-0 self-end"
-                style={{ borderRadius: 0 }}
-              />
-            )}
+          <div className="mb-6 w-full">
             <h1 
-              className="font-display font-black uppercase tracking-tighter text-white leading-[0.88]"
-              style={{ fontSize: 'clamp(48px, 8vw, 120px)' }}
+              className="font-display font-black uppercase tracking-tighter text-white"
+              style={{ fontSize: 'clamp(52px, 9vw, 130px)', lineHeight: 0.88 }}
             >
               {data.name}
             </h1>
