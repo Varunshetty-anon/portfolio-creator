@@ -81,6 +81,9 @@ export const authApi = {
   getMe: () =>
     request(`/auth/me?_t=${Date.now()}`),
 
+  getSession: () =>
+    request(`/auth/session?_t=${Date.now()}`),
+
   deleteAccount: () =>
     request('/auth/account', { method: 'DELETE' }),
 };

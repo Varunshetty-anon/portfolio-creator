@@ -184,9 +184,18 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
             {projects.map((project) => (
               <div
                 key={project._id || project.id}
+                role="button"
+                tabIndex={0}
+                aria-label={`Open project: ${project.title}`}
                 className="group relative overflow-hidden cursor-pointer bg-[#111]"
                 style={{ aspectRatio: '16/9' }}
                 onClick={() => setSelectedProject(project)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    setSelectedProject(project);
+                  }
+                }}
               >
                 {project.thumbnailUrl ? (
                   <img
@@ -359,12 +368,18 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
                       aspectRatio="16:9"
                       className="h-full w-full"
                     />
-                  ) : (
+                  ) : selectedProject.imageUrl || selectedProject.thumbnailUrl ? (
                     <img 
                       src={selectedProject.imageUrl || selectedProject.thumbnailUrl} 
                       alt={selectedProject.title} 
                       className="w-full h-full object-contain"
                     />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-[#070707]">
+                      <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/30">
+                        Media pending
+                      </span>
+                    </div>
                   )}
                 </div>
               </div>

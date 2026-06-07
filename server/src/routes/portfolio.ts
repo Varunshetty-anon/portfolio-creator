@@ -14,6 +14,48 @@ import { sanitizeUsername } from '../utils/helpers.js';
 
 const router = Router();
 
+function serializePortfolio(portfolio: any) {
+  return {
+    _id: portfolio._id,
+    username: portfolio.username,
+    name: portfolio.name,
+    role: portfolio.role,
+    bio: portfolio.bio,
+    location: portfolio.location,
+    languages: portfolio.languages,
+    contactEmail: portfolio.contactEmail,
+    profileImageUrl: portfolio.profileImageUrl,
+    showreelUrl: portfolio.showreelUrl,
+    showreelThumbnailUrl: portfolio.showreelThumbnailUrl,
+    socials: portfolio.socials,
+    availability: portfolio.availability,
+    theme: portfolio.theme,
+    primaryTool: portfolio.primaryTool,
+    tools: portfolio.tools,
+    aiTools: portfolio.aiTools,
+    publishedAt: portfolio.publishedAt,
+  };
+}
+
+function serializeProject(project: any) {
+  return {
+    _id: project._id,
+    id: project._id?.toString(),
+    title: project.title,
+    description: project.description,
+    thumbnailUrl: project.thumbnailUrl,
+    videoUrl: project.videoUrl,
+    imageUrl: project.imageUrl,
+    videoSource: project.videoSource,
+    aspectRatio: project.aspectRatio,
+    contentType: project.contentType,
+    subjectMatter: project.subjectMatter,
+    softwareUsed: project.softwareUsed,
+    aiToolsUsed: project.aiToolsUsed,
+    order: project.order,
+  };
+}
+
 // ── GET / — current user's portfolio ────────────────────────────────
 router.get('/', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -131,6 +173,7 @@ router.put('/', authenticateToken, async (req: Request, res: Response, next: Nex
           description: p.description || '',
           thumbnailUrl: p.thumbnailUrl || '',
           videoUrl: p.videoUrl || '',
+          imageUrl: p.imageUrl || '',
           videoSource: p.videoSource || 'youtube',
           aspectRatio: p.aspectRatio || '16:9',
           contentType: p.contentType || '',
@@ -168,9 +211,18 @@ router.post(
         throw new AppError('Portfolio not found.', 404);
       }
 
-      portfolio.liveContent = portfolio.draftContent;
+      const projects = await Project.find({ portfolioId: portfolio._id }).sort({ order: 1 });
+
       portfolio.isPublished = true;
       portfolio.publishedAt = new Date();
+      portfolio.liveContent = {
+        portfolio: {
+          ...serializePortfolio(portfolio),
+          isPublished: true,
+          publishedAt: portfolio.publishedAt,
+        },
+        projects: projects.map(serializeProject),
+      };
       await portfolio.save();
 
       res.json({ success: true, data: { portfolio } });
@@ -234,31 +286,18 @@ router.get(
       }
 
       const projects = await Project.find({ portfolioId: portfolio._id }).sort({ order: 1 });
+      const liveContent = portfolio.liveContent as any;
+      const livePortfolio = liveContent?.portfolio;
+      const liveProjects = Array.isArray(liveContent?.projects) ? liveContent.projects : null;
 
       res.json({
         success: true,
         data: {
-          portfolio: {
-            username: portfolio.username,
-            name: portfolio.name,
-            role: portfolio.role,
-            bio: portfolio.bio,
-            location: portfolio.location,
-            languages: portfolio.languages,
-            contactEmail: portfolio.contactEmail,
-            profileImageUrl: portfolio.profileImageUrl,
-            showreelUrl: portfolio.showreelUrl,
-            showreelThumbnailUrl: portfolio.showreelThumbnailUrl,
-            socials: portfolio.socials,
-            availability: portfolio.availability,
-            theme: portfolio.theme,
-            primaryTool: portfolio.primaryTool,
-            tools: portfolio.tools,
-            aiTools: portfolio.aiTools,
+          portfolio: livePortfolio || {
+            ...serializePortfolio(portfolio),
             liveContent: portfolio.liveContent,
-            publishedAt: portfolio.publishedAt,
           },
-          projects,
+          projects: liveProjects || projects.map(serializeProject),
         },
       });
     } catch (err) {

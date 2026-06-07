@@ -16,7 +16,7 @@ import Portfolio from '../models/Portfolio.js';
 import Project from '../models/Project.js';
 import Analytics from '../models/Analytics.js';
 import Settings from '../models/Settings.js';
-import { authenticateToken } from '../middleware/auth.js';
+import { authenticateToken, optionalAuth } from '../middleware/auth.js';
 import { AppError } from '../middleware/errors.js';
 import { generateJWT } from '../utils/helpers.js';
 
@@ -162,6 +162,19 @@ router.post('/logout', (_req: Request, res: Response) => {
 });
 
 // ── GET /me ─────────────────────────────────────────────────────────
+router.get('/session', optionalAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user?.userId) {
+      return res.json({ success: true, data: { user: null } });
+    }
+
+    const user = await User.findById(req.user.userId);
+    res.json({ success: true, data: { user: user || null } });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/me', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = await User.findById(req.user!.userId);

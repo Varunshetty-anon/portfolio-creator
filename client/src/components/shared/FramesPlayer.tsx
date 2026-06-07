@@ -73,6 +73,23 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
   const lastTapRef = useRef<{ time: number; clientX: number }>({ time: 0, clientX: 0 });
   const hasAutoplayStarted = useRef(false);
 
+  const getCurrentTime = useCallback(() => {
+    const player = playerRef.current;
+    if (!player) return 0;
+    if (typeof player.getCurrentTime === 'function') return player.getCurrentTime() || 0;
+    return player.currentTime || 0;
+  }, []);
+
+  const seekTo = useCallback((time: number) => {
+    const player = playerRef.current;
+    if (!player) return;
+    if (typeof player.seekTo === 'function') {
+      player.seekTo(time, 'seconds');
+      return;
+    }
+    player.currentTime = Math.max(time, 0);
+  }, []);
+
   // Persist volume settings
   useEffect(() => {
     localStorage.setItem('frames_player_muted', JSON.stringify(muted));
@@ -179,16 +196,16 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
       case 'ArrowRight':
         e.preventDefault();
         if (playerRef.current) {
-          const current = playerRef.current.getCurrentTime() || 0;
-          playerRef.current.seekTo(current + 5, 'seconds');
+          const current = getCurrentTime();
+          seekTo(current + 5);
           showControls();
         }
         break;
       case 'ArrowLeft':
         e.preventDefault();
         if (playerRef.current) {
-          const current = playerRef.current.getCurrentTime() || 0;
-          playerRef.current.seekTo(current - 5, 'seconds');
+          const current = getCurrentTime();
+          seekTo(current - 5);
           showControls();
         }
         break;
@@ -203,7 +220,7 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
         toggleFullscreen();
         break;
     }
-  }, [isFullscreen, showControls, toggleFullscreen]);
+  }, [getCurrentTime, isFullscreen, seekTo, showControls, toggleFullscreen]);
 
   useEffect(() => {
     document.addEventListener('keydown', handleKeyDown);
@@ -239,7 +256,7 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
     setIsScrubbing(false);
     if (playerRef.current) {
       const val = parseFloat(e.currentTarget.value);
-      playerRef.current.seekTo(val, 'fraction');
+      seekTo(val * duration);
     }
   };
 
@@ -279,12 +296,12 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
           if (containerRef.current && playerRef.current) {
             const { left, width } = containerRef.current.getBoundingClientRect();
             const clickX = e.clientX - left;
-            const current = playerRef.current.getCurrentTime() || 0;
+            const current = getCurrentTime();
             
             if (clickX < width / 2) {
-              playerRef.current.seekTo(Math.max(current - 10, 0), 'seconds');
+              seekTo(Math.max(current - 10, 0));
             } else {
-              playerRef.current.seekTo(current + 10, 'seconds');
+              seekTo(current + 10);
             }
             showControls();
           }
@@ -369,7 +386,7 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
         </div>
       ) : !hasError && (
         <Player
-          url={url}
+          src={processedUrl}
           playing={playing}
           muted={muted}
           volume={volume}
@@ -377,7 +394,7 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
           loop={loop}
           width="100%"
           height="100%"
-          playsinline={true}
+          playsInline={true}
           config={{
             youtube: {
               playerVars: {
@@ -407,13 +424,24 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
             }
             if (onReady) onReady();
           }}
-          onProgress={(state: any) => {
-            if (!isScrubbing) setPlayed(state.played);
-            setLoaded(state.loaded);
+          onTimeUpdate={(event: React.SyntheticEvent<HTMLVideoElement>) => {
+            const media = event.currentTarget;
+            if (!isScrubbing && media.duration) {
+              setPlayed(media.currentTime / media.duration);
+            }
           }}
-          onDuration={(d: number) => setDuration(d)}
-          onBuffer={() => setIsBuffering(true)}
-          onBufferEnd={() => setIsBuffering(false)}
+          onProgress={(event: React.SyntheticEvent<HTMLVideoElement>) => {
+            const media = event.currentTarget;
+            if (media.buffered.length && media.duration) {
+              const end = media.buffered.end(media.buffered.length - 1);
+              setLoaded(Math.min(end / media.duration, 1));
+            }
+          }}
+          onDurationChange={(event: React.SyntheticEvent<HTMLVideoElement>) => {
+            setDuration(event.currentTarget.duration || 0);
+          }}
+          onWaiting={() => setIsBuffering(true)}
+          onPlaying={() => setIsBuffering(false)}
           onError={() => setHasError(true)}
           ref={playerRef}
         />

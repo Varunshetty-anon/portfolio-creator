@@ -11,6 +11,7 @@ import { INITIAL_PORTFOLIO } from '@/types';
 import { Button } from '@/components/ui/Button';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { ShareModal } from '@/components/shared/ShareModal';
+import { toast } from '@/components/ui/ToastProvider';
 
 import ProfileSection from './sections/ProfileSection';
 import ProjectsSection from './sections/ProjectsSection';
@@ -115,8 +116,28 @@ export default function EditorLayout() {
     triggerAutoSave();
   };
 
+  const getPublishBlocker = () => {
+    const hasHeroMedia = Boolean(portfolio.showreelUrl || projects.some(project => project.videoUrl || project.imageUrl));
+    if (!hasHeroMedia) {
+      return 'Add a showreel or at least one project video before publishing.';
+    }
+
+    const incompleteProject = projects.find(project => !project.title?.trim() || (!project.videoUrl && !project.imageUrl));
+    if (incompleteProject) {
+      return 'Every listed project needs a title and media before publishing.';
+    }
+
+    return null;
+  };
+
   const handlePublish = async () => {
     try {
+      const blocker = getPublishBlocker();
+      if (blocker) {
+        toast.error(blocker);
+        return;
+      }
+
       setIsPublishing(true);
       if (hasUnsavedChanges) {
         if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -137,9 +158,11 @@ export default function EditorLayout() {
       }
       
       setPublishStatus('success');
+      toast.success('Portfolio published.');
       setTimeout(() => setPublishStatus('idle'), 3000);
     } catch (err) {
       console.error("Publish failed:", err);
+      toast.error('Publish failed. Try again after saving your changes.');
     } finally {
       setIsPublishing(false);
     }
