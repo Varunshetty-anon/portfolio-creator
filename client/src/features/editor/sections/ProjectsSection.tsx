@@ -1,6 +1,20 @@
 import React, { useState } from 'react';
-import { motion, Reorder, AnimatePresence } from 'framer-motion';
-import { Plus, GripVertical, Film } from 'lucide-react';
+import { AnimatePresence } from 'framer-motion';
+import { Plus, Film } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
 import type { PortfolioData, Project } from '@/types';
 import { INITIAL_PROJECT } from '@/types';
 import { Button } from '@/components/ui/Button';
@@ -18,6 +32,17 @@ interface ProjectsSectionProps {
 export default function ProjectsSection({ data, onChange, onAutoSave, projects, onChangeProjects }: ProjectsSectionProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   const handleAddProject = () => {
     const newId = `temp_${Date.now()}`;
@@ -53,10 +78,18 @@ export default function ProjectsSection({ data, onChange, onAutoSave, projects, 
     }
   };
 
-  const handleReorder = (reorderedProjects: Project[]) => {
-    const updated = reorderedProjects.map((p, index) => ({ ...p, order: index }));
-    onChangeProjects(updated);
-    onAutoSave();
+  const handleDragEnd = (event: any) => {
+    const { active, over } = event;
+
+    if (active.id !== over?.id) {
+      const oldIndex = projects.findIndex((p) => (p._id || p.id) === active.id);
+      const newIndex = projects.findIndex((p) => (p._id || p.id) === over.id);
+
+      const reordered = arrayMove(projects, oldIndex, newIndex);
+      const updated = reordered.map((p, index) => ({ ...p, order: index }));
+      onChangeProjects(updated);
+      onAutoSave();
+    }
   };
 
   return (
@@ -85,33 +118,34 @@ export default function ProjectsSection({ data, onChange, onAutoSave, projects, 
             </Button>
           </div>
         ) : (
-          <Reorder.Group 
-            axis="y" 
-            values={projects} 
-            onReorder={handleReorder}
-            className="space-y-3"
+          <DndContext 
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
           >
-            <AnimatePresence initial={false}>
-              {projects.map((project, index) => (
-                <Reorder.Item 
-                  key={project._id} 
-                  value={project}
-                  className="relative"
-                >
-                  <ProjectCardEditor
-                    project={project}
-                    index={index}
-                    isExpanded={expandedId === project._id}
-                    isDeleting={deletingId === project._id}
-                    onToggleExpand={() => setExpandedId(expandedId === project._id ? null : project._id!)}
-                    onChange={handleUpdateProject}
-                    onDelete={() => handleDeleteProject(project._id!)}
-                    onAutoSave={onAutoSave}
-                  />
-                </Reorder.Item>
-              ))}
-            </AnimatePresence>
-          </Reorder.Group>
+            <SortableContext 
+              items={projects.map(p => p._id || p.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="space-y-3">
+                <AnimatePresence initial={false}>
+                  {projects.map((project, index) => (
+                    <ProjectCardEditor
+                      key={project._id || project.id}
+                      project={project}
+                      index={index}
+                      isExpanded={expandedId === (project._id || project.id)}
+                      isDeleting={deletingId === (project._id || project.id)}
+                      onToggleExpand={() => setExpandedId(expandedId === (project._id || project.id) ? null : project._id!)}
+                      onChange={handleUpdateProject}
+                      onDelete={() => handleDeleteProject(project._id || project.id)}
+                      onAutoSave={onAutoSave}
+                    />
+                  ))}
+                </AnimatePresence>
+              </div>
+            </SortableContext>
+          </DndContext>
         )}
       </PanelSection>
     </Panel>

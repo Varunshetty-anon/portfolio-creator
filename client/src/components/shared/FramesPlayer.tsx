@@ -18,6 +18,7 @@ interface FramesPlayerProps {
   onClick?: () => void;
   onTheatreToggle?: () => void;
   isTheatre?: boolean;
+  onReady?: () => void;
 }
 
 const aspectClasses: Record<string, string> = {
@@ -39,6 +40,7 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
   onClick,
   onTheatreToggle,
   isTheatre = false,
+  onReady,
 }) => {
   const [playing, setPlaying] = useState(autoplay);
   const [muted, setMuted] = useState(() => {
@@ -69,6 +71,7 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const hideControlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastTapRef = useRef<{ time: number; clientX: number }>({ time: 0, clientX: 0 });
+  const hasAutoplayStarted = useRef(false);
 
   // Persist volume settings
   useEffect(() => {
@@ -210,6 +213,10 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
   // --- ACTIONS ---
   const handlePlayPause = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+    if (!isReady && !playing) {
+      hasAutoplayStarted.current = true;
+      return;
+    }
     setPlaying(p => !p);
   };
 
@@ -362,49 +369,53 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
         </div>
       ) : !hasError && (
         <Player
-          ref={playerRef}
-          url={processedUrl}
-          className="absolute inset-0 !w-full !h-full"
-          width="100%"
-          height="100%"
+          url={url}
           playing={playing}
           muted={muted}
           volume={volume}
+          controls={false}
           loop={loop}
-          playsInline
-          onReady={() => {
-            setIsReady(true);
-            if (playerRef.current) {
-              setDuration(playerRef.current.getDuration() || 0);
+          width="100%"
+          height="100%"
+          playsinline={true}
+          config={{
+            youtube: {
+              playerVars: {
+                controls: 0,
+                modestbranding: 1,
+                rel: 0,
+                showinfo: 0,
+                iv_load_policy: 3,
+                playsinline: 1,
+              }
+            },
+            vimeo: {
+              playerOptions: {
+                controls: false,
+                byline: false,
+                portrait: false,
+                title: false,
+                dnt: true,
+              }
             }
           }}
-          onStart={() => setIsBuffering(false)}
-          onBuffer={() => setIsBuffering(true)}
-          onBufferEnd={() => setIsBuffering(false)}
-          onError={(e: any) => {
-            console.error('FramesPlayer Error:', e);
-            setHasError(true);
-            setIsBuffering(false);
+          onReady={() => {
+            setIsReady(true);
+            if (hasAutoplayStarted.current) {
+              setPlaying(true);
+              hasAutoplayStarted.current = false;
+            }
+            if (onReady) onReady();
           }}
           onProgress={(state: any) => {
             if (!isScrubbing) setPlayed(state.played);
             setLoaded(state.loaded);
-            if (playerRef.current) {
-              const d = playerRef.current.getDuration();
-              if (d > 0 && d !== duration) setDuration(d);
-            }
           }}
-          config={{
-            youtube: {
-              playerVars: { controls: 0, modestbranding: 1, rel: 0, showinfo: 0, iv_load_policy: 3, fs: 0 }
-            },
-            vimeo: {
-              playerOptions: { controls: false, title: false, byline: false, portrait: false, background: true, dnt: true }
-            },
-            file: {
-              attributes: { controlsList: 'nodownload', disablePictureInPicture: true }
-            }
-          }}
+          onDuration={(d: number) => setDuration(d)}
+          onBuffer={() => setIsBuffering(true)}
+          onBufferEnd={() => setIsBuffering(false)}
+          onError={() => setHasError(true)}
+          ref={playerRef}
         />
       )}
 

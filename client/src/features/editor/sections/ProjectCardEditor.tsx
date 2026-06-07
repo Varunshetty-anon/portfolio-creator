@@ -12,6 +12,8 @@ import { Button } from '@/components/ui/Button';
 import { MediaManager } from '@/components/shared/MediaManager';
 import { PROJECT_CONTENT_TYPES, PROJECT_SUBJECT_MATTERS, EDITING_TOOLS_LIST, AI_TOOLS_LIST } from '@/lib/constants';
 import { getVideoMetadata, detectVideoSource } from '@/lib/media-utils';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 import { uploadApi } from '@/lib/api';
 
@@ -36,6 +38,15 @@ export default function ProjectCardEditor({
   onAutoSave,
   isDeleting = false
 }: ProjectCardEditorProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: project._id || project.id });
+
   const [isValidatingLink, setIsValidatingLink] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
   const [isDrivePrivate, setIsDrivePrivate] = useState<boolean>(false);
@@ -111,10 +122,19 @@ export default function ProjectCardEditor({
     }
   };
 
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 1 : 0,
+    position: isDragging ? 'relative' as const : undefined,
+  };
+
   return (
     <motion.div 
       layout
-      className="bg-[#111111] border border-white/[0.06] hover:border-white/10 rounded-xl overflow-hidden transition-colors"
+      ref={setNodeRef}
+      style={style}
+      className={`bg-[#111111] border border-white/[0.06] hover:border-white/10 rounded-xl overflow-hidden transition-colors ${isDragging ? 'shadow-2xl scale-[1.02] border-[#C0A36E]/50' : ''}`}
     >
       {/* ── Collapsed Header ── */}
       <div 
@@ -122,6 +142,8 @@ export default function ProjectCardEditor({
         onClick={onToggleExpand}
       >
         <div 
+          {...attributes}
+          {...listeners}
           className="p-2 mr-2 text-text-muted hover:text-text-primary cursor-grab active:cursor-grabbing transition-colors"
           onClick={(e) => e.stopPropagation()} // Prevent expand when dragging
         >
@@ -212,6 +234,28 @@ export default function ProjectCardEditor({
                     onUploadComplete={(url) => handleFieldChange('thumbnailUrl', url)}
                     onRemove={() => handleFieldChange('thumbnailUrl', '')}
                   />
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wider text-text-muted mb-2 block">ASPECT RATIO</label>
+                  <div className="flex bg-[#050505] border border-white/10 rounded-lg p-1">
+                    {['16:9', '9:16', '4:3', '1:1', '2.35:1'].map(ratio => {
+                      const isActive = (project.aspectRatio || '16:9') === ratio;
+                      return (
+                        <button
+                          key={ratio}
+                          onClick={() => handleFieldChange('aspectRatio', ratio)}
+                          className={`flex-1 py-1.5 text-xs font-mono transition-colors rounded-md border ${
+                            isActive 
+                              ? 'border-[#C0A36E] text-[#C0A36E] bg-[#C0A36E]/10' 
+                              : 'border-transparent text-white/40 hover:text-white/60 hover:bg-white/5'
+                          }`}
+                        >
+                          {ratio}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <div className="space-y-4 pt-2">

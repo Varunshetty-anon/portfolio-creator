@@ -69,11 +69,15 @@ export default function ProfileSection({ data, onChange }: ProfileSectionProps) 
 
       <PanelSection title="Showreel" description="Your main hero video">
         <Input
-          label="Showreel Video URL"
+          label="SHOWREEL VIDEO URL"
           placeholder="https://youtube.com/... or Vimeo link"
           value={data.showreelUrl || ''}
           onChange={(e) => handleInputChange('showreelUrl', e.target.value)}
         />
+        <p className="font-mono text-[10px] text-white/25 mt-1 leading-snug">
+          Paste a YouTube, Vimeo, or Cloudinary URL.
+          This appears as the first section of your portfolio.
+        </p>
         <div className="mt-4">
           <label className="block text-xs font-medium text-text-primary mb-2 uppercase tracking-wider">
             Custom Thumbnail
