@@ -66,7 +66,10 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({ project, allProjects
 
           {/* Modal Container */}
           <motion.div
-            layoutId={`card-${project._id || project.id}`}
+            initial={{ opacity: 0, scale: 0.97 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.97 }}
+            transition={{ duration: 0.3 }}
             className="relative z-10 w-[100vw] h-[100dvh] md:w-[95vw] md:h-[92vh] flex flex-col md:flex-row overflow-hidden"
             style={{
               background: 'rgba(12, 12, 14, 0.92)',

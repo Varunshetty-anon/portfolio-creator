@@ -20,13 +20,12 @@ export const IntroOverlay: React.FC<IntroOverlayProps> = ({ name, role, profileI
       setShouldRender(false);
       onComplete();
     } else {
-      sessionStorage.setItem('frames_intro_seen', 'true');
-      
       const exitTimer = setTimeout(() => {
         setIsExiting(true);
       }, 2800);
 
       const completeTimer = setTimeout(() => {
+        sessionStorage.setItem('frames_intro_seen', 'true');
         setShouldRender(false);
         onComplete();
       }, 3200);

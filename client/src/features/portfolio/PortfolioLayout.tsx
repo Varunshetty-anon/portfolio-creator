@@ -177,7 +177,25 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
             </div>
           </div>
         </section>
-
+        {/* About Section */}
+        <section className="px-6 md:px-14 py-20 border-t border-white/[0.06]">
+          <p className="font-mono text-[10px] tracking-[0.3em] uppercase text-white/25 mb-10">ABOUT</p>
+          <div className="flex items-start gap-8 md:gap-16">
+            {data.profileImageUrl && (
+              <img
+                src={data.profileImageUrl}
+                alt={data.name}
+                className="w-24 h-24 md:w-32 md:h-32 object-cover flex-shrink-0"
+                style={{ borderRadius: 0 }}
+              />
+            )}
+            <div>
+              <p className="text-white/60 text-base md:text-lg font-light leading-relaxed max-w-xl">
+                {data.bio}
+              </p>
+            </div>
+          </div>
+        </section>
         {/* Showreel Section */}
         {data.showreelUrl && (
           <section className="w-full mt-16 mb-24">
@@ -209,20 +227,11 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
                 const ratio = project.aspectRatio || '16:9';
                 let colSpan = 'col-span-12 md:col-span-8'; // default landscape
                 
-                if (ratio === '16:9' || ratio === '2.35:1') {
-                  colSpan = idx === 0 ? 'col-span-12' : 'col-span-12 md:col-span-8';
-                } else if (ratio === '4:3') {
-                  colSpan = 'col-span-6 md:col-span-6'; // Wait: mobile col-span-6
-                } else if (ratio === '1:1') {
-                  colSpan = 'col-span-6 md:col-span-4';
-                } else if (ratio === '9:16') {
-                  colSpan = 'col-span-6 md:col-span-3';
-                }
+                const isSparseGrid = projects.length <= 2;
 
-                // If mobile: all cards are col-span-6 except full-width
-                // Tailwind handles this with `col-span-6 md:col-span-X` but for landscape, mobile should be col-span-6?
-                // The prompt: "Mobile: all cards are col-span-6. Portrait cards col-span-6. Full-width stays col-span-12."
-                if (idx === 0 && (ratio === '16:9' || ratio === '2.35:1')) {
+                if (isSparseGrid) {
+                  colSpan = 'col-span-12';
+                } else if (idx === 0 && (ratio === '16:9' || ratio === '2.35:1')) {
                    colSpan = 'col-span-12';
                 } else {
                    // mobile is col-span-6 for everything else
@@ -391,7 +400,6 @@ const ProjectCard = ({ project, className, onClick }: { project: Project; classN
 
   return (
     <motion.div 
-      layoutId={`card-${project._id || project.id}`}
       onClick={onClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => { setIsHovered(false); setIsReady(false); }}
