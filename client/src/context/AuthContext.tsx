@@ -28,7 +28,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Check authentication status on mount
   const refreshUser = useCallback(async () => {
     try {
-      const response = await authApi.getMe() as { user: User };
+      const response = await authApi.getSession() as { user: User | null };
+      if (!response.user) {
+        setState({
+          user: null,
+          isAuthenticated: false,
+          isLoading: false,
+        });
+        return;
+      }
+
       setState({
         user: response.user,
         isAuthenticated: true,

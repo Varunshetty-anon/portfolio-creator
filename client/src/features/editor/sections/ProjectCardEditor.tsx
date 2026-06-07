@@ -113,6 +113,17 @@ export default function ProjectCardEditor({
     onChange({ ...latestProjectRef.current, [field]: value });
   };
 
+  const handleMediaUrlSave = (url: string) => {
+    const isImg = url.match(/\.(jpeg|jpg|gif|png|webp)$/i) != null;
+    const latest = latestProjectRef.current;
+
+    onChange({
+      ...latest,
+      videoUrl: isImg ? '' : url,
+      imageUrl: isImg ? url : '',
+    });
+  };
+
   const handleMultiSelect = (field: 'softwareUsed' | 'aiToolsUsed', value: string) => {
     const current = project[field] || [];
     if (current.includes(value)) {
@@ -194,12 +205,7 @@ export default function ProjectCardEditor({
                     type="project"
                     currentUrl={project.videoUrl || project.imageUrl}
                     allowUrlInput={true}
-                    onUrlSave={(url) => {
-                      const isImg = url.match(/\.(jpeg|jpg|gif|png|webp)$/i) != null;
-                      handleFieldChange(isImg ? 'imageUrl' : 'videoUrl', url);
-                      if (isImg) handleFieldChange('videoUrl', '');
-                      else handleFieldChange('imageUrl', '');
-                    }}
+                    onUrlSave={handleMediaUrlSave}
                     onUploadComplete={(url, thumb) => {
                       const isImg = url.match(/\.(jpeg|jpg|gif|png|webp)$/i) != null;
                       onChange({ 
