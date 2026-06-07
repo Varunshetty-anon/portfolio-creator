@@ -1,73 +1,47 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { getRoleIcons } from '@/lib/intro-icons';
 
 interface IntroOverlayProps {
   name: string;
   role: string;
-  profileImageUrl?: string;
   onComplete: () => void;
 }
 
-export const IntroOverlay: React.FC<IntroOverlayProps> = ({ name, role, profileImageUrl, onComplete }) => {
+export const IntroOverlay: React.FC<IntroOverlayProps> = ({ name, role, onComplete }) => {
+  const [alreadySeen] = useState(() => {
+    try { return sessionStorage.getItem('frames_intro_seen') === 'true'; }
+    catch { return false; }
+  });
+
   const [isExiting, setIsExiting] = useState(false);
-  const [shouldRender, setShouldRender] = useState(true);
 
-  // Check sessionStorage
   useEffect(() => {
-    const hasSeen = sessionStorage.getItem('frames_intro_seen');
-    if (hasSeen) {
-      setShouldRender(false);
+    if (alreadySeen) {
       onComplete();
-    } else {
-      const exitTimer = setTimeout(() => {
-        setIsExiting(true);
-      }, 2800);
-
-      const completeTimer = setTimeout(() => {
-        sessionStorage.setItem('frames_intro_seen', 'true');
-        setShouldRender(false);
-        onComplete();
-      }, 3200);
-
-      return () => {
-        clearTimeout(exitTimer);
-        clearTimeout(completeTimer);
-      };
+      return;
     }
-  }, [onComplete]);
 
-  // Generate deterministic random positions for icons around the edges
-  const icons = useMemo(() => {
-    const rawIcons = getRoleIcons(role);
-    // Duplicate icons to have exactly 8 for a nice circle effect if needed,
-    // or just use the returned ones
-    const activeIcons = rawIcons.length > 0 ? rawIcons : ['×', '×', '×', '×'];
-    
-    // Seeded pseudo-random so it doesn't jump on re-renders
-    const seededRandom = (seed: number) => {
-      const x = Math.sin(seed++) * 10000;
-      return x - Math.floor(x);
+    const exitTimer = setTimeout(() => {
+      setIsExiting(true);
+    }, 2400);
+
+    const completeTimer = setTimeout(() => {
+      try { sessionStorage.setItem('frames_intro_seen', 'true'); } catch {}
+      onComplete();
+    }, 2900);
+
+    return () => {
+      clearTimeout(exitTimer);
+      clearTimeout(completeTimer);
     };
+  }, [alreadySeen, onComplete]);
 
-    return activeIcons.map((icon, i) => {
-      // distribute angle
-      const angle = (i / activeIcons.length) * Math.PI * 2;
-      // random distance from center (but towards edges)
-      const dist = 40 + seededRandom(i) * 20; // 40vw to 60vw from center
-      const startX = Math.cos(angle) * dist;
-      const startY = Math.sin(angle) * dist;
+  if (alreadySeen) return null;
 
-      return {
-        id: i,
-        icon,
-        startX: `${startX}vw`,
-        startY: `${startY}vh`,
-      };
-    });
-  }, [role]);
-
-  if (!shouldRender) return null;
+  const pathTransition = {
+    duration: 0.55,
+    ease: "easeInOut",
+  };
 
   return (
     <AnimatePresence>
@@ -76,111 +50,67 @@ export const IntroOverlay: React.FC<IntroOverlayProps> = ({ name, role, profileI
           key="intro-overlay"
           initial={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.4 }}
-          className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center overflow-hidden"
+          transition={{ duration: 0.5 }}
+          className="fixed inset-0 z-[100] bg-[#050505] flex items-center justify-center flex-col gap-6"
         >
-          {/* Icons Converging */}
-          {icons.map((item, i) => {
-            const isSvg = item.icon.startsWith('<svg');
-            return (
-              <motion.div
-                key={item.id}
-                initial={{ opacity: 0, x: item.startX, y: item.startY, scale: 1 }}
-                animate={{
-                  opacity: [0, 0.3, 0.3, 0],
-                  x: [item.startX, item.startX, '0vw'],
-                  y: [item.startY, item.startY, '0vh'],
-                  scale: [1, 1, 0.3]
-                }}
-                transition={{
-                  times: [0, 0.1, 0.25, 0.43], // Mapping to 0, 320ms, 800ms, 1400ms out of 3200 total?
-                  // Better: explicitly set duration and delay
-                  // 0-800ms: drift slowly (x/y stay same but appear)
-                  // 800ms: converge
-                  // 1400ms: disappear
-                  duration: 1.4,
-                  ease: "easeInOut",
-                  delay: i * 0.08
-                }}
-                className="absolute text-white mix-blend-screen pointer-events-none w-6 h-6 flex items-center justify-center"
-              >
-                {isSvg ? (
-                  <div dangerouslySetInnerHTML={{ __html: item.icon }} />
-                ) : (
-                  <span className="text-sm font-mono">{item.icon}</span>
-                )}
-              </motion.div>
-            );
-          })}
+          {/* Viewfinder SVG */}
+          <div className="relative w-10 h-10 flex items-center justify-center text-white">
+            <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+              <motion.path 
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{ ...pathTransition, delay: 0 }}
+                d="M2 10V2H10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="square" strokeLinejoin="miter"
+              />
+              <motion.path 
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{ ...pathTransition, delay: 0.08 }}
+                d="M18 2H26V10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="square" strokeLinejoin="miter"
+              />
+              <motion.path 
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{ ...pathTransition, delay: 0.16 }}
+                d="M26 18V26H18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="square" strokeLinejoin="miter"
+              />
+              <motion.path 
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{ ...pathTransition, delay: 0.24 }}
+                d="M10 26H2V18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="square" strokeLinejoin="miter"
+              />
+            </svg>
+          </div>
 
-          {/* Gradient Burst */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0 }}
-            animate={{
-              opacity: [0, 0.8, 0],
-              scale: [0, 3]
-            }}
-            transition={{
-              duration: 0.4,
-              delay: 1.4, // Starts at 1400ms
-              ease: "easeOut"
-            }}
-            className="absolute w-64 h-64 pointer-events-none mix-blend-screen"
-            style={{
-              background: 'radial-gradient(circle, rgba(192,163,110,0.6), transparent)'
-            }}
-          />
+          <div className="flex flex-col items-center">
+            {/* Creator Name */}
+            <motion.h1
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{
+                duration: 0.6,
+                ease: [0.16, 1, 0.3, 1],
+                delay: 0.7
+              }}
+              className="font-display font-bold text-4xl md:text-5xl text-white tracking-tighter text-center"
+            >
+              {name}
+            </motion.h1>
 
-          {/* Profile Photo or Viewfinder */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.5 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{
-              type: "spring",
-              delay: 1.6, // Starts at 1600ms
-              duration: 0.4
-            }}
-            className="relative z-10 w-24 h-24 rounded-full border-[1.5px] border-white/20 overflow-hidden flex items-center justify-center bg-zinc-900/50 backdrop-blur-sm"
-          >
-            {profileImageUrl ? (
-              <img src={profileImageUrl} alt={name} className="w-full h-full object-cover" />
-            ) : (
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-white/40">
-                <path d="M4 8V4h4" />
-                <path d="M20 8V4h-4" />
-                <path d="M4 16v4h4" />
-                <path d="M20 16v4h-4" />
-              </svg>
-            )}
-          </motion.div>
-
-          {/* Creator Name */}
-          <motion.h1
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{
-              type: "spring",
-              damping: 20,
-              stiffness: 120,
-              delay: 2.0 // Starts at 2000ms
-            }}
-            className="font-display font-bold text-4xl text-white mt-6 z-10 text-center tracking-tight"
-          >
-            {name}
-          </motion.h1>
-
-          {/* Role Text */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{
-              duration: 0.3,
-              delay: 2.3 // Starts at 2300ms
-            }}
-            className="font-mono text-xs uppercase tracking-[0.25em] text-[#C0A36E] mt-3 z-10 text-center"
-          >
-            {role}
-          </motion.div>
+            {/* Role Text */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{
+                duration: 0.4,
+                delay: 1.0
+              }}
+              className="font-mono text-[11px] uppercase tracking-[0.25em] text-[#C0A36E] mt-3 text-center"
+            >
+              {role}
+            </motion.div>
+          </div>
 
         </motion.div>
       )}
