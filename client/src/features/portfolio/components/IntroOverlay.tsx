@@ -104,9 +104,12 @@ export const IntroOverlay: React.FC<IntroOverlayProps> = ({ name, role, profileI
                   delay: i * 0.08
                 }}
                 className="absolute text-white mix-blend-screen pointer-events-none w-6 h-6 flex items-center justify-center"
-                dangerouslySetInnerHTML={isSvg ? { __html: item.icon } : undefined}
               >
-                {!isSvg && <span className="text-sm font-mono">{item.icon}</span>}
+                {isSvg ? (
+                  <div dangerouslySetInnerHTML={{ __html: item.icon }} />
+                ) : (
+                  <span className="text-sm font-mono">{item.icon}</span>
+                )}
               </motion.div>
             );
           })}

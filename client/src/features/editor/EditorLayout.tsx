@@ -171,7 +171,6 @@ export default function EditorLayout() {
       <aside className="hidden md:flex w-64 border-r border-white/[0.06] bg-[#050505] flex-col py-6 z-20 shrink-0">
         <div className="mb-12 px-6 flex items-center gap-3">
           <Logo />
-          <span className="font-mono text-xs tracking-[0.2em] text-white">FRAMES</span>
         </div>
 
         <nav className="flex-1 w-full flex flex-col gap-2 px-2">
