@@ -5,6 +5,8 @@ import type { PortfolioData } from '@/types';
 import { Input, Textarea } from '@/components/ui/Input';
 import { MediaManager } from '@/components/shared/MediaManager';
 import { Panel, PanelSection, ControlRow } from '@/components/ui/EditorPanels';
+import { QRCodeCanvas } from 'qrcode.react';
+import { Copy, Check, ExternalLink } from 'lucide-react';
 
 interface ProfileSectionProps {
   data: PortfolioData;
@@ -13,6 +15,9 @@ interface ProfileSectionProps {
 
 export default function ProfileSection({ data, onChange }: ProfileSectionProps) {
   const [showSocials, setShowSocials] = useState(false);
+  const [copied, setCopied] = useState(false);
+  
+  const shareUrl = data.username ? `${window.location.origin}/portfolio/${data.username}` : '';
 
   const handleInputChange = (field: keyof PortfolioData, value: any) => {
     onChange({ ...data, [field]: value });
@@ -38,6 +43,45 @@ export default function ProfileSection({ data, onChange }: ProfileSectionProps) 
 
   return (
     <Panel>
+      {data.isPublished && data.username && (
+        <PanelSection title="Share" description="Direct link & QR">
+          <div className="flex gap-5 items-center bg-[#0a0a0c] p-4 border border-white/10 rounded-lg">
+            <div className="p-2 bg-white/5 border border-white/10 shrink-0">
+              <QRCodeCanvas 
+                value={shareUrl}
+                size={70}
+                bgColor={"transparent"}
+                fgColor={"#F2F0EC"}
+                level={"H"}
+              />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-mono text-[10px] text-white/50 truncate mb-3 select-all">{shareUrl}</div>
+              <div className="flex gap-2">
+                <button 
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(shareUrl);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  }} 
+                  className="px-3 py-1.5 bg-white/10 hover:bg-white/20 transition-colors font-mono text-[9px] uppercase tracking-widest text-white flex items-center gap-2"
+                >
+                  {copied ? <Check size={12} /> : <Copy size={12} />} {copied ? 'Copied' : 'Copy'}
+                </button>
+                <a 
+                  href={`/portfolio/${data.username}`} 
+                  target="_blank" 
+                  rel="noreferrer" 
+                  className="px-3 py-1.5 border border-white/20 hover:border-white/40 transition-colors font-mono text-[9px] uppercase tracking-widest text-white flex items-center gap-2"
+                >
+                  <ExternalLink size={12} /> View
+                </a>
+              </div>
+            </div>
+          </div>
+        </PanelSection>
+      )}
+
       <PanelSection title="Identity" description="Your core details">
         <MediaManager
           type="profile"

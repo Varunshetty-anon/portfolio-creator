@@ -41,6 +41,7 @@ export default function EditorLayout() {
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishStatus, setPublishStatus] = useState<'idle' | 'success'>('idle');
   const [showShareModal, setShowShareModal] = useState(false);
+  const [previewDevice, setPreviewDevice] = useState<'desktop' | 'mobile'>('desktop');
 
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestDataRef = useRef<{ portfolio: PortfolioData; projects: Project[] }>({ portfolio: INITIAL_PORTFOLIO, projects: [] });
@@ -188,7 +189,24 @@ export default function EditorLayout() {
   ] as const;
 
   return (
-    <div className="flex h-screen bg-[#080808] text-text-primary font-body overflow-hidden">
+    <>
+    <div className="md:hidden flex h-[100dvh] bg-[#050505] text-white flex-col items-center justify-center p-8 text-center border-t-4 border-[#C0A36E]">
+      <Logo />
+      <h2 className="mt-10 text-xl font-bold font-display uppercase tracking-widest mb-3 text-white/90">Desktop Required</h2>
+      <p className="text-white/40 text-sm max-w-xs leading-relaxed mb-8">
+        The Studio Editor is designed for larger screens. Please use a desktop browser to create and manage your portfolio.
+      </p>
+      {portfolio.isPublished && portfolio.username && (
+        <a 
+          href={`/portfolio/${portfolio.username}`}
+          className="px-6 py-3 bg-white/5 border border-white/10 hover:bg-white/10 transition-colors font-mono text-[10px] uppercase tracking-widest text-white/80"
+        >
+          View Live Portfolio
+        </a>
+      )}
+    </div>
+
+    <div className="hidden md:flex h-screen bg-[#080808] text-text-primary font-body overflow-hidden">
       
       {/* ── Left Sidebar (Navigation) ── */}
       <aside className="hidden md:flex w-64 border-r border-white/[0.06] bg-[#050505] flex-col py-6 z-20 shrink-0">
@@ -245,25 +263,6 @@ export default function EditorLayout() {
         </div>
       </aside>
 
-      {/* Mobile Sidebar Toggle (Fallback) */}
-      <aside className="md:hidden w-16 border-r border-white/[0.06] bg-[#050505] flex flex-col items-center py-4 z-20 shrink-0">
-        <div className="mb-8"><Logo /></div>
-        <nav className="flex-1 w-full flex flex-col gap-3 px-3">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => { setActiveTab(tab.id as TabType); setIsRightSidebarOpen(true); }}
-                className={`relative flex items-center justify-center w-full aspect-square rounded-xl transition-all group ${isActive ? 'text-white bg-white/5' : 'text-text-subtle'}`}
-              >
-                <Icon size={20} className={isActive ? 'text-accent' : ''} />
-              </button>
-            );
-          })}
-        </nav>
-      </aside>
       {/* ── Main Canvas (Live Preview) ── */}
       <main className="flex-1 relative bg-bg-raised flex flex-col min-w-0">
         {/* Floating Top Header */}
@@ -278,6 +277,12 @@ export default function EditorLayout() {
             ) : (
               <span className="font-mono text-[10px] tracking-widest text-text-subtle">✓ SAVED</span>
             )}
+          </div>
+
+          {/* Device Toggle */}
+          <div className="pointer-events-auto flex items-center bg-black/40 backdrop-blur-md rounded-full border border-white/10 p-1">
+            <button onClick={() => setPreviewDevice('desktop')} className={`px-4 py-1.5 rounded-full text-[9px] font-mono tracking-[0.2em] uppercase transition-colors ${previewDevice === 'desktop' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white'}`}>Desktop</button>
+            <button onClick={() => setPreviewDevice('mobile')} className={`px-4 py-1.5 rounded-full text-[9px] font-mono tracking-[0.2em] uppercase transition-colors ${previewDevice === 'mobile' ? 'bg-white/10 text-white shadow-sm' : 'text-white/40 hover:text-white'}`}>Mobile</button>
           </div>
 
           {/* Actions */}
@@ -301,12 +306,20 @@ export default function EditorLayout() {
         </header>
 
         {/* The Live Portfolio Canvas */}
-        <div className="w-full h-full overflow-hidden border-x border-border/50">
-          <div className="w-full h-full overflow-y-auto scrollbar-hide">
-            <PortfolioLayout 
-              isPreviewMode 
-              draftData={{ ...portfolio, projects }} 
-            />
+        <div className="w-full h-full flex items-center justify-center p-4 pt-16 pb-6 bg-[#050505]">
+          <div 
+            className={`transition-all duration-500 ease-in-out bg-[#050505] overflow-hidden ${
+              previewDevice === 'mobile' 
+                ? 'w-[375px] h-[812px] max-h-full rounded-[2.5rem] border-[8px] border-[#1a1a1a] shadow-[0_0_50px_rgba(0,0,0,0.5)] relative'
+                : 'w-full h-full border border-border/50 rounded-lg'
+            }`}
+          >
+            <div className="w-full h-full overflow-y-auto scrollbar-hide">
+              <PortfolioLayout 
+                isPreviewMode 
+                draftData={{ ...portfolio, projects }} 
+              />
+            </div>
           </div>
         </div>
       </main>
@@ -366,7 +379,7 @@ export default function EditorLayout() {
         )}
       </AnimatePresence>
 
-      {/* Share Modal */}
+      {/* Share Modal - Still kept around just in case, but mostly moved to sidebar */}
       {portfolio.username && (
         <ShareModal 
           isOpen={showShareModal} 
@@ -375,5 +388,6 @@ export default function EditorLayout() {
         />
       )}
     </div>
+    </>
   );
 }

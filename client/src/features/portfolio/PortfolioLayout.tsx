@@ -85,16 +85,15 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
     <div className="min-h-screen bg-[#050505] text-white selection:bg-white/20">
       {!introComplete && !isPreviewMode && (
         <IntroOverlay
-          name={data.name || 'Creative'}
-          role={data.role || 'Portfolio'}
-          profileImage={data.profileImageUrl}
+          data={data}
+          heroProject={heroProject}
           onComplete={() => setIntroComplete(true)}
         />
       )}
 
       {/* FIXED NAVBAR */}
       <nav 
-        className={`fixed top-0 left-0 right-0 z-40 h-[52px] flex items-center justify-between px-6 md:px-10 transition-all duration-300 ${
+        className={`${isPreviewMode ? 'absolute' : 'fixed'} top-0 left-0 right-0 w-full z-40 h-[52px] flex items-center justify-between px-6 md:px-10 transition-all duration-300 ${
           scrolled ? 'bg-black/80 backdrop-blur-md border-b border-white/[0.06]' : 'bg-transparent border-transparent'
         }`}
       >
@@ -129,6 +128,16 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
         <div className={`w-full max-w-[1600px] mx-auto flex flex-col xl:flex-row gap-12 xl:gap-20 items-center ${heroProject ? 'justify-between' : 'justify-center text-center'}`}>
           
           <div className={`flex-1 w-full max-w-3xl shrink-0 flex flex-col ${!heroProject ? 'items-center' : ''}`}>
+            {data.profileImageUrl && (
+              <div className="mb-6 relative">
+                <img 
+                  src={data.profileImageUrl} 
+                  alt={data.name} 
+                  className="w-[80px] h-[80px] rounded-full object-cover relative z-10"
+                  style={{ border: '1px solid rgba(255,255,255,0.15)', boxShadow: '0 0 40px rgba(192,163,110,0.15)' }}
+                />
+              </div>
+            )}
             <div className="font-mono text-xs uppercase tracking-[0.22em] text-[#C0A36E] mb-4">
               {data.role}
             </div>
@@ -199,14 +208,17 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
         {/* Scroll Down Indicator */}
         <div 
           className="absolute pointer-events-none"
-          style={{ bottom: '32px', left: '50%', transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}
+          style={{ bottom: '32px', left: '50%', transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}
         >
-          <span className="font-mono text-[9px] tracking-[0.25em] uppercase text-white/25">SCROLL TO EXPLORE</span>
+          <span className="font-mono text-[9px] tracking-[0.3em] uppercase text-white/30">EXPLORE</span>
           <motion.div
-            animate={{ y: [0, 6, 0] }}
-            transition={{ duration: 1.5, ease: "easeInOut", repeat: Infinity }}
+            className="w-[26px] h-[40px] border border-white/20 rounded-full flex justify-center pt-[6px]"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C0A36E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            <motion.div 
+              animate={{ y: [0, 16, 0], opacity: [0.4, 1, 0.4] }}
+              transition={{ duration: 1.5, ease: "easeInOut", repeat: Infinity }}
+              className="w-1 h-2 bg-[#C0A36E] rounded-full shadow-[0_0_8px_rgba(192,163,110,0.6)]"
+            />
           </motion.div>
         </div>
       </section>

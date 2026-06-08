@@ -1,16 +1,16 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import type { PortfolioData, Project } from '@/types';
 
 interface IntroOverlayProps {
-  name: string;
-  role: string;
-  profileImage?: string;
+  data: PortfolioData;
+  heroProject: Project | null;
   onComplete: () => void;
 }
 
 type Phase = 'hidden' | 'elements' | 'pulling' | 'spinning' | 'reveal' | 'exit';
 
-export const IntroOverlay: React.FC<IntroOverlayProps> = ({ name, role, profileImage, onComplete }) => {
+export const IntroOverlay: React.FC<IntroOverlayProps> = ({ data, heroProject, onComplete }) => {
   const [alreadySeen] = useState(() => {
     try { return sessionStorage.getItem('frames_intro_seen') === 'true'; }
     catch { return false; }
@@ -42,7 +42,7 @@ export const IntroOverlay: React.FC<IntroOverlayProps> = ({ name, role, profileI
 
   const elements = useMemo(() => {
     const getRoleElements = (r: string) => {
-      const lower = r.toLowerCase();
+      const lower = (r || '').toLowerCase();
       if (lower.includes('video') || lower.includes('editor')) {
         return ['Timeline bar', 'Scissors ✂', 'Play ▶', 'Film 🎬', 'Color wheel circle', 'Waveform squiggle'];
       }
@@ -61,17 +61,15 @@ export const IntroOverlay: React.FC<IntroOverlayProps> = ({ name, role, profileI
       return ['Corner Top Left', 'Corner Top Right', 'Corner Bottom Left', 'Corner Bottom Right'];
     };
 
-    const roleElems = getRoleElements(role);
+    const roleElems = getRoleElements(data.role || '');
     return roleElems.map((name, i) => {
-      // Seeded random positions near edges
       const angle = (i / roleElems.length) * Math.PI * 2;
-      const radius = 35 + Math.random() * 10; // 35-45% of viewport
+      const radius = 35 + Math.random() * 10;
       const top = 50 + Math.sin(angle) * radius;
       const left = 50 + Math.cos(angle) * radius;
-      
       return { id: i, label: name, top: `${top}%`, left: `${left}%` };
     });
-  }, [role]);
+  }, [data.role]);
 
   if (alreadySeen) return null;
 
@@ -87,15 +85,15 @@ export const IntroOverlay: React.FC<IntroOverlayProps> = ({ name, role, profileI
         >
           {/* PHASE 1 & 2: Floating Elements */}
           {(phase === 'elements' || phase === 'pulling') && (
-            <div className="absolute inset-0">
+            <div className="absolute inset-0 z-0">
               {elements.map((el, i) => (
                 <motion.div
                   key={el.id}
                   initial={{ opacity: 0, scale: 0.5, top: el.top, left: el.left, x: '-50%', y: '-50%' }}
                   animate={
                     phase === 'pulling'
-                      ? { top: '50%', left: '50%', scale: 0, opacity: 0 }
-                      : { opacity: 0.6, scale: 1, y: ['-50%', '-60%', '-40%', '-50%'] }
+                      ? { scale: 0, opacity: 0 }
+                      : { opacity: 0.4, scale: 1, y: ['-50%', '-60%', '-40%', '-50%'] }
                   }
                   transition={
                     phase === 'pulling'
@@ -108,7 +106,6 @@ export const IntroOverlay: React.FC<IntroOverlayProps> = ({ name, role, profileI
                   }
                   className="absolute text-white font-mono text-[10px]"
                 >
-                  {/* Generic SVG representation for the element names to keep it simple, or text if needed. Using text for now as small SVGs would take a lot of code, and user just gave descriptions. Oh wait, user said "Each element is a small SVG icon (20-24px), white...". I will use some generic geometry. */}
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                     {el.label.includes('Timeline') && <path d="M4 12h16m-12-4v8m8-8v8"/>}
                     {el.label.includes('Scissors') && <path d="M6 6l12 12m0-12L6 18M4 4a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm0 12a2 2 0 1 0 0 4 2 2 0 0 0 0-4z"/>}
@@ -135,80 +132,95 @@ export const IntroOverlay: React.FC<IntroOverlayProps> = ({ name, role, profileI
             </div>
           )}
 
-          {/* PHASE 2 & 3: Glowing Orb & Spinning */}
-          {(phase === 'pulling' || phase === 'spinning') && (
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={
-                phase === 'spinning' 
-                  ? { scale: 0.1, rotate: 1440 } 
-                  : { scale: 1, rotate: 360 }
-              }
-              transition={
-                phase === 'spinning'
-                  ? { duration: 0.8, ease: "easeIn" }
-                  : { scale: { duration: 0.3 }, rotate: { duration: 2, ease: "linear" } }
-              }
-              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full"
-              style={{
-                width: '60px',
-                height: '60px',
-                background: 'radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(200,163,100,0.8) 40%, rgba(192,163,110,0.3) 70%, transparent 100%)',
-                boxShadow: '0 0 40px 20px rgba(192,163,110,0.4), 0 0 80px 40px rgba(192,163,110,0.15)'
-              }}
-            />
-          )}
+          {/* EXACT Layout Replication for perfect alignment with PortfolioLayout */}
+          <section className="relative min-h-[100dvh] w-full flex flex-col items-center justify-center px-6 pt-24 pb-12 md:px-14 z-10 pointer-events-none">
+            <div className={`w-full max-w-[1600px] mx-auto flex flex-col xl:flex-row gap-12 xl:gap-20 items-center ${heroProject ? 'justify-between' : 'justify-center text-center'}`}>
+              
+              <div className={`flex-1 w-full max-w-3xl shrink-0 flex flex-col ${!heroProject ? 'items-center' : ''}`}>
+                
+                {/* Profile Pic / Glowing Orb Slot */}
+                <div className="mb-6 relative w-[80px] h-[80px] flex items-center justify-center">
+                  {(phase === 'pulling' || phase === 'spinning' || phase === 'reveal') && (
+                    <motion.div
+                      initial={{ scale: 0, opacity: 0 }}
+                      animate={
+                        phase === 'reveal' 
+                          ? { scale: 1, opacity: data.profileImageUrl ? 0 : 1 } 
+                          : phase === 'spinning' 
+                            ? { scale: [1, 1.05, 1], opacity: 1, rotate: 360 } 
+                            : { scale: 1, opacity: 1, rotate: 180 }
+                      }
+                      transition={
+                        phase === 'reveal'
+                          ? { duration: 0.5 }
+                          : phase === 'spinning'
+                            ? { scale: { duration: 2, repeat: Infinity, ease: "easeInOut" }, rotate: { duration: 4, ease: "linear", repeat: Infinity }, opacity: { duration: 0.4 } }
+                            : { duration: 0.8, ease: "easeOut" }
+                      }
+                      className="absolute rounded-full"
+                      style={{
+                        width: '80px',
+                        height: '80px',
+                        background: 'radial-gradient(circle at 35% 35%, rgba(255,255,255,1) 0%, rgba(220,190,130,0.85) 45%, rgba(150,120,70,0.4) 80%, transparent 100%)',
+                        filter: 'blur(3px)',
+                        mixBlendMode: 'screen',
+                        boxShadow: '0 0 40px 10px rgba(192,163,110,0.4), inset 0 0 15px rgba(255,255,255,0.9)'
+                      }}
+                    />
+                  )}
 
-          {/* PHASE 4: Reveal */}
-          {phase === 'reveal' && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              {profileImage ? (
-                <motion.img
-                  initial={{ scale: 0.1 }}
-                  animate={{ scale: 1 }}
-                  transition={{ duration: 0.4, type: "spring", stiffness: 200, damping: 20 }}
-                  src={profileImage}
-                  alt={name}
-                  className="w-[80px] h-[80px] rounded-full object-cover mb-4"
-                  style={{ border: '1.5px solid rgba(255,255,255,0.25)', boxShadow: '0 0 30px rgba(192,163,110,0.3)' }}
-                />
-              ) : (
-                <motion.div
-                  initial={{ scale: 0.1 }}
-                  animate={{ scale: 1 }}
-                  transition={{ duration: 0.4, type: "spring", stiffness: 200, damping: 20 }}
-                  className="w-[40px] h-[40px] mb-4 text-white"
+                  {/* Profile Image Reveal */}
+                  {phase === 'reveal' && data.profileImageUrl && (
+                    <motion.img
+                      initial={{ scale: 0.8, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                      src={data.profileImageUrl}
+                      alt={data.name}
+                      className="absolute inset-0 w-full h-full rounded-full object-cover z-10"
+                      style={{ border: '1px solid rgba(255,255,255,0.15)', boxShadow: '0 0 40px rgba(192,163,110,0.15)' }}
+                    />
+                  )}
+                </div>
+
+                <div className="font-mono text-xs uppercase tracking-[0.22em] text-[#C0A36E] mb-4 h-[16px]">
+                  {phase === 'reveal' ? (
+                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.1 }}>
+                      {data.role || 'Portfolio'}
+                    </motion.div>
+                  ) : <div className="opacity-0">{data.role || 'Portfolio'}</div>}
+                </div>
+                
+                <h1 
+                  className="font-display font-black uppercase tracking-tighter text-white leading-[0.9] mb-8"
+                  style={{ fontSize: 'clamp(48px, 8vw, 110px)' }}
                 >
-                  <svg viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-                    <path d="M2 10V2H10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="square" />
-                    <path d="M18 2H26V10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="square" />
-                    <path d="M26 18V26H18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="square" />
-                    <path d="M10 26H2V18" stroke="currentColor" strokeWidth="1.5" strokeLinecap="square" />
-                  </svg>
-                </motion.div>
+                  {phase === 'reveal' ? (
+                    <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.2 }}>
+                      {data.name || 'Creative'}
+                    </motion.div>
+                  ) : <div className="opacity-0">{data.name || 'Creative'}</div>}
+                </h1>
+                
+                <p className={`max-w-md font-light text-base md:text-lg text-white/50 leading-[1.7] mb-8 opacity-0 ${!heroProject ? 'mx-auto' : ''}`}>
+                  {data.bio || 'Invisible spacer'}
+                </p>
+                
+                <div className={`flex flex-col gap-3 opacity-0 ${!heroProject ? 'items-center' : ''}`}>
+                  {data.location && <div className="font-mono text-xs text-white/30 uppercase">{data.location}</div>}
+                  {data.availability?.status && <div className="inline-flex items-center gap-2 bg-white/5 px-3 py-1.5 border border-white/10 rounded-full h-[26px]"></div>}
+                </div>
+              </div>
+
+              {heroProject && (
+                <div className="w-full xl:w-[55%] shrink-0 opacity-0 pointer-events-none">
+                  <div className="w-full aspect-video relative rounded-xl" />
+                </div>
               )}
-
-              <motion.h1
-                initial={{ y: -20, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.2, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-                className="font-display font-bold text-white tracking-tighter text-center"
-                style={{ fontSize: 'clamp(28px, 4vw, 48px)' }}
-              >
-                {name}
-              </motion.h1>
-
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5, duration: 0.4 }}
-                className="font-mono uppercase tracking-[0.25em] text-[#C0A36E] mt-2 text-center"
-                style={{ fontSize: 'clamp(11px, 1.2vw, 14px)' }}
-              >
-                {role}
-              </motion.div>
+              
             </div>
-          )}
+          </section>
+
         </motion.div>
       )}
     </AnimatePresence>
