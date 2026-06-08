@@ -16,8 +16,7 @@ interface ProfileSectionProps {
 export default function ProfileSection({ data, onChange }: ProfileSectionProps) {
   const [showSocials, setShowSocials] = useState(false);
   const [copied, setCopied] = useState(false);
-  
-  const shareUrl = data.username ? `${window.location.origin}/portfolio/${data.username}` : '';
+  const shareUrl = data.username ? `${window.location.origin}/${data.username}` : '';
 
   const handleInputChange = (field: keyof PortfolioData, value: any) => {
     onChange({ ...data, [field]: value });

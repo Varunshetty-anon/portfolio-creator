@@ -97,15 +97,6 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
           scrolled ? 'bg-black/80 backdrop-blur-md border-b border-white/[0.06]' : 'bg-transparent border-transparent'
         }`}
       >
-        <div className="flex items-center gap-2">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-white/40">
-            <path d="M4 8V4h4" />
-            <path d="M20 8V4h-4" />
-            <path d="M4 16v4h4" />
-            <path d="M20 16v4h-4" />
-          </svg>
-          <span className="font-mono text-[11px] tracking-[0.2em] text-white/40">FRAMES</span>
-        </div>
         <div className="flex items-center">
           <span className="font-mono text-xs text-white/50 mr-4">{data.name}</span>
           <div className="flex items-center gap-3">
@@ -289,15 +280,18 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
 
       {/* SKILLS SECTION */}
       {data.tools && data.tools.length > 0 && (
-        <section className="w-full px-6 py-16 md:px-14 md:py-16 border-t border-white/[0.06] mt-16 max-w-[1600px] mx-auto">
-          <div className="font-mono text-[10px] tracking-[0.3em] uppercase text-white/25 mb-8">
-            SKILLS
+        <section className="w-full px-6 py-16 md:px-14 md:py-20 border-t border-white/[0.06] mt-16 max-w-[1600px] mx-auto overflow-hidden">
+          <div className="font-mono text-[10px] tracking-[0.3em] uppercase text-white/25 mb-10 text-center">
+            SPECIALIZED IN
           </div>
-          <div className="flex flex-wrap gap-[10px]">
+          <div className="flex flex-wrap justify-center gap-3 max-w-4xl mx-auto">
             {data.tools.map(tool => (
-              <div key={tool} className="border border-white/10 hover:border-white/25 transition-colors duration-200 px-3 py-2 flex items-center gap-2">
-                <ToolIcon name={tool} size={14} className="opacity-50" />
-                <span className="font-mono text-xs text-white/50">{tool}</span>
+              <div 
+                key={tool} 
+                className="group relative bg-[#0a0a0c] border border-white/10 hover:border-white/30 transition-all duration-300 rounded-full px-6 py-3 flex items-center gap-3 shadow-[0_0_20px_rgba(0,0,0,0.5)] hover:shadow-[0_0_20px_rgba(255,255,255,0.05)]"
+              >
+                <ToolIcon name={tool} size={16} className="text-[#C0A36E] group-hover:text-[#F5E6C8] transition-colors duration-300" />
+                <span className="font-mono text-xs tracking-widest text-white/50 group-hover:text-white transition-colors uppercase">{tool}</span>
               </div>
             ))}
           </div>
@@ -316,9 +310,6 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
         >
           LET'S TALK
         </h2>
-        <div className="text-center font-mono text-[9px] tracking-[0.18em] uppercase text-white/12 pt-12">
-          BUILT WITH FRAMES
-        </div>
       </section>
 
       {/* CONTACT DRAWER */}
