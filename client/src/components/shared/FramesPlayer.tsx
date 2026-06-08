@@ -369,13 +369,31 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
       {/* React Player Core or GDrive Iframe */}
       {!hasError && gdriveId ? (
         <div className="absolute inset-0 w-full h-full z-10 bg-black pointer-events-auto">
-          <iframe
-            src={`https://drive.google.com/file/d/${gdriveId}/preview`}
-            className="absolute inset-0 w-full h-full border-0 relative z-50"
-            style={{ pointerEvents: 'auto' }}
-            allow="autoplay; fullscreen"
-            onLoad={() => { setIsReady(true); setIsBuffering(false); }}
-          />
+          {typeof window !== 'undefined' && window.innerWidth < 768 ? (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#070707] z-50">
+               <div className="w-16 h-16 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white mb-6">
+                 <Play className="w-6 h-6 fill-current ml-1 opacity-70" />
+               </div>
+               <a 
+                 href={`https://drive.google.com/file/d/${gdriveId}/view`} 
+                 target="_blank" 
+                 rel="noreferrer"
+                 className="font-mono text-xs text-[#C0A36E] border border-[#C0A36E]/30 px-5 py-2.5 rounded hover:bg-[#C0A36E]/10 transition-colors uppercase tracking-[0.2em]"
+                 onClick={(e) => e.stopPropagation()}
+               >
+                 Open Video
+               </a>
+               <span className="text-[10px] text-white/30 font-mono mt-4 uppercase tracking-widest max-w-[200px] text-center leading-relaxed">Browser Preview Blocked.<br/>Open in Drive app.</span>
+            </div>
+          ) : (
+            <iframe
+              src={`https://drive.google.com/file/d/${gdriveId}/preview`}
+              className="absolute inset-0 w-full h-full border-0 relative z-50"
+              style={{ pointerEvents: 'auto' }}
+              allow="autoplay; fullscreen"
+              onLoad={() => { setIsReady(true); setIsBuffering(false); }}
+            />
+          )}
         </div>
       ) : !hasError && (
         <Player

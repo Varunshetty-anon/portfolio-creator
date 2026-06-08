@@ -118,18 +118,18 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
       <section className="relative min-h-[100dvh] flex flex-col items-center justify-center px-6 pt-24 pb-12 md:px-14">
         <div className={`w-full max-w-[1600px] mx-auto flex flex-col xl:flex-row gap-12 xl:gap-20 items-center ${heroProject ? 'justify-between' : 'justify-center text-center'}`}>
           
-          <div className={`flex-1 w-full max-w-3xl shrink-0 flex flex-col ${!heroProject ? 'items-center' : ''}`}>
+          <div className={`flex-1 w-full max-w-3xl shrink-0 flex flex-col ${!heroProject ? 'items-center text-center' : 'items-center text-center xl:items-start xl:text-left'}`}>
             {data.profileImageUrl && (
-              <div className="mb-6 relative">
+              <div className="mb-6 md:mb-8 relative">
                 <img 
                   src={data.profileImageUrl} 
                   alt={data.name} 
-                  className="w-[80px] h-[80px] rounded-full object-cover relative z-10"
+                  className="w-[120px] h-[120px] md:w-[150px] md:h-[150px] rounded-full object-cover relative z-10"
                   style={{ border: '1px solid rgba(255,255,255,0.15)', boxShadow: '0 0 40px rgba(192,163,110,0.15)' }}
                 />
               </div>
             )}
-            <div className="font-mono text-xs uppercase tracking-[0.22em] text-[#C0A36E] mb-4">
+            <div className="font-mono text-sm md:text-base uppercase tracking-[0.25em] text-[#C0A36E] mb-4 md:mb-6">
               {data.role}
             </div>
             <h1 
@@ -138,7 +138,7 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
             >
               {data.name}
             </h1>
-            <p className={`max-w-md font-light text-base md:text-lg text-white/50 leading-[1.7] mb-8 ${!heroProject ? 'mx-auto' : ''}`}>
+            <p className={`max-w-md font-light text-base md:text-lg text-white/50 leading-[1.7] mb-8 ${!heroProject ? 'mx-auto' : 'mx-auto xl:mx-0'}`}>
               {data.bio}
             </p>
             

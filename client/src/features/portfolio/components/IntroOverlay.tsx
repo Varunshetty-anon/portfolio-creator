@@ -136,10 +136,10 @@ export const IntroOverlay: React.FC<IntroOverlayProps> = ({ data, heroProject, o
           <section className="relative min-h-[100dvh] w-full flex flex-col items-center justify-center px-6 pt-24 pb-12 md:px-14 z-10 pointer-events-none">
             <div className={`w-full max-w-[1600px] mx-auto flex flex-col xl:flex-row gap-12 xl:gap-20 items-center ${heroProject ? 'justify-between' : 'justify-center text-center'}`}>
               
-              <div className={`flex-1 w-full max-w-3xl shrink-0 flex flex-col ${!heroProject ? 'items-center' : ''}`}>
+              <div className={`flex-1 w-full max-w-3xl shrink-0 flex flex-col ${!heroProject ? 'items-center text-center' : 'items-center text-center xl:items-start xl:text-left'}`}>
                 
                 {/* Profile Pic / Glowing Orb Slot */}
-                <div className="mb-6 relative w-[80px] h-[80px] flex items-center justify-center">
+                <div className="mb-6 md:mb-8 relative w-[120px] h-[120px] md:w-[150px] md:h-[150px] flex items-center justify-center">
                   {(phase === 'pulling' || phase === 'spinning' || phase === 'reveal') && (
                     <motion.div
                       initial={{ scale: 0, opacity: 0 }}
@@ -157,10 +157,8 @@ export const IntroOverlay: React.FC<IntroOverlayProps> = ({ data, heroProject, o
                             ? { scale: { duration: 2, repeat: Infinity, ease: "easeInOut" }, rotate: { duration: 4, ease: "linear", repeat: Infinity }, opacity: { duration: 0.4 } }
                             : { duration: 0.8, ease: "easeOut" }
                       }
-                      className="absolute rounded-full"
+                      className="absolute rounded-full w-full h-full"
                       style={{
-                        width: '80px',
-                        height: '80px',
                         background: 'radial-gradient(circle at 35% 35%, #FFFFFF 0%, #F5E6C8 25%, #C0A36E 60%, transparent 90%)',
                         filter: 'blur(2px) drop-shadow(0 0 25px rgba(255,255,255,0.7))',
                         mixBlendMode: 'screen',
@@ -183,7 +181,7 @@ export const IntroOverlay: React.FC<IntroOverlayProps> = ({ data, heroProject, o
                   )}
                 </div>
 
-                <div className="font-mono text-xs uppercase tracking-[0.22em] text-[#C0A36E] mb-4 h-[16px]">
+                <div className="font-mono text-sm md:text-base uppercase tracking-[0.25em] text-[#C0A36E] mb-4 md:mb-6 h-[20px] md:h-[24px]">
                   {phase === 'reveal' ? (
                     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.1 }}>
                       {data.role || 'Portfolio'}
@@ -202,7 +200,7 @@ export const IntroOverlay: React.FC<IntroOverlayProps> = ({ data, heroProject, o
                   ) : <div className="opacity-0">{data.name || 'Creative'}</div>}
                 </h1>
                 
-                <p className={`max-w-md font-light text-base md:text-lg text-white/50 leading-[1.7] mb-8 opacity-0 ${!heroProject ? 'mx-auto' : ''}`}>
+                <p className={`max-w-md font-light text-base md:text-lg text-white/50 leading-[1.7] mb-8 opacity-0 ${!heroProject ? 'mx-auto' : 'mx-auto xl:mx-0'}`}>
                   {data.bio || 'Invisible spacer'}
                 </p>
                 
