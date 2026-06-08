@@ -13,12 +13,29 @@ interface ProjectModalProps {
 export const ProjectModal: React.FC<ProjectModalProps> = ({ project, allProjects = [], onClose, onSelectProject }) => {
   useEffect(() => {
     if (project) {
+      // iOS specific scroll lock
       document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
+      document.body.style.top = `-${window.scrollY}px`;
     } else {
-      document.body.style.overflow = 'unset';
+      const scrollY = document.body.style.top;
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.top = '';
+      if (scrollY) {
+        window.scrollTo(0, parseInt(scrollY || '0') * -1);
+      }
     }
     return () => {
-      document.body.style.overflow = 'unset';
+      document.body.style.overflow = '';
+      document.documentElement.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.top = '';
     };
   }, [project]);
 
@@ -81,9 +98,9 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({ project, allProjects
             {/* Close Button Mobile (Top Right) */}
             <button
               onClick={onClose}
-              className="absolute top-4 right-4 z-50 p-2 text-white/60 hover:text-white transition-colors backdrop-blur-md md:hidden"
+              className="absolute top-4 right-4 z-50 p-2 text-white/60 hover:text-white transition-colors backdrop-blur-md md:hidden bg-black/40 rounded-full"
             >
-              ✕
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
             </button>
 
             {/* Left: Media Player (60%) */}
@@ -96,7 +113,7 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({ project, allProjects
                     aspectRatio={project.aspectRatio as any || "16:9"}
                     controls={true}
                     autoplay={true}
-                    muted={false}
+                    muted={true} // Must be true for iOS autoplay
                     loop={true}
                   />
                 ) : project.imageUrl ? (
@@ -123,9 +140,11 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({ project, allProjects
                   {project.contentType || 'Project'}
                 </span>
                 
-                <h2 className="font-display font-bold uppercase tracking-tight text-3xl md:text-4xl text-white leading-tight mt-3">
-                  {project.title || 'Untitled'}
-                </h2>
+                <div className="pr-12 md:pr-0">
+                  <h2 className="font-display font-bold uppercase tracking-tight text-3xl md:text-4xl text-white leading-tight mt-3">
+                    {project.title || 'Untitled'}
+                  </h2>
+                </div>
                 
                 {project.description && (
                   <p className="font-light text-sm text-white/60 mt-4 leading-[1.7]">

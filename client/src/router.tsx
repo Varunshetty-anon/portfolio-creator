@@ -65,20 +65,16 @@ export const router = createBrowserRouter([
       </SuspenseWrapper>
     ),
   },
-  // Alias: /@username → /portfolio/username
-  // React Router v6 doesn't support partial dynamic segments (/@:username)
+  // Custom clean URL support (e.g. domain.com/username)
+  // React Router will match specific routes (/editor, /onboarding) first.
+  // Anything else falls through to here, functioning as a native URL shortener.
   {
-    path: '/:handle',
-    loader: ({ params }) => {
-      const handle = params.handle || '';
-      if (handle.startsWith('@')) {
-        return redirect(`/portfolio/${handle.slice(1)}`);
-      }
-      // If it doesn't start with @, let it fall through to 404 (by throwing or returning null)
-      // Actually loader can't easily fallback to the next route in v6 if matched.
-      // We should throw a 404 Response.
-      throw new Response('Not Found', { status: 404 });
-    },
+    path: '/:username',
+    element: (
+      <SuspenseWrapper>
+        <PortfolioLayout />
+      </SuspenseWrapper>
+    ),
     errorElement: (
       <SuspenseWrapper>
         <NotFound />
@@ -88,7 +84,11 @@ export const router = createBrowserRouter([
   // Legacy route support: /v/username → /portfolio/username
   {
     path: '/v/:username',
-    loader: ({ params }) => redirect(`/portfolio/${params.username}`),
+    loader: ({ params }) => redirect(`/${params.username}`),
+  },
+  {
+    path: '/portfolio/:username',
+    loader: ({ params }) => redirect(`/${params.username}`),
   },
   // 404
   {

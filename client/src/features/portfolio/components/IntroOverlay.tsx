@@ -161,10 +161,10 @@ export const IntroOverlay: React.FC<IntroOverlayProps> = ({ data, heroProject, o
                       style={{
                         width: '80px',
                         height: '80px',
-                        background: 'radial-gradient(circle at 35% 35%, rgba(255,255,255,1) 0%, rgba(220,190,130,0.85) 45%, rgba(150,120,70,0.4) 80%, transparent 100%)',
-                        filter: 'blur(3px)',
+                        background: 'radial-gradient(circle at 35% 35%, #FFFFFF 0%, #F5E6C8 25%, #C0A36E 60%, transparent 90%)',
+                        filter: 'blur(2px) drop-shadow(0 0 25px rgba(255,255,255,0.7))',
                         mixBlendMode: 'screen',
-                        boxShadow: '0 0 40px 10px rgba(192,163,110,0.4), inset 0 0 15px rgba(255,255,255,0.9)'
+                        boxShadow: '0 0 60px 20px rgba(192,163,110,0.7), 0 0 100px 40px rgba(192,163,110,0.3), inset 0 0 20px rgba(255,255,255,1)'
                       }}
                     />
                   )}

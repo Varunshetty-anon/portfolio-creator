@@ -287,14 +287,6 @@ export default function EditorLayout() {
 
           {/* Actions */}
           <div className="flex items-center gap-3 pointer-events-auto">
-            {portfolio.isPublished && portfolio.username && (
-              <button
-                onClick={() => setShowShareModal(true)}
-                className="font-mono text-[10px] uppercase tracking-widest text-text-subtle hover:text-white transition-colors"
-              >
-                Share
-              </button>
-            )}
             
             <button
               onClick={() => setIsRightSidebarOpen(!isRightSidebarOpen)}

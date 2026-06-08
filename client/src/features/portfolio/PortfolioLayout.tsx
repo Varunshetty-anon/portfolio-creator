@@ -266,13 +266,7 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
                 />
                 
                 <div 
-                  className="absolute bottom-0 left-0 right-0 p-4 z-20 pointer-events-none"
-                  style={{
-                    background: 'rgba(0, 0, 0, 0.2)',
-                    backdropFilter: 'blur(16px) saturate(160%)',
-                    WebkitBackdropFilter: 'blur(16px) saturate(160%)',
-                    borderTop: '1px solid rgba(255, 255, 255, 0.06)'
-                  }}
+                  className="absolute bottom-0 left-0 right-0 p-4 z-20 pointer-events-none bg-black/60 md:bg-black/20 md:backdrop-blur-md border-t border-white/[0.06]"
                 >
                   {project.contentType && (
                     <span className="font-mono text-[9px] tracking-[0.18em] uppercase text-white/45 border border-white/15 px-1.5 py-0.5 inline-block mb-2">

@@ -368,16 +368,17 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
 
       {/* React Player Core or GDrive Iframe */}
       {!hasError && gdriveId ? (
-        <div className="absolute inset-0 w-full h-full z-10 bg-black">
+        <div className="absolute inset-0 w-full h-full z-10 bg-black pointer-events-auto">
           {playing ? (
             <iframe
-              src={`https://drive.google.com/file/d/${gdriveId}/preview?autoplay=1`}
-              className="absolute inset-0 w-full h-full border-0"
-              allow="autoplay; fullscreen"
+              src={`https://drive.google.com/file/d/${gdriveId}/preview?autoplay=1&playsinline=1`}
+              className="absolute inset-0 w-full h-full border-0 relative z-50"
+              style={{ pointerEvents: 'auto' }}
+              allow="autoplay; fullscreen; playsinline"
               onLoad={() => { setIsReady(true); setIsBuffering(false); }}
             />
           ) : (
-            <div className="absolute inset-0 flex items-center justify-center cursor-pointer pointer-events-auto" onClick={(e) => { e.stopPropagation(); setPlaying(true); }}>
+            <div className="absolute inset-0 flex items-center justify-center cursor-pointer pointer-events-auto z-50" onClick={(e) => { e.stopPropagation(); setPlaying(true); }}>
                <div className="w-20 h-20 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-white/90 hover:scale-105 transition-transform shadow-2xl border border-white/20">
                  <Play className="w-8 h-8 fill-current ml-2" />
                </div>
@@ -413,6 +414,9 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
                 portrait: false,
                 title: false,
                 dnt: true,
+                playsinline: true,
+                background: true,
+                muted: muted,
               }
             }
           }}
