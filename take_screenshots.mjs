@@ -42,7 +42,7 @@ async function run() {
   await page.screenshot({ path: 'screenshots/2_editor.png' });
 
   // Add Project
-  await page.click('button[title="Projects"]');
+  await page.click('button:has-text("Projects")');
   await page.click('button:has-text("New Project")');
   await page.click('button:has-text("Paste Link")');
   await page.fill('input[placeholder="YouTube, Vimeo, or direct link..."]', 'https://www.youtube.com/watch?v=Jm-upHSP9KU');
@@ -68,12 +68,12 @@ async function run() {
   await livePage.screenshot({ path: 'screenshots/4_index_desktop.png' });
 
   // Hovered Project State
-  await livePage.hover('li:has-text("Inception")');
+  await livePage.hover('div:has-text("Inception")');
   await livePage.waitForTimeout(1500); // wait for crossfade
   await livePage.screenshot({ path: 'screenshots/5_hover_desktop.png' });
 
   // Open Project Modal
-  await livePage.click('li:has-text("Inception")');
+  await livePage.click('div:has-text("Inception")');
   await livePage.waitForTimeout(1500);
   await livePage.screenshot({ path: 'screenshots/6_modal_desktop.png' });
 
