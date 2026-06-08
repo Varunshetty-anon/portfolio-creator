@@ -195,13 +195,25 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
           )}
           
         </div>
+
+        {/* Scroll Down Indicator */}
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 opacity-50 animate-bounce pointer-events-none">
+          <span className="font-mono text-[9px] uppercase tracking-[0.3em] text-white/50">Scroll to explore</span>
+          <svg className="w-4 h-4 text-[#C0A36E]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+          </svg>
+        </div>
       </section>
 
       {/* WORK GRID */}
       {projects.length > 0 && (
         <section className="w-full p-0 m-0">
-          <div className="font-mono text-[10px] tracking-[0.3em] uppercase text-white/25 px-6 md:px-10 mb-4 mt-16 max-w-[1600px] mx-auto">
-            WORK
+          <div className="flex flex-col items-center justify-center mb-12 mt-16 max-w-[1600px] mx-auto px-6 md:px-10">
+            <div className="w-full h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent mb-8"></div>
+            <h2 className="font-display font-black text-2xl md:text-3xl tracking-tight uppercase text-white/90">
+              Featured Work
+            </h2>
+            <div className="w-8 h-[2px] bg-[#C0A36E] mt-4"></div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-[3px] w-full">
             {projects.map((project) => (
@@ -370,7 +382,7 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
               exit={{ opacity: 0, scale: 0.96 }}
               transition={{ duration: 0.25, ease: "easeOut" }}
               onClick={(e) => e.stopPropagation()}
-              className="relative z-10 w-full h-[100dvh] md:w-[calc(100vw-32px)] md:h-[calc(100vh-32px)] md:m-4 bg-[rgba(10,10,12,0.95)] border border-white/[0.08] overflow-hidden flex flex-col md:flex-row"
+              className="relative z-10 w-full h-[100dvh] md:w-[calc(100vw-64px)] md:h-[calc(100vh-64px)] md:m-8 bg-[rgba(15,15,18,0.65)] backdrop-blur-3xl border border-white/10 shadow-[0_0_80px_rgba(0,0,0,0.8)] rounded-xl overflow-hidden flex flex-col md:flex-row"
             >
               <button
                 onClick={() => setSelectedProject(null)}
@@ -407,38 +419,38 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
                 </div>
               </div>
 
-              <div className="flex-1 flex flex-col relative overflow-y-auto p-8 custom-scrollbar scrollbar-width-thin" style={{ scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
+              <div className="flex-1 flex flex-col relative overflow-y-auto p-10 md:p-14 custom-scrollbar scrollbar-width-thin" style={{ scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
                 {selectedProject.contentType && (
-                  <span className="font-mono text-[9px] uppercase tracking-[0.2em] border border-white/10 px-2 py-1 text-white/40 inline-block mb-3 w-fit">
+                  <span className="font-mono text-[10px] uppercase tracking-[0.25em] border border-white/10 px-3 py-1.5 text-white/50 inline-block mb-4 w-fit rounded-sm">
                     {selectedProject.contentType}
                   </span>
                 )}
                 
-                <h2 className="font-display font-bold text-2xl md:text-3xl tracking-tight text-white leading-tight mb-4">
+                <h2 className="font-display font-black text-3xl md:text-5xl tracking-tight text-white leading-tight mb-6">
                   {selectedProject.title}
                 </h2>
                 
                 {selectedProject.description && (
-                  <p className="text-sm text-white/55 font-light leading-relaxed mb-6">
+                  <p className="text-base md:text-lg text-white/70 font-light leading-relaxed mb-8">
                     {selectedProject.description}
                   </p>
                 )}
                 
-                <div className="border-t border-white/[0.06] mb-5" />
+                <div className="border-t border-white/[0.06] mb-6" />
                 
                 {selectedProject.subjectMatter && (
-                  <div className="mb-3">
-                    <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-white/25 block mb-0.5">Client</span>
-                    <span className="font-mono text-xs text-white/70">{selectedProject.subjectMatter}</span>
+                  <div className="mb-5">
+                    <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#C0A36E] block mb-1.5">Client / Subject</span>
+                    <span className="font-mono text-sm text-white/90">{selectedProject.subjectMatter}</span>
                   </div>
                 )}
                 
                 {selectedProject.softwareUsed && selectedProject.softwareUsed.length > 0 && (
-                  <div className="mt-1 mb-3">
-                    <span className="font-mono text-[9px] uppercase tracking-[0.15em] text-white/25 block mb-1">Tools</span>
-                    <div className="flex flex-wrap gap-1.5 mt-1">
+                  <div className="mt-2 mb-4">
+                    <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#C0A36E] block mb-2.5">Tools</span>
+                    <div className="flex flex-wrap gap-2 mt-1">
                       {selectedProject.softwareUsed.map(tool => (
-                        <span key={tool} className="font-mono text-[9px] px-2 py-0.5 border border-white/[0.08] text-white/40 rounded-sm">
+                        <span key={tool} className="font-mono text-[10px] uppercase tracking-wider px-3 py-1 border border-white/10 text-white/60 bg-white/5 rounded-full">
                           {tool}
                         </span>
                       ))}
