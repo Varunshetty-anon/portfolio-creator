@@ -21,6 +21,8 @@ interface ProjectCardEditorProps {
   project: Project;
   index: number;
   isExpanded: boolean;
+  isHero?: boolean;
+  onSetHero?: () => void;
   onToggleExpand: () => void;
   onChange: (project: Project) => void;
   onDelete: () => void;
@@ -32,6 +34,8 @@ export default function ProjectCardEditor({
   project,
   index,
   isExpanded,
+  isHero = false,
+  onSetHero,
   onToggleExpand,
   onChange,
   onDelete,
@@ -171,13 +175,20 @@ export default function ProjectCardEditor({
           )}
         </div>
         
-        <div className="flex-1 min-w-0">
-          <h4 className="text-sm font-semibold text-text-primary truncate">
-            {project.title || 'Untitled Project'}
-          </h4>
-          <p className="text-xs text-text-muted truncate mt-0.5 font-medium">
-            {project.contentType || 'No type'} • {project.videoUrl || 'No link'}
-          </p>
+        <div className="flex-1 min-w-0 flex items-center gap-2">
+          <div>
+            <h4 className="text-sm font-semibold text-text-primary truncate">
+              {project.title || 'Untitled Project'}
+            </h4>
+            <p className="text-xs text-text-muted truncate mt-0.5 font-medium">
+              {project.contentType || 'No type'} • {project.videoUrl || 'No link'}
+            </p>
+          </div>
+          {isHero && (
+            <span className="ml-2 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-accent/10 text-accent border border-accent/20 rounded-sm">
+              Hero
+            </span>
+          )}
         </div>
         
         <div className="p-2 text-text-muted">
@@ -272,6 +283,22 @@ export default function ProjectCardEditor({
                     onChange={(e) => handleFieldChange('title', e.target.value)}
                     className="font-display font-medium text-lg"
                   />
+                  
+                  <div className="flex items-center justify-between p-3 bg-bg-raised border border-border-strong rounded-lg">
+                    <div>
+                      <h5 className="text-sm font-semibold text-text-primary">Hero Project</h5>
+                      <p className="text-xs text-text-muted mt-0.5">Use this project as the main portfolio hero.</p>
+                    </div>
+                    <Button 
+                      variant={isHero ? 'primary' : 'secondary'} 
+                      size="sm" 
+                      onClick={onSetHero}
+                      disabled={isHero}
+                      className={isHero ? 'bg-accent hover:bg-accent text-bg-base pointer-events-none' : ''}
+                    >
+                      {isHero ? 'Active Hero' : 'Set as Hero'}
+                    </Button>
+                  </div>
                 </div>
               </div>
 

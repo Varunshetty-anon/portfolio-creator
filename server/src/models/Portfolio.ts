@@ -39,8 +39,9 @@ export interface IPortfolio extends Document {
   languages?: string;
   contactEmail?: string;
   profileImageUrl?: string;
-  showreelUrl?: string;
-  showreelThumbnailUrl?: string;
+  heroProjectId?: mongoose.Types.ObjectId;
+  showreelUrl?: string; // @deprecated - use heroProjectId instead
+  showreelThumbnailUrl?: string; // @deprecated
   socials?: ISocials;
   availability?: IAvailability;
   theme?: 'magazine' | 'futuristic' | 'glassmorphic' | 'minimalism';
@@ -80,6 +81,10 @@ const portfolioSchema = new Schema<IPortfolio>(
     languages: { type: String, trim: true },
     contactEmail: { type: String, trim: true },
     profileImageUrl: { type: String },
+    heroProjectId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Project',
+    },
     showreelUrl: { type: String },
     showreelThumbnailUrl: { type: String },
     socials: {

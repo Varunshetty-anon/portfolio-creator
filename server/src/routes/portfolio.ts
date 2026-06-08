@@ -25,6 +25,7 @@ function serializePortfolio(portfolio: any) {
     languages: portfolio.languages,
     contactEmail: portfolio.contactEmail,
     profileImageUrl: portfolio.profileImageUrl,
+    heroProjectId: portfolio.heroProjectId?.toString(),
     showreelUrl: portfolio.showreelUrl,
     showreelThumbnailUrl: portfolio.showreelThumbnailUrl,
     socials: portfolio.socials,
@@ -139,7 +140,7 @@ router.put('/', authenticateToken, async (req: Request, res: Response, next: Nex
     // Allow updating all editable fields
     const editable = [
       'name', 'role', 'bio', 'location', 'languages', 'contactEmail',
-      'profileImageUrl', 'showreelUrl', 'showreelThumbnailUrl',
+      'profileImageUrl', 'heroProjectId', 'showreelUrl', 'showreelThumbnailUrl',
       'socials', 'availability', 'theme', 'draftContent',
       'primaryTool', 'tools', 'aiTools',
     ] as const;

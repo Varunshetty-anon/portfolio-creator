@@ -4,10 +4,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 interface IntroOverlayProps {
   name: string;
   role: string;
+  profileImage?: string;
   onComplete: () => void;
 }
 
-export const IntroOverlay: React.FC<IntroOverlayProps> = ({ name, role, onComplete }) => {
+export const IntroOverlay: React.FC<IntroOverlayProps> = ({ name, role, profileImage, onComplete }) => {
   const [alreadySeen] = useState(() => {
     try { return sessionStorage.getItem('frames_intro_seen') === 'true'; }
     catch { return false; }
@@ -84,6 +85,18 @@ export const IntroOverlay: React.FC<IntroOverlayProps> = ({ name, role, onComple
           </div>
 
           <div className="flex flex-col items-center">
+            {/* Profile Image */}
+            {profileImage && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: 0.5 }}
+                className="mb-6 rounded-full overflow-hidden w-24 h-24 border border-white/10 shadow-lg"
+              >
+                <img src={profileImage} alt={name} className="w-full h-full object-cover" />
+              </motion.div>
+            )}
+
             {/* Creator Name */}
             <motion.h1
               initial={{ opacity: 0, y: 16 }}

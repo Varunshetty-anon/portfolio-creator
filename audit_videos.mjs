@@ -1,28 +1,31 @@
 import { chromium } from 'playwright';
 import path from 'path';
 import fetch from 'node-fetch';
+import fs from 'fs';
 
-const PORT = 3001;
+const URL = 'http://localhost:3001/audit-videos';
 const ARTIFACT_DIR = 'C:/Users/varun/.gemini/antigravity/brain/58fc36df-1457-405d-b3fc-84f841967157/';
 
 async function waitForServer(url) {
   for (let i = 0; i < 30; i++) {
     try {
-      await fetch(url);
-      console.log('Server is ready!');
-      return true;
+      const res = await fetch(url);
+      if (res.ok) {
+        console.log('Local Server is ready!');
+        return true;
+      }
     } catch (e) {
-      console.log('Waiting for server...');
-      await new Promise(r => setTimeout(r, 1000));
+      console.log('Waiting for local deployment...');
+      await new Promise(r => setTimeout(r, 2000));
     }
   }
   return false;
 }
 
 async function run() {
-  const isReady = await waitForServer(`http://localhost:${PORT}`);
+  const isReady = await waitForServer(URL);
   if (!isReady) {
-    console.error('Server is not running on ' + PORT);
+    console.error('Server is not ready at ' + URL);
     process.exit(1);
   }
 
@@ -30,7 +33,20 @@ async function run() {
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   
-  await page.goto(`http://localhost:${PORT}/audit-videos`, { waitUntil: 'domcontentloaded' });
+  // Capture console logs
+  const logStream = fs.createWriteStream(path.join(ARTIFACT_DIR, 'browser_console.log'), { flags: 'w' });
+  page.on('console', msg => {
+    const text = `[${msg.type()}] ${msg.text()}\n`;
+    console.log(text);
+    logStream.write(text);
+  });
+  page.on('pageerror', exception => {
+    const text = `[error] ${exception}\n`;
+    console.log(text);
+    logStream.write(text);
+  });
+
+  await page.goto(URL, { waitUntil: 'domcontentloaded' });
   
   // Wait a few seconds for all iframe/players to instantiate
   await new Promise(r => setTimeout(r, 5000));
@@ -70,10 +86,13 @@ async function run() {
   const stratD = await page.locator('#strategy-d');
   await stratD.screenshot({ path: path.join(ARTIFACT_DIR, 'strategy_d_motion.png') });
 
+  const stratE = await page.locator('#strategy-e');
+  await stratE.screenshot({ path: path.join(ARTIFACT_DIR, 'strategy_e_intro.png') });
+
   // Mobile Audit
   console.log('Capturing Mobile Behavior...');
   const mobilePage = await browser.newPage({ viewport: { width: 390, height: 844 } });
-  await mobilePage.goto(`http://localhost:${PORT}/audit-videos`, { waitUntil: 'domcontentloaded' });
+  await mobilePage.goto(URL, { waitUntil: 'domcontentloaded' });
   await new Promise(r => setTimeout(r, 5000));
   
   const mobileAuditBlock = await mobilePage.locator('#video-audit');

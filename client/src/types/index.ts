@@ -44,9 +44,10 @@ export interface PortfolioData {
   contactEmail: string;
   profileImageUrl: string;
 
-  // Showreel
-  showreelUrl: string;
-  showreelThumbnailUrl: string;
+  // Hero & Showreel
+  heroProjectId?: string;
+  showreelUrl?: string; // @deprecated
+  showreelThumbnailUrl?: string; // @deprecated
 
   // Socials
   socials: Socials;
@@ -124,6 +125,7 @@ export const INITIAL_PORTFOLIO: PortfolioData = {
   languages: 'English',
   contactEmail: '',
   profileImageUrl: '',
+  heroProjectId: undefined,
   showreelUrl: '',
   showreelThumbnailUrl: '',
   socials: {

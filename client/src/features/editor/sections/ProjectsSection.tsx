@@ -136,7 +136,12 @@ export default function ProjectsSection({ data, onChange, onAutoSave, projects, 
                       index={index}
                       isExpanded={expandedId === (project._id || project.id)}
                       isDeleting={deletingId === (project._id || project.id)}
+                      isHero={data.heroProjectId === (project._id || project.id)}
                       onToggleExpand={() => setExpandedId(expandedId === (project._id || project.id) ? null : project._id!)}
+                      onSetHero={() => {
+                        onChange({ ...data, heroProjectId: project._id || project.id });
+                        onAutoSave();
+                      }}
                       onChange={handleUpdateProject}
                       onDelete={() => handleDeleteProject(project._id || project.id)}
                       onAutoSave={onAutoSave}

@@ -72,7 +72,9 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
   if (loading || !data) return null;
 
   const projects = [...(data.projects || [])].sort((a, b) => a.order - b.order);
-  const heroVideoUrl = data.showreelUrl || (projects[0]?.videoUrl);
+  const heroProjectId = data.heroProjectId;
+  const heroProject = projects.find(p => (p._id || p.id) === heroProjectId) || null;
+  const heroVideoUrl = heroProject?.videoUrl || null;
 
   const truncate = (str: string, length: number) => {
     if (str.length <= length) return str;
@@ -85,6 +87,7 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
         <IntroOverlay
           name={data.name || 'Creative'}
           role={data.role || 'Portfolio'}
+          profileImage={data.profileImageUrl}
           onComplete={() => setIntroComplete(true)}
         />
       )}
@@ -122,55 +125,75 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
       </nav>
 
       {/* HERO SECTION */}
-      <section className="relative min-h-[100dvh] overflow-hidden flex flex-col justify-end px-6 pb-20 md:px-14 md:pb-24 pt-20">
-        <div className="absolute inset-0 z-0">
-          {heroVideoUrl && (
-            <div className="w-full h-full opacity-30 scale-[1.1]">
-              <FramesPlayer url={heroVideoUrl} controls={false} autoplay={true} muted={true} loop={true} />
+      <section className="relative min-h-[100dvh] flex flex-col items-center justify-center px-6 pt-24 pb-12 md:px-14">
+        <div className={`w-full max-w-[1600px] mx-auto flex flex-col xl:flex-row gap-12 xl:gap-20 items-center ${heroProject ? 'justify-between' : 'justify-center text-center'}`}>
+          
+          <div className={`flex-1 w-full max-w-3xl shrink-0 flex flex-col ${!heroProject ? 'items-center' : ''}`}>
+            <div className="font-mono text-xs uppercase tracking-[0.22em] text-[#C0A36E] mb-4">
+              {data.role}
             </div>
-          )}
-          <div 
-            className="absolute inset-0"
-            style={{ background: 'linear-gradient(to top, #050505 0%, #050505 20%, rgba(5,5,5,0.7) 60%, rgba(5,5,5,0.3) 100%)' }}
-          />
-        </div>
-
-        <div className="relative z-10 w-full max-w-[1600px] mx-auto">
-          {/* ROW 1 */}
-          <div className="mb-6 w-full">
             <h1 
-              className="font-display font-black uppercase tracking-tighter text-white"
-              style={{ fontSize: 'clamp(52px, 9vw, 130px)', lineHeight: 0.88 }}
+              className="font-display font-black uppercase tracking-tighter text-white leading-[0.9] mb-8"
+              style={{ fontSize: 'clamp(48px, 8vw, 110px)' }}
             >
               {data.name}
             </h1>
-          </div>
-
-          <div className="w-full border-t border-white/10 my-6" />
-
-          {/* ROW 2 */}
-          <div className="flex justify-between items-start flex-col md:flex-row gap-8">
-            <p className="max-w-[420px] font-light text-base md:text-lg text-white/45 leading-[1.7]">
+            <p className={`max-w-md font-light text-base md:text-lg text-white/50 leading-[1.7] mb-8 ${!heroProject ? 'mx-auto' : ''}`}>
               {data.bio}
             </p>
             
-            <div className="md:text-right flex flex-col gap-1 md:items-end w-full md:w-auto text-left">
-              <div className="font-mono text-xs uppercase tracking-[0.22em] text-[#C0A36E]">
-                {data.role}
-              </div>
+            <div className={`flex flex-col gap-3 ${!heroProject ? 'items-center' : ''}`}>
               {data.location && (
-                <div className="font-mono text-[11px] text-white/25 uppercase">
+                <div className="font-mono text-xs text-white/30 uppercase">
                   {data.location}
                 </div>
               )}
               {data.availability?.status && (
-                <div className="mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 border border-white/10 self-start md:self-end">
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-                  <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-white/60">Available</span>
+                <div className="inline-flex items-center gap-2 bg-white/5 px-3 py-1.5 border border-white/10 rounded-full">
+                  <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse shadow-[0_0_8px_rgba(74,222,128,0.6)]" />
+                  <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-white/70">Available for hire</span>
                 </div>
               )}
             </div>
           </div>
+
+          {heroProject && (
+            <div className="w-full xl:w-[55%] shrink-0">
+              <div 
+                className="w-full aspect-video relative rounded-xl overflow-hidden border border-white/10 shadow-2xl bg-[#0a0a0c] cursor-pointer group"
+                onClick={() => setSelectedProject(heroProject)}
+              >
+                {heroVideoUrl ? (
+                  <>
+                    <div className="absolute inset-0 pointer-events-none scale-105 group-hover:scale-100 transition-transform duration-700 ease-out">
+                      <FramesPlayer url={heroVideoUrl} thumbnail={heroProject.thumbnailUrl} controls={false} autoplay={true} muted={true} loop={true} />
+                    </div>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60 group-hover:opacity-40 transition-opacity duration-300" />
+                    <div className="absolute bottom-6 left-6 flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-white border border-white/20 group-hover:scale-110 transition-transform duration-300">
+                        <svg className="w-5 h-5 ml-1 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                      </div>
+                      <div>
+                        <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#C0A36E] mb-1">Play Showreel</div>
+                        <h3 className="font-display font-bold text-white text-lg leading-none">{heroProject.title}</h3>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center group-hover:scale-105 transition-transform duration-700 ease-out">
+                    {heroProject.imageUrl || heroProject.thumbnailUrl ? (
+                      <img src={heroProject.imageUrl || heroProject.thumbnailUrl} alt={heroProject.title} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full bg-[#111] flex items-center justify-center">
+                        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/30">No Media</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          
         </div>
       </section>
 
