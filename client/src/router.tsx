@@ -12,6 +12,7 @@ const AuthPage = lazy(() => import('@/features/auth/AuthPage'));
 const EditorLayout = lazy(() => import('@/features/editor/EditorLayout'));
 const OnboardingFlow = lazy(() => import('@/features/onboarding/OnboardingFlow'));
 const PortfolioLayout = lazy(() => import('@/features/portfolio/PortfolioLayout'));
+const AuditMedia = lazy(() => import('@/pages/AuditMedia'));
 
 const SuspenseWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <Suspense fallback={<LoadingScreen message="Loading..." />}>
@@ -53,6 +54,14 @@ export const router = createBrowserRouter([
     element: (
       <SuspenseWrapper>
         <PortfolioLayout />
+      </SuspenseWrapper>
+    ),
+  },
+  {
+    path: '/audit-videos',
+    element: (
+      <SuspenseWrapper>
+        <AuditMedia />
       </SuspenseWrapper>
     ),
   },
