@@ -197,11 +197,17 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
         </div>
 
         {/* Scroll Down Indicator */}
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 opacity-50 animate-bounce pointer-events-none">
-          <span className="font-mono text-[9px] uppercase tracking-[0.3em] text-white/50">Scroll to explore</span>
-          <svg className="w-4 h-4 text-[#C0A36E]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-          </svg>
+        <div 
+          className="absolute pointer-events-none"
+          style={{ bottom: '32px', left: '50%', transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}
+        >
+          <span className="font-mono text-[9px] tracking-[0.25em] uppercase text-white/25">SCROLL TO EXPLORE</span>
+          <motion.div
+            animate={{ y: [0, 6, 0] }}
+            transition={{ duration: 1.5, ease: "easeInOut", repeat: Infinity }}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C0A36E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          </motion.div>
         </div>
       </section>
 
@@ -210,8 +216,8 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
         <section className="w-full p-0 m-0">
           <div className="flex flex-col items-center justify-center mb-12 mt-16 max-w-[1600px] mx-auto px-6 md:px-10">
             <div className="w-full h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent mb-8"></div>
-            <h2 className="font-display font-black text-2xl md:text-3xl tracking-tight uppercase text-white/90">
-              Featured Work
+            <h2 className="font-display font-black text-xs md:text-sm tracking-tight uppercase text-white/90">
+              MY WORKS
             </h2>
             <div className="w-8 h-[2px] bg-[#C0A36E] mt-4"></div>
           </div>
@@ -223,7 +229,7 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
                 tabIndex={0}
                 aria-label={`Open project: ${project.title}`}
                 className="group relative overflow-hidden cursor-pointer bg-[#111]"
-                style={{ aspectRatio: '16/9' }}
+                style={{ aspectRatio: '16/9', border: '1px solid rgba(255, 255, 255, 0.07)' }}
                 onClick={() => setSelectedProject(project)}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' || event.key === ' ') {
@@ -247,13 +253,21 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
                   style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.5) 35%, rgba(0,0,0,0.1) 65%, transparent 100%)' }}
                 />
                 
-                <div className="absolute bottom-0 left-0 right-0 p-4 z-20 pointer-events-none">
+                <div 
+                  className="absolute bottom-0 left-0 right-0 p-4 z-20 pointer-events-none"
+                  style={{
+                    background: 'rgba(0, 0, 0, 0.2)',
+                    backdropFilter: 'blur(16px) saturate(160%)',
+                    WebkitBackdropFilter: 'blur(16px) saturate(160%)',
+                    borderTop: '1px solid rgba(255, 255, 255, 0.06)'
+                  }}
+                >
                   {project.contentType && (
                     <span className="font-mono text-[9px] tracking-[0.18em] uppercase text-white/45 border border-white/15 px-1.5 py-0.5 inline-block mb-2">
                       {project.contentType}
                     </span>
                   )}
-                  <h3 className="font-display font-bold text-white leading-[1.2] line-clamp-2" style={{ fontSize: 'clamp(16px, 2vw, 22px)' }}>
+                  <h3 className="font-display text-sm md:text-base font-bold leading-snug text-white line-clamp-2 overflow-hidden text-ellipsis">
                     {project.title}
                   </h3>
                 </div>
@@ -426,7 +440,10 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
                   </span>
                 )}
                 
-                <h2 className="font-display font-black text-3xl md:text-5xl tracking-tight text-white leading-tight mb-6">
+                <h2 
+                  className="font-display font-bold text-white tracking-tight leading-tight mb-6"
+                  style={{ fontSize: 'clamp(18px, 2.5vw, 28px)', overflow: 'hidden', wordBreak: 'break-word', maxWidth: '100%' }}
+                >
                   {selectedProject.title}
                 </h2>
                 

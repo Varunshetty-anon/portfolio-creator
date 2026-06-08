@@ -74,25 +74,65 @@ export default function ProjectCardEditor({
         setLinkError(null);
         
         try {
+          let extractedThumbnail = '';
+
           if (source === 'gdrive') {
             const driveMeta = await uploadApi.validateDrive(currentProject.videoUrl);
             if (driveMeta.isPrivate) {
               setIsDrivePrivate(true);
             }
+            const match = currentProject.videoUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || currentProject.videoUrl.match(/id=([a-zA-Z0-9_-]+)/);
+            if (match && match[1]) {
+              extractedThumbnail = `https://drive.google.com/thumbnail?id=${match[1]}&sz=w1280`;
+            }
+          } else if (source === 'youtube') {
+            const match = currentProject.videoUrl.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([^&?]+)/);
+            if (match && match[1]) {
+              const videoId = match[1];
+              extractedThumbnail = await new Promise((resolve) => {
+                const url = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+                const img = new Image();
+                img.onload = () => {
+                  if (img.width === 120) {
+                    resolve(`https://img.youtube.com/vi/${videoId}/hqdefault.jpg`);
+                  } else {
+                    resolve(url);
+                  }
+                };
+                img.onerror = () => resolve(`https://img.youtube.com/vi/${videoId}/hqdefault.jpg`);
+                img.src = url;
+              });
+            }
+          } else if (source === 'vimeo') {
+            const res = await fetch(`https://vimeo.com/api/oembed.json?url=${encodeURIComponent(currentProject.videoUrl)}`);
+            if (res.ok) {
+              const data = await res.json();
+              if (data.thumbnail_url) {
+                extractedThumbnail = data.thumbnail_url;
+              }
+            }
+          } else if (source === 'cloudinary') {
+            extractedThumbnail = currentProject.videoUrl.replace(/\.[^/.]+$/, '.jpg').replace('/upload/', '/upload/so_0/');
           }
-          
-          const meta = await getVideoMetadata(currentProject.videoUrl);
+
           const latest = latestProjectRef.current;
           
-          if (meta) {
+          if (extractedThumbnail && !latest.thumbnailUrl) {
             onChange({
               ...latest,
               videoSource: source as any,
-              thumbnailUrl: meta.thumbnail || latest.thumbnailUrl,
-              aspectRatio: meta.aspectRatio || latest.aspectRatio,
+              thumbnailUrl: extractedThumbnail
             });
+            if (typeof window !== 'undefined') {
+              import('react-hot-toast').then(({ default: toast }) => {
+                toast.success('Thumbnail auto-detected');
+              }).catch(() => {});
+            }
           } else {
-            setLinkError("Could not extract video details. Check link.");
+            onChange({
+              ...latest,
+              videoSource: source as any
+            });
           }
         } catch (err) {
           setLinkError("Failed to validate link.");
