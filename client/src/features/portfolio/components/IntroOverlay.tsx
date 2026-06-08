@@ -117,7 +117,7 @@ export const IntroOverlay: React.FC<IntroOverlayProps> = ({ name, role, profileI
                     {el.label.includes('Color') && <circle cx="12" cy="12" r="10"/>}
                     {el.label.includes('Waveform') && <path d="M4 12v-4m4 8v-12m4 16V4m4 12v-8m4 4v0"/>}
                     {el.label.includes('Clapper') && <path d="M4 4h16v16H4zm0 4h16m-4-8l-4 4M8 0L4 4"/>}
-                    {el.label.includes('Camera') && <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/>}
+                    {el.label.includes('Camera') && <><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></>}
                     {el.label.includes('Aperture') && <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>}
                     {el.label.includes('Grid') && <path d="M3 3h18v18H3zM3 9h18M3 15h18M9 3v18M15 3v18"/>}
                     {el.label.includes('Triangle') && <polygon points="12 2 22 20 2 20"/>}
