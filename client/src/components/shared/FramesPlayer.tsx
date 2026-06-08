@@ -371,10 +371,10 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
         <div className="absolute inset-0 w-full h-full z-10 bg-black pointer-events-auto">
           {playing ? (
             <iframe
-              src={`https://drive.google.com/file/d/${gdriveId}/preview?autoplay=1&playsinline=1`}
+              src={`https://drive.google.com/file/d/${gdriveId}/preview?autoplay=1`}
               className="absolute inset-0 w-full h-full border-0 relative z-50"
               style={{ pointerEvents: 'auto' }}
-              allow="autoplay; fullscreen; playsinline"
+              allow="autoplay; fullscreen"
               onLoad={() => { setIsReady(true); setIsBuffering(false); }}
             />
           ) : (
