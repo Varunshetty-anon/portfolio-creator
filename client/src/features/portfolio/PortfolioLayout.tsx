@@ -126,9 +126,9 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
 
       {/* HERO SECTION */}
       <section className="relative min-h-[100dvh] flex flex-col items-center justify-center px-6 pt-24 pb-48 md:px-14">
-        <div className={`w-full max-w-[1600px] mx-auto flex flex-col xl:flex-row gap-12 xl:gap-20 items-center ${hasHeroMedia ? 'justify-between' : 'justify-center text-center'}`}>
+        <div className={`w-full max-w-[1400px] mx-auto flex flex-col xl:flex-row gap-16 xl:gap-24 items-center ${hasHeroMedia ? 'justify-between' : 'justify-center text-center'}`}>
           
-          <div className={`flex-1 w-full max-w-3xl shrink-0 flex flex-col ${!hasHeroMedia ? 'items-center text-center' : 'items-center text-center xl:items-start xl:text-left'}`}>
+          <div className={`flex-1 w-full max-w-2xl shrink-0 flex flex-col ${!hasHeroMedia ? 'items-center text-center' : 'items-center text-center xl:items-start xl:text-left'}`}>
             {data.profileImageUrl && (
               <div className="mb-6 md:mb-8 relative">
                 <img 
@@ -168,9 +168,9 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
           </div>
 
           {hasHeroMedia && (
-            <div className="w-full xl:w-[55%] shrink-0">
+            <div className="w-full max-w-[320px] sm:max-w-[400px] xl:max-w-[480px] shrink-0">
               <div 
-                className="w-full aspect-video relative rounded-xl overflow-hidden border border-white/10 shadow-2xl bg-[#0a0a0c] group"
+                className="w-full aspect-square relative rounded-[40px] overflow-hidden border border-white/10 shadow-[0_0_60px_rgba(255,255,255,0.05)] bg-[#0a0a0c] group cursor-pointer"
               >
                 {showreelMedia ? (
                   <>
@@ -178,11 +178,13 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
                       <FramesPlayer 
                         url={showreelMedia} 
                         thumbnail={showreelThumbnail} 
-                        controls={true} 
+                        controls={false}
+                        minimalMode={true} 
                         autoplay={true} 
                         muted={true} 
                         loop={true} 
-                        className="w-full h-full"
+                        className="w-full h-full object-cover"
+                        aspectRatio="1:1"
                       />
                     </div>
                   </>

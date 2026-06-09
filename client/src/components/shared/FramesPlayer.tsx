@@ -19,6 +19,7 @@ interface FramesPlayerProps {
   onTheatreToggle?: () => void;
   isTheatre?: boolean;
   onReady?: () => void;
+  minimalMode?: boolean; // If true, disables play/pause interactions and scrubber, only shows mute toggle
 }
 
 const aspectClasses: Record<string, string> = {
@@ -41,6 +42,7 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
   onTheatreToggle,
   isTheatre = false,
   onReady,
+  minimalMode = false,
 }) => {
   const [playing, setPlaying] = useState(autoplay);
   const [muted, setMuted] = useState(() => {
@@ -168,12 +170,14 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
   }, [showControls]);
 
   const handleMouseLeave = useCallback(() => {
+    if (minimalMode) return;
     if (playing && !isScrubbing) {
       setIsHovering(false);
     }
-  }, [playing, isScrubbing]);
+  }, [playing, isScrubbing, minimalMode]);
 
   useEffect(() => {
+    if (minimalMode) return;
     if (!playing) {
       setIsHovering(true); // Always show controls when paused
       if (hideControlsTimeoutRef.current) clearTimeout(hideControlsTimeoutRef.current);
@@ -183,7 +187,7 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
     return () => {
       if (hideControlsTimeoutRef.current) clearTimeout(hideControlsTimeoutRef.current);
     };
-  }, [playing, showControls]);
+  }, [playing, showControls, minimalMode]);
 
   // --- KEYBOARD ACCESSIBILITY ---
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -242,8 +246,8 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
     setPlaying(p => !p);
   };
 
-  const handleToggleMute = (e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleToggleMute = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     setMuted((m: boolean) => !m);
     setVolume(muted ? 1 : 0);
   };
@@ -280,14 +284,30 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
   if (!url) return null;
 
   return (
-    <div
-      ref={containerRef}
-      className={`relative overflow-hidden bg-black group focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50 ${
-        !isFullscreen ? aspectClasses[aspectRatio] : 'w-full h-full'
-      } ${className}`}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleMouseLeave}
+    <>
+      {minimalMode && (
+        <style>{`
+          .frames-player-minimal video {
+            object-fit: cover !important;
+          }
+          .frames-player-minimal iframe {
+            pointer-events: none !important;
+            transform: scale(1.05); /* hide iframe borders if any */
+          }
+        `}</style>
+      )}
+      <div
+        ref={containerRef}
+        className={`relative overflow-hidden bg-black group focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50 ${
+          !isFullscreen ? aspectClasses[aspectRatio] : 'w-full h-full'
+        } ${className} ${minimalMode ? 'frames-player-minimal' : ''}`}
+      onMouseMove={minimalMode ? undefined : handleMouseMove}
+      onMouseLeave={minimalMode ? undefined : handleMouseLeave}
       onClick={(e) => {
+        if (minimalMode) {
+          handleToggleMute(e);
+          return;
+        }
         if (onClick) {
           onClick();
           return;
@@ -462,8 +482,21 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
         />
       )}
 
+      {/* Minimal Mode Persistent Mute Button */}
+      {minimalMode && !hasError && isReady && (
+        <div className="absolute bottom-4 right-4 z-40">
+          <button 
+            onClick={handleToggleMute}
+            className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center hover:bg-black/60 transition-colors focus:outline-none"
+            aria-label={muted || volume === 0 ? "Unmute" : "Mute"}
+          >
+            {muted || volume === 0 ? <VolumeX className="w-4 h-4 text-white" /> : <Volume2 className="w-4 h-4 text-white" />}
+          </button>
+        </div>
+      )}
+
       {/* Minimalistic Cinematic Controls overlay */}
-      {controls && !hasError && isReady && (!gdriveId || !gdriveError) && (
+      {!minimalMode && controls && !hasError && isReady && (!gdriveId || !gdriveError) && (
         <AnimatePresence>
           {isHovering && (
             <motion.div
@@ -567,5 +600,6 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
         </AnimatePresence>
       )}
     </div>
+    </>
   );
 };
