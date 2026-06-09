@@ -99,16 +99,18 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
     localStorage.setItem('frames_player_volume', volume.toString());
   }, [volume]);
 
-  // Parse GDrive URL to use iframe preview embed instead of direct stream
   const gdriveId = getGoogleDriveId(url);
-  const processedUrl = url;
+  const [gdriveError, setGdriveError] = useState(false);
+  const processedUrl = gdriveId && !gdriveError 
+    ? `https://drive.google.com/uc?export=download&confirm=t&id=${gdriveId}` 
+    : url;
 
   useEffect(() => {
-    if (gdriveId) {
+    if (gdriveId && gdriveError) {
       // GDrive iframe doesn't need to 'ready' the same way ReactPlayer does
       setIsReady(true);
     }
-  }, [gdriveId]);
+  }, [gdriveId, gdriveError]);
 
   // --- FULLSCREEN HANDLING ---
   useEffect(() => {
@@ -367,7 +369,7 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
       )}
 
       {/* React Player Core or GDrive Iframe */}
-      {!hasError && gdriveId ? (
+      {!hasError && gdriveId && gdriveError ? (
         <div className="absolute inset-0 w-full h-full z-10 bg-black pointer-events-auto">
           <iframe
             src={`https://drive.google.com/file/d/${gdriveId}/preview?autoplay=1`}
@@ -389,6 +391,13 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
           height="100%"
           playsInline={true}
           config={{
+            file: {
+              forceVideo: gdriveId && !gdriveError ? true : undefined,
+              attributes: {
+                crossOrigin: 'anonymous',
+                controlsList: 'nodownload'
+              }
+            },
             youtube: {
               playerVars: {
                 controls: 0,
@@ -438,13 +447,20 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
           }}
           onWaiting={() => setIsBuffering(true)}
           onPlaying={() => setIsBuffering(false)}
-          onError={() => setHasError(true)}
+          onError={(err: any) => {
+            console.warn('FramesPlayer Error:', err);
+            if (gdriveId && !gdriveError) {
+              setGdriveError(true);
+            } else {
+              setHasError(true);
+            }
+          }}
           ref={playerRef}
         />
       )}
 
       {/* Minimalistic Cinematic Controls overlay */}
-      {controls && !hasError && isReady && !gdriveId && (
+      {controls && !hasError && isReady && (!gdriveId || !gdriveError) && (
         <AnimatePresence>
           {isHovering && (
             <motion.div
