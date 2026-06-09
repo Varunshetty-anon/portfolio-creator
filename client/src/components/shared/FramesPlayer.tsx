@@ -102,9 +102,15 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
   }, [volume]);
 
   const gdriveId = getGoogleDriveId(url);
+  const [isMobileDevice, setIsMobileDevice] = useState(false);
 
-  // Use our backend stream proxy to completely bypass mobile third-party cookie restrictions and Google Drive virus scan pages
-  const processedUrl = gdriveId ? `/api/v1/portfolio/drive-proxy/${gdriveId}` : url;
+  useEffect(() => {
+    setIsMobileDevice(window.innerWidth < 768);
+  }, []);
+
+  // Use our backend stream proxy ONLY for mobile to bypass third-party cookie restrictions.
+  // Desktop continues using direct Google Drive CDN for maximum speed.
+  const processedUrl = (gdriveId && isMobileDevice) ? `/api/v1/portfolio/drive-proxy/${gdriveId}` : url;
 
 
   // --- FULLSCREEN HANDLING ---
