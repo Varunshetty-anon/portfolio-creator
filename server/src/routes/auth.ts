@@ -40,20 +40,20 @@ interface TokenPair {
   refreshToken: string;
 }
 
-/** Issue access (15 min) + refresh (7 d) JWTs */
+/** Issue access + refresh (30 d) JWTs */
 function generateTokens(userId: string): TokenPair {
   const jwtSecret = process.env.JWT_SECRET!;
   const refreshSecret = process.env.JWT_REFRESH_SECRET ?? jwtSecret;
 
-  const accessToken = generateJWT({ userId }, jwtSecret, '15m');
-  const refreshToken = generateJWT({ userId }, refreshSecret, '7d');
+  const accessToken = generateJWT({ userId }, jwtSecret, '30d');
+  const refreshToken = generateJWT({ userId }, refreshSecret, '30d');
   return { accessToken, refreshToken };
 }
 
 /** Set both tokens as httpOnly cookies on the response */
 function setTokenCookies(res: Response, tokens: TokenPair): void {
-  res.cookie('frames_token', tokens.accessToken, cookieOptions(15 * 60 * 1000));
-  res.cookie('frames_refresh', tokens.refreshToken, cookieOptions(7 * 24 * 60 * 60 * 1000));
+  res.cookie('frames_token', tokens.accessToken, cookieOptions(30 * 24 * 60 * 60 * 1000));
+  res.cookie('frames_refresh', tokens.refreshToken, cookieOptions(30 * 24 * 60 * 60 * 1000));
 }
 
 // ── POST /signup ────────────────────────────────────────────────────
