@@ -7,6 +7,7 @@ import type { PortfolioData, Project } from '@/types';
 import { FramesPlayer } from '@/components/shared/FramesPlayer';
 import { ToolIcon } from '@/components/shared/ToolIcon';
 import { IntroOverlay } from './components/IntroOverlay';
+import { AmbientBackground } from './components/AmbientBackground';
 
 interface PortfolioLayoutProps {
   isPreviewMode?: boolean;
@@ -82,7 +83,9 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
   };
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white selection:bg-white/20">
+    <div className="min-h-screen text-white selection:bg-white/20 relative">
+      <AmbientBackground />
+      
       {!introComplete && !isPreviewMode && (
         <IntroOverlay
           data={data}

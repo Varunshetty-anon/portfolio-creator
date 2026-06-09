@@ -1,0 +1,48 @@
+import React from 'react';
+
+export const AmbientBackground = () => {
+  return (
+    <div className="fixed inset-0 z-[-1] overflow-hidden pointer-events-none bg-[#050505]">
+      {/* Noise Texture Layer */}
+      <div 
+        className="absolute inset-0 z-10 opacity-[0.04] mix-blend-overlay"
+        style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`
+        }}
+      />
+      
+      {/* Cinematic Deep Core Blob */}
+      <div 
+        className="absolute top-[20%] left-[10%] w-[60vw] h-[60vw] min-w-[400px] min-h-[400px] rounded-full opacity-[0.12] blur-[100px] md:blur-[160px]"
+        style={{ 
+          background: 'radial-gradient(circle, #C0A36E 0%, transparent 60%)', 
+          animation: 'ambient-blob1 35s infinite alternate ease-in-out' 
+        }}
+      />
+      
+      {/* Secondary Shadow Blob */}
+      <div 
+        className="absolute bottom-[10%] right-[-5%] w-[70vw] h-[70vw] min-w-[500px] min-h-[500px] rounded-full opacity-[0.08] blur-[120px] md:blur-[180px]"
+        style={{ 
+          background: 'radial-gradient(circle, #F5E6C8 0%, transparent 60%)', 
+          animation: 'ambient-blob2 40s infinite alternate-reverse ease-in-out' 
+        }}
+      />
+
+      <style>{`
+        @keyframes ambient-blob1 {
+          0% { transform: translate(0, 0) scale(1); }
+          33% { transform: translate(15%, 5%) scale(1.05); }
+          66% { transform: translate(5%, 15%) scale(0.95); }
+          100% { transform: translate(-10%, -5%) scale(1.1); }
+        }
+        @keyframes ambient-blob2 {
+          0% { transform: translate(0, 0) scale(1); }
+          33% { transform: translate(-15%, -10%) scale(1.1); }
+          66% { transform: translate(-5%, -20%) scale(0.9); }
+          100% { transform: translate(10%, 10%) scale(1.05); }
+        }
+      `}</style>
+    </div>
+  );
+};
