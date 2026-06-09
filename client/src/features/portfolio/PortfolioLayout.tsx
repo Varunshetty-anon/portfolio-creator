@@ -140,16 +140,23 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
                {/* Profile Image */}
                {data.profileImageUrl && (
                  <div className="mb-6 relative">
-                   <img src={data.profileImageUrl} alt={data.name} className="w-[100px] h-[100px] md:w-[120px] md:h-[120px] rounded-full object-cover shadow-2xl relative z-10" style={{ border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 0 40px rgba(192,163,110,0.1)' }} />
+                   <motion.img 
+                     layoutId="intro-profile-image"
+                     transition={{ type: 'spring', stiffness: 200, damping: 25, mass: 1.2 }}
+                     src={data.profileImageUrl} alt={data.name} className="w-[100px] h-[100px] md:w-[120px] md:h-[120px] rounded-full object-cover shadow-2xl relative z-10" style={{ border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 0 40px rgba(192,163,110,0.1)' }} />
                  </div>
                )}
                
                {/* Role & Location Badge Group */}
                <div className={`flex flex-wrap items-center gap-3 mb-5 ${!hasHeroMedia ? 'justify-center' : 'justify-center xl:justify-start'}`}>
                   {data.role && (
-                    <div className="font-mono text-xs md:text-sm uppercase tracking-[0.2em] text-[#C0A36E] bg-[#C0A36E]/10 px-3 py-1.5 rounded-full border border-[#C0A36E]/20">
+                    <motion.div 
+                      layoutId="intro-role"
+                      transition={{ type: 'spring', stiffness: 200, damping: 25, mass: 1.2 }}
+                      className="font-mono text-xs md:text-sm uppercase tracking-[0.2em] text-[#C0A36E] bg-[#C0A36E]/10 px-3 py-1.5 rounded-full border border-[#C0A36E]/20"
+                    >
                       {data.role}
-                    </div>
+                    </motion.div>
                   )}
                   {data.location && (
                     <div className="font-mono text-[10px] md:text-xs text-white/50 uppercase tracking-[0.1em] flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-white/10 bg-white/5">
@@ -159,9 +166,13 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
                </div>
 
                {/* Name */}
-               <h1 className="font-display font-black uppercase tracking-tighter text-white leading-[0.85] mb-6" style={{ fontSize: 'clamp(56px, 8vw, 100px)' }}>
+               <motion.h1 
+                 layoutId="intro-name"
+                 transition={{ type: 'spring', stiffness: 200, damping: 25, mass: 1.2 }}
+                 className="font-display font-black uppercase tracking-tighter text-white leading-[0.85] mb-6" style={{ fontSize: 'clamp(56px, 8vw, 100px)' }}
+               >
                  {data.name}
-               </h1>
+               </motion.h1>
 
                {/* Bio */}
                <p className={`max-w-md font-light text-base md:text-lg text-white/60 leading-[1.6] mb-8 ${!hasHeroMedia ? 'mx-auto' : 'mx-auto xl:mx-0'}`}>
