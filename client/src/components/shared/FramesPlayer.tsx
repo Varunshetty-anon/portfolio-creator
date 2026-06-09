@@ -108,9 +108,9 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
     setIsMobileDevice(window.innerWidth < 768);
   }, []);
 
-  // Use our backend stream proxy ONLY for mobile to bypass third-party cookie restrictions.
-  // Desktop continues using direct Google Drive CDN for maximum speed.
-  const processedUrl = (gdriveId && isMobileDevice) ? `/api/v1/portfolio/drive-proxy/${gdriveId}` : url;
+  // Use direct URL for desktop. We bypass the slow proxy completely.
+  // On mobile, we will use the native Google Drive iframe to achieve maximum CDN speeds.
+  const processedUrl = url;
 
 
   // --- FULLSCREEN HANDLING ---
@@ -387,8 +387,18 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
         </div>
       )}
 
-      {/* React Player Core */}
-      {!hasError && (
+      {/* React Player Core or Mobile Native GDrive Iframe */}
+      {gdriveId && isMobileDevice ? (
+        <div className="absolute inset-0 w-full h-full z-10 bg-black pointer-events-auto">
+          <iframe
+            src={`https://drive.google.com/file/d/${gdriveId}/preview?autoplay=1`}
+            className="absolute inset-0 w-full h-full border-0 relative z-50"
+            style={{ pointerEvents: 'auto' }}
+            allow="autoplay; fullscreen"
+            onLoad={() => { setIsReady(true); setIsBuffering(false); }}
+          />
+        </div>
+      ) : !hasError && (
         <Player
           src={processedUrl}
           playing={playing}
@@ -478,7 +488,7 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
       )}
 
       {/* Minimalistic Cinematic Controls overlay */}
-      {!minimalMode && controls && !hasError && isReady && (
+      {!minimalMode && controls && !hasError && isReady && !(gdriveId && isMobileDevice) && (
         <AnimatePresence>
           {isHovering && (
             <motion.div
