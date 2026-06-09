@@ -65,6 +65,14 @@ export const router = createBrowserRouter([
       </SuspenseWrapper>
     ),
   },
+  {
+    path: '/404',
+    element: (
+      <SuspenseWrapper>
+        <NotFound />
+      </SuspenseWrapper>
+    ),
+  },
   // Custom clean URL support (e.g. domain.com/username)
   // React Router will match specific routes (/editor, /onboarding) first.
   // Anything else falls through to here, functioning as a native URL shortener.
