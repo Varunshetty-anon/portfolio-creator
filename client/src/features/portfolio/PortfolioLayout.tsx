@@ -263,7 +263,7 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
           <div className="columns-1 sm:columns-2 lg:columns-3 gap-[3px] w-full max-w-[1600px] mx-auto px-[3px]">
             {projects.map((project) => {
               let pb = '56.25%'; // 16:9
-              if (project.aspectRatio === '9:16') pb = '177.77%';
+              if (project.aspectRatio === '9:16') pb = '70%'; // Capped vertical ratio requested by user
               else if (project.aspectRatio === '4:3') pb = '75%';
               else if (project.aspectRatio === '1:1') pb = '100%';
 

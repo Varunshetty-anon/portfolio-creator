@@ -308,6 +308,8 @@ router.get(
   },
 );
 
+import { Readable } from 'stream';
+
 // ── GET /drive-proxy/:id — public proxy for Google Drive videos ──────
 router.get(
   '/drive-proxy/:id',
@@ -332,22 +334,57 @@ router.get(
         // Try old confirm token format
         const oldConfirmMatch = text.match(/confirm=([a-zA-Z0-9_-]+)/);
         
+        let finalUrl = '';
         if (actionMatch && uuidMatch) {
           const actionUrl = actionMatch[1].startsWith('http') ? actionMatch[1] : `https://drive.google.com${actionMatch[1]}`;
-          const finalUrl = `${actionUrl}?id=${fileId}&export=download&confirm=t&uuid=${uuidMatch[1]}`;
-          // Redirect the browser directly to Google's CDN to eliminate backend bandwidth bottleneck
-          return res.redirect(302, finalUrl);
+          finalUrl = `${actionUrl}?id=${fileId}&export=download&confirm=t&uuid=${uuidMatch[1]}`;
         } else if (oldConfirmMatch) {
-          const finalUrl = `${url}&confirm=${oldConfirmMatch[1]}`;
-          return res.redirect(302, finalUrl);
+          finalUrl = `${url}&confirm=${oldConfirmMatch[1]}`;
         } else {
           return res.status(404).json({ success: false, error: 'Not found or private' });
+        }
+        
+        // Stream the video directly to bypass iOS Safari's restrictive cross-site redirect policies
+        const videoRes = await fetch(finalUrl, {
+          headers: {
+            Range: req.headers.range || 'bytes=0-',
+            'User-Agent': 'Mozilla/5.0'
+          }
+        });
+        
+        res.status(videoRes.status);
+        videoRes.headers.forEach((val, key) => {
+          res.setHeader(key, val);
+        });
+        
+        if (videoRes.body) {
+          const readable = Readable.fromWeb(videoRes.body as any);
+          readable.pipe(res);
+          return;
+        } else {
+          return res.status(500).send('Error streaming video');
         }
       }
       
       // If it's not an HTML page, it means there's no virus scan warning (e.g. file is small)
-      // In this case, we can just redirect directly to the original URL and Google will stream it.
-      return res.redirect(302, url);
+      // Stream it directly
+      const videoRes = await fetch(url, {
+        headers: {
+          Range: req.headers.range || 'bytes=0-',
+          'User-Agent': 'Mozilla/5.0'
+        }
+      });
+      res.status(videoRes.status);
+      videoRes.headers.forEach((val, key) => {
+        res.setHeader(key, val);
+      });
+      if (videoRes.body) {
+        const readable = Readable.fromWeb(videoRes.body as any);
+        readable.pipe(res);
+        return;
+      } else {
+        return res.status(500).send('Error streaming video');
+      }
       
     } catch (err) {
       console.error('Drive proxy error:', err);

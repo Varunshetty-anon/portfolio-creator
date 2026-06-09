@@ -102,19 +102,9 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
   }, [volume]);
 
   const gdriveId = getGoogleDriveId(url);
-  const [gdriveError, setGdriveError] = useState(false);
-  
-  // Use our backend proxy to completely bypass mobile third-party cookie restrictions and Google Drive virus scan pages
-  const processedUrl = gdriveId && !gdriveError 
-    ? `/api/v1/portfolio/drive-proxy/${gdriveId}` 
-    : url;
 
-  useEffect(() => {
-    if (gdriveId && gdriveError) {
-      // GDrive iframe doesn't need to 'ready' the same way ReactPlayer does
-      setIsReady(true);
-    }
-  }, [gdriveId, gdriveError]);
+  // Use our backend stream proxy to completely bypass mobile third-party cookie restrictions and Google Drive virus scan pages
+  const processedUrl = gdriveId ? `/api/v1/portfolio/drive-proxy/${gdriveId}` : url;
 
 
   // --- FULLSCREEN HANDLING ---
@@ -391,29 +381,8 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
         </div>
       )}
 
-      {/* React Player Core or GDrive Iframe */}
-      {!hasError && gdriveId && gdriveError ? (
-        <div className="absolute inset-0 w-full h-full z-10 bg-black pointer-events-auto">
-          {window.innerWidth < 768 ? (
-             <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center z-50">
-                <AlertCircle className="w-10 h-10 text-[#C0A36E] mb-4 mx-auto" />
-                <h3 className="text-white font-display text-lg mb-2">Watch Video</h3>
-                <p className="text-white/50 font-mono text-[10px] uppercase tracking-widest mb-6">Mobile browsers restrict inline playback</p>
-                <a href={`https://drive.google.com/file/d/${gdriveId}/view`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 bg-[#C0A36E] text-black px-6 py-3 rounded-full font-bold uppercase tracking-wider text-xs hover:bg-[#F5E6C8] transition">
-                  Play on Drive <ArrowUpRight size={14} />
-                </a>
-             </div>
-          ) : (
-             <iframe
-               src={`https://drive.google.com/file/d/${gdriveId}/preview?autoplay=1`}
-               className="absolute inset-0 w-full h-full border-0 relative z-50"
-               style={{ pointerEvents: 'auto' }}
-               allow="autoplay; fullscreen"
-               onLoad={() => { setIsReady(true); setIsBuffering(false); }}
-             />
-          )}
-        </div>
-      ) : !hasError && (
+      {/* React Player Core */}
+      {!hasError && (
         <Player
           src={processedUrl}
           playing={playing}
@@ -426,7 +395,7 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
           playsInline={true}
           config={{
             file: {
-              forceVideo: gdriveId && !gdriveError ? true : undefined,
+              forceVideo: gdriveId ? true : undefined,
               attributes: {
                 controlsList: 'nodownload',
                 playsInline: true
@@ -483,11 +452,7 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
           onPlaying={() => setIsBuffering(false)}
           onError={(err: any) => {
             console.warn('FramesPlayer Error:', err);
-            if (gdriveId && !gdriveError) {
-              setGdriveError(true);
-            } else {
-              setHasError(true);
-            }
+            setHasError(true);
           }}
           ref={playerRef}
         />
