@@ -325,15 +325,23 @@ router.get(
       // Handle Google Drive virus scan warning page (which returns 200 HTML)
       if (response.status === 200 && response.headers.get('content-type')?.includes('text/html')) {
         const text = await response.text();
-        const match = text.match(/confirm=([a-zA-Z0-9_-]+)/);
-        if (match) {
-          const confirmToken = match[1];
-          const cookies = response.headers.get('set-cookie') || '';
-          
-          headers['Cookie'] = cookies;
-          url = `${url}&confirm=${confirmToken}`;
-          
-          // Re-fetch with the confirm token and original Range header
+        
+        // Try new UUID format first (drive.usercontent.google.com)
+        const actionMatch = text.match(/action="([^"]+)"/);
+        const uuidMatch = text.match(/name="uuid" value="([^"]+)"/);
+        
+        // Try old confirm token format
+        const oldConfirmMatch = text.match(/confirm=([a-zA-Z0-9_-]+)/);
+        
+        const cookies = response.headers.get('set-cookie') || '';
+        headers['Cookie'] = cookies;
+
+        if (actionMatch && uuidMatch) {
+          const actionUrl = actionMatch[1].startsWith('http') ? actionMatch[1] : `https://drive.google.com${actionMatch[1]}`;
+          url = `${actionUrl}?id=${fileId}&export=download&confirm=t&uuid=${uuidMatch[1]}`;
+          response = await fetch(url, { headers });
+        } else if (oldConfirmMatch) {
+          url = `${url}&confirm=${oldConfirmMatch[1]}`;
           response = await fetch(url, { headers });
         } else {
           return res.status(404).json({ success: false, error: 'Not found or private' });
