@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Instagram, Mail, ArrowUpRight, X } from 'lucide-react';
+import { Instagram, Mail, ArrowUpRight, X, MapPin } from 'lucide-react';
 import { portfolioApi } from '@/lib/api';
 import type { PortfolioData, Project } from '@/types';
 import { FramesPlayer } from '@/components/shared/FramesPlayer';
@@ -23,6 +23,14 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [contactOpen, setContactOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     if (isPreviewMode && draftData) {
@@ -128,43 +136,48 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
       <section className="relative min-h-[100dvh] flex flex-col items-center justify-center px-6 pt-24 pb-48 md:px-14">
         <div className={`w-full max-w-[1200px] mx-auto flex flex-col xl:flex-row gap-16 xl:gap-24 items-center justify-center`}>
           
-          <div className={`flex-1 w-full max-w-xl flex flex-col ${!hasHeroMedia ? 'items-center text-center' : 'items-center text-center xl:items-start xl:text-left'}`}>
-            {data.profileImageUrl && (
-              <div className="mb-6 md:mb-8 relative">
-                <img 
-                  src={data.profileImageUrl} 
-                  alt={data.name} 
-                  className="w-[120px] h-[120px] md:w-[150px] md:h-[150px] rounded-full object-cover relative z-10"
-                  style={{ border: '1px solid rgba(255,255,255,0.15)', boxShadow: '0 0 40px rgba(192,163,110,0.15)' }}
-                />
-              </div>
-            )}
-            <div className="font-mono text-sm md:text-base uppercase tracking-[0.25em] text-[#C0A36E] mb-4 md:mb-6">
-              {data.role}
-            </div>
-            <h1 
-              className="font-display font-black uppercase tracking-tighter text-white leading-[0.9] mb-8"
-              style={{ fontSize: 'clamp(48px, 8vw, 110px)' }}
-            >
-              {data.name}
-            </h1>
-            <p className={`max-w-md font-light text-base md:text-lg text-white/50 leading-[1.7] mb-8 ${!hasHeroMedia ? 'mx-auto' : 'mx-auto xl:mx-0'}`}>
-              {data.bio}
-            </p>
-            
-            <div className={`flex flex-col gap-3 ${!hasHeroMedia ? 'items-center' : ''}`}>
-              {data.location && (
-                <div className="font-mono text-xs text-white/30 uppercase">
-                  {data.location}
-                </div>
-              )}
-              {data.availability?.status && (
-                <div className="inline-flex items-center gap-2 bg-white/5 px-3 py-1.5 border border-white/10 rounded-full mt-2">
-                  <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse shadow-[0_0_8px_rgba(74,222,128,0.6)]" />
-                  <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-white/70">Available for hire</span>
-                </div>
-              )}
-            </div>
+          <div className={`w-full xl:w-auto max-w-xl flex flex-col ${!hasHeroMedia ? 'items-center text-center' : 'items-center text-center xl:items-start xl:text-left'}`}>
+               {/* Profile Image */}
+               {data.profileImageUrl && (
+                 <div className="mb-6 relative">
+                   <img src={data.profileImageUrl} alt={data.name} className="w-[100px] h-[100px] md:w-[120px] md:h-[120px] rounded-full object-cover shadow-2xl relative z-10" style={{ border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 0 40px rgba(192,163,110,0.1)' }} />
+                 </div>
+               )}
+               
+               {/* Role & Location Badge Group */}
+               <div className={`flex flex-wrap items-center gap-3 mb-5 ${!hasHeroMedia ? 'justify-center' : 'justify-center xl:justify-start'}`}>
+                  {data.role && (
+                    <div className="font-mono text-xs md:text-sm uppercase tracking-[0.2em] text-[#C0A36E] bg-[#C0A36E]/10 px-3 py-1.5 rounded-full border border-[#C0A36E]/20">
+                      {data.role}
+                    </div>
+                  )}
+                  {data.location && (
+                    <div className="font-mono text-[10px] md:text-xs text-white/50 uppercase tracking-[0.1em] flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-white/10 bg-white/5">
+                      <MapPin size={12} /> {data.location}
+                    </div>
+                  )}
+               </div>
+
+               {/* Name */}
+               <h1 className="font-display font-black uppercase tracking-tighter text-white leading-[0.85] mb-6" style={{ fontSize: 'clamp(56px, 8vw, 100px)' }}>
+                 {data.name}
+               </h1>
+
+               {/* Bio */}
+               <p className={`max-w-md font-light text-base md:text-lg text-white/60 leading-[1.6] mb-8 ${!hasHeroMedia ? 'mx-auto' : 'mx-auto xl:mx-0'}`}>
+                 {data.bio}
+               </p>
+
+               {/* Availability */}
+               {data.availability?.status && (
+                 <div className={`inline-flex items-center gap-2.5 bg-white/5 px-4 py-2 border border-white/10 rounded-full cursor-default ${!hasHeroMedia ? 'mx-auto' : 'mx-auto xl:mx-0'}`}>
+                   <span className="relative flex h-2.5 w-2.5">
+                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                     <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></span>
+                   </span>
+                   <span className="font-mono text-[11px] uppercase tracking-[0.15em] text-white/80">Available for hire</span>
+                 </div>
+               )}
           </div>
 
           {hasHeroMedia && (
@@ -178,9 +191,9 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
                       <FramesPlayer 
                         url={showreelMedia} 
                         thumbnail={showreelThumbnail} 
-                        controls={false}
-                        minimalMode={true} 
-                        autoplay={true} 
+                        controls={isMobile}
+                        minimalMode={!isMobile} 
+                        autoplay={!isMobile} 
                         muted={true} 
                         loop={true} 
                         className="w-full h-full object-cover"
