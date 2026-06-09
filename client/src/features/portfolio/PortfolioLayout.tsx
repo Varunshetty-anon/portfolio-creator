@@ -73,18 +73,16 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
   if (loading || !data) return null;
 
   const projects = [...(data.projects || [])].sort((a, b) => a.order - b.order);
-  const heroProject = React.useMemo(() => {
-    if (!projects || projects.length === 0) return null;
-    return projects.find(p => (p._id || p.id) === data?.heroProjectId) || projects[0];
-  }, [projects, data?.heroProjectId]);
+  
+  const heroProject = projects.length > 0 
+    ? (projects.find(p => (p._id || p.id) === data?.heroProjectId) || projects[0]) 
+    : null;
 
   const showreelMedia = data?.showreelUrl || heroProject?.videoUrl;
   const showreelThumbnail = data?.showreelThumbnailUrl || heroProject?.thumbnailUrl || heroProject?.imageUrl;
   const hasHeroMedia = Boolean(showreelMedia || showreelThumbnail);
 
-  const heroVideoUrl = React.useMemo(() => {
-    return heroProject?.videoUrl;
-  }, [heroProject]);
+  const heroVideoUrl = heroProject?.videoUrl;
 
   const truncate = (str: string, length: number) => {
     if (str.length <= length) return str;
