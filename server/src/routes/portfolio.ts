@@ -342,7 +342,16 @@ router.get(
           return res.status(404).json({ success: false, error: 'Not found or private' });
         }
         
-        // Stream the video directly to bypass iOS Safari's restrictive cross-site redirect policies
+        // Detect if the client is a mobile device
+        const userAgent = req.headers['user-agent'] || '';
+        const isMobile = /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
+
+        if (!isMobile) {
+          // For Desktop: 302 Redirect directly to Google's CDN for instant, maximum-speed playback
+          return res.redirect(302, finalUrl);
+        }
+
+        // For Mobile: Stream the video directly to bypass iOS Safari's restrictive cross-site redirect policies
         const videoRes = await fetch(finalUrl, {
           headers: {
             Range: req.headers.range || 'bytes=0-',
@@ -364,8 +373,16 @@ router.get(
         }
       }
       
+      // Detect if the client is a mobile device
+      const userAgent = req.headers['user-agent'] || '';
+      const isMobile = /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
+
+      if (!isMobile) {
+        return res.redirect(302, url);
+      }
+
       // If it's not an HTML page, it means there's no virus scan warning (e.g. file is small)
-      // Stream it directly
+      // Stream it directly for mobile
       const videoRes = await fetch(url, {
         headers: {
           Range: req.headers.range || 'bytes=0-',

@@ -102,15 +102,11 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
   }, [volume]);
 
   const gdriveId = getGoogleDriveId(url);
-  const [isMobileDevice, setIsMobileDevice] = useState(false);
 
-  useEffect(() => {
-    setIsMobileDevice(window.innerWidth < 768);
-  }, []);
-
-  // Use direct URL for desktop. We bypass the slow proxy completely.
-  // On mobile, we will use the native Google Drive iframe to achieve maximum CDN speeds.
-  const processedUrl = url;
+  // We route all Google Drive videos through our smart backend proxy.
+  // The backend will dynamically serve a direct CDN redirect for Desktop (maximum speed)
+  // and a piped stream for Mobile (to bypass Safari third-party cookie blocks).
+  const processedUrl = gdriveId ? `/api/v1/portfolio/drive-proxy/${gdriveId}` : url;
 
 
   // --- FULLSCREEN HANDLING ---
@@ -387,18 +383,8 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
         </div>
       )}
 
-      {/* React Player Core or Mobile Native GDrive Iframe */}
-      {gdriveId && isMobileDevice ? (
-        <div className="absolute inset-0 w-full h-full z-10 bg-black pointer-events-auto">
-          <iframe
-            src={`https://drive.google.com/file/d/${gdriveId}/preview?autoplay=1`}
-            className="absolute inset-0 w-full h-full border-0 relative z-50"
-            style={{ pointerEvents: 'auto' }}
-            allow="autoplay; fullscreen"
-            onLoad={() => { setIsReady(true); setIsBuffering(false); }}
-          />
-        </div>
-      ) : !hasError && (
+      {/* React Player Core */}
+      {!hasError && (
         <Player
           src={processedUrl}
           playing={playing}
@@ -488,7 +474,7 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
       )}
 
       {/* Minimalistic Cinematic Controls overlay */}
-      {!minimalMode && controls && !hasError && isReady && !(gdriveId && isMobileDevice) && (
+      {!minimalMode && controls && !hasError && isReady && (
         <AnimatePresence>
           {isHovering && (
             <motion.div
