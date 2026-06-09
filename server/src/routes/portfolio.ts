@@ -314,13 +314,12 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const fileId = req.params.id;
-      const range = req.headers.range;
-      
       let url = `https://drive.google.com/uc?export=download&id=${fileId}`;
       const headers: Record<string, string> = { 'User-Agent': 'Mozilla/5.0' };
-      if (range) headers['Range'] = range;
 
-      let response = await fetch(url, { headers });
+      // We only fetch the HEAD or a tiny range to check if it's an HTML virus scan page
+      headers['Range'] = 'bytes=0-0';
+      const response = await fetch(url, { headers });
       
       // Handle Google Drive virus scan warning page (which returns 200 HTML)
       if (response.status === 200 && response.headers.get('content-type')?.includes('text/html')) {
@@ -333,42 +332,26 @@ router.get(
         // Try old confirm token format
         const oldConfirmMatch = text.match(/confirm=([a-zA-Z0-9_-]+)/);
         
-        const cookies = response.headers.get('set-cookie') || '';
-        headers['Cookie'] = cookies;
-
         if (actionMatch && uuidMatch) {
           const actionUrl = actionMatch[1].startsWith('http') ? actionMatch[1] : `https://drive.google.com${actionMatch[1]}`;
-          url = `${actionUrl}?id=${fileId}&export=download&confirm=t&uuid=${uuidMatch[1]}`;
-          response = await fetch(url, { headers });
+          const finalUrl = `${actionUrl}?id=${fileId}&export=download&confirm=t&uuid=${uuidMatch[1]}`;
+          // Redirect the browser directly to Google's CDN to eliminate backend bandwidth bottleneck
+          return res.redirect(302, finalUrl);
         } else if (oldConfirmMatch) {
-          url = `${url}&confirm=${oldConfirmMatch[1]}`;
-          response = await fetch(url, { headers });
+          const finalUrl = `${url}&confirm=${oldConfirmMatch[1]}`;
+          return res.redirect(302, finalUrl);
         } else {
           return res.status(404).json({ success: false, error: 'Not found or private' });
         }
       }
       
-      // Forward necessary headers
-      const headersToForward = ['content-type', 'content-length', 'accept-ranges', 'content-range'];
-      headersToForward.forEach(header => {
-        if (response.headers.has(header)) {
-          res.setHeader(header, response.headers.get(header)!);
-        }
-      });
+      // If it's not an HTML page, it means there's no virus scan warning (e.g. file is small)
+      // In this case, we can just redirect directly to the original URL and Google will stream it.
+      return res.redirect(302, url);
       
-      res.status(response.status);
-      
-      // Pipe the video stream directly to the client
-      if (response.body) {
-        // @ts-ignore
-        const readable = Readable.fromWeb(response.body);
-        readable.pipe(res);
-      } else {
-        res.end();
-      }
     } catch (err) {
       console.error('Drive proxy error:', err);
-      res.status(500).send('Error proxying video');
+      res.status(500).send('Error resolving video URL');
     }
   }
 );
