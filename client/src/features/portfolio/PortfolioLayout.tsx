@@ -175,13 +175,16 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></span>
                    </span>
-                   <span className="font-mono text-[11px] uppercase tracking-[0.15em] text-white/80">Available for hire</span>
+                   <span className="font-mono text-[11px] uppercase tracking-[0.15em] text-white/80">Available to work</span>
                  </div>
                )}
           </div>
 
           {hasHeroMedia && (
             <div className="w-full max-w-[320px] sm:max-w-[400px] xl:max-w-[440px] shrink-0">
+              <div className="font-mono text-[10px] tracking-[0.3em] uppercase text-white/30 mb-5 text-center">
+                SHOWREEL
+              </div>
               <div 
                 className="w-full aspect-square relative rounded-[40px] overflow-hidden border border-white/10 shadow-[0_0_60px_rgba(255,255,255,0.05)] bg-[#0a0a0c]"
               >
@@ -223,7 +226,7 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
           className="absolute pointer-events-none"
           style={{ bottom: '24px', left: '50%', transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}
         >
-          <span className="font-mono text-[9px] tracking-[0.3em] uppercase text-white/30">EXPLORE</span>
+          <span className="font-mono text-[9px] tracking-[0.3em] uppercase text-white/30">SCROLL FOR WORKS</span>
           <motion.div
             className="w-[26px] h-[40px] border border-white/20 rounded-full flex justify-center pt-[6px]"
           >
@@ -246,56 +249,63 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
             </h2>
             <div className="w-8 h-[2px] bg-[#C0A36E] mt-4"></div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-[3px] w-full">
-            {projects.map((project) => (
-              <div
-                key={project._id || project.id}
-                role="button"
-                tabIndex={0}
-                aria-label={`Open project: ${project.title}`}
-                className="group relative overflow-hidden cursor-pointer bg-[#111]"
-                style={{ aspectRatio: '16/9', border: '1px solid rgba(255, 255, 255, 0.07)' }}
-                onClick={() => setSelectedProject(project)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    setSelectedProject(project);
-                  }
-                }}
-              >
-                {project.thumbnailUrl ? (
-                  <img
-                    src={project.thumbnailUrl}
-                    alt={project.title}
-                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
-                  />
-                ) : (
-                  <div className="absolute inset-0 bg-gradient-to-b from-[#111] to-[#1a1a1a]" />
-                )}
-                
-                <div 
-                  className="absolute inset-0 z-10 pointer-events-none"
-                  style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.5) 35%, rgba(0,0,0,0.1) 65%, transparent 100%)' }}
-                />
-                
-                <div 
-                  className="absolute bottom-0 left-0 right-0 p-4 z-20 pointer-events-none bg-black/60 md:bg-black/20 md:backdrop-blur-md border-t border-white/[0.06]"
-                >
-                  {project.contentType && (
-                    <span className="font-mono text-[9px] tracking-[0.18em] uppercase text-white/45 border border-white/15 px-1.5 py-0.5 inline-block mb-2">
-                      {project.contentType}
-                    </span>
-                  )}
-                  <h3 className="font-display text-sm md:text-base font-bold leading-snug text-white line-clamp-2 overflow-hidden text-ellipsis">
-                    {project.title}
-                  </h3>
-                </div>
+          <div className="columns-1 sm:columns-2 lg:columns-3 gap-[3px] w-full max-w-[1600px] mx-auto px-[3px]">
+            {projects.map((project) => {
+              let pb = '56.25%'; // 16:9
+              if (project.aspectRatio === '9:16') pb = '177.77%';
+              else if (project.aspectRatio === '4:3') pb = '75%';
+              else if (project.aspectRatio === '1:1') pb = '100%';
 
-                <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-20">
-                  <ArrowUpRight size={16} className="text-white" />
+              return (
+                <div
+                  key={project._id || project.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Open project: ${project.title}`}
+                  className="group relative overflow-hidden cursor-pointer bg-[#111] mb-[3px] break-inside-avoid"
+                  style={{ paddingBottom: pb, border: '1px solid rgba(255, 255, 255, 0.07)' }}
+                  onClick={() => setSelectedProject(project)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      setSelectedProject(project);
+                    }
+                  }}
+                >
+                  {project.thumbnailUrl ? (
+                    <img
+                      src={project.thumbnailUrl}
+                      alt={project.title}
+                      className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 bg-gradient-to-b from-[#111] to-[#1a1a1a]" />
+                  )}
+                  
+                  <div 
+                    className="absolute inset-0 z-10 pointer-events-none"
+                    style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.5) 35%, rgba(0,0,0,0.1) 65%, transparent 100%)' }}
+                  />
+                  
+                  <div 
+                    className="absolute bottom-0 left-0 right-0 p-4 z-20 pointer-events-none bg-black/60 md:bg-black/20 md:backdrop-blur-md border-t border-white/[0.06]"
+                  >
+                    {project.contentType && (
+                      <span className="font-mono text-[9px] tracking-[0.18em] uppercase text-white/45 border border-white/15 px-1.5 py-0.5 inline-block mb-2">
+                        {project.contentType}
+                      </span>
+                    )}
+                    <h3 className="font-display text-sm md:text-base font-bold leading-snug text-white line-clamp-2 overflow-hidden text-ellipsis">
+                      {project.title}
+                    </h3>
+                  </div>
+
+                  <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-20">
+                    <ArrowUpRight size={16} className="text-white" />
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
       )}
