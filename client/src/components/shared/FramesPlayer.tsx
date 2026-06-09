@@ -106,11 +106,27 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
   }, [volume, minimalMode]);
 
   const gdriveId = getGoogleDriveId(url);
+  const [resolvedUrl, setResolvedUrl] = useState<string | null>(gdriveId ? null : url);
 
-  // We route all Google Drive videos through our smart backend proxy.
-  // The backend will dynamically serve a direct CDN redirect for Desktop (maximum speed)
-  // and a piped stream for Mobile (to bypass Safari third-party cookie blocks).
-  const processedUrl = gdriveId ? `/api/v1/portfolio/drive-proxy/${gdriveId}` : url;
+  useEffect(() => {
+    if (gdriveId) {
+      fetch(`/api/v1/portfolio/drive-url/${gdriveId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.url) {
+            setResolvedUrl(data.url);
+          } else {
+            setHasError(true);
+          }
+        })
+        .catch(err => {
+          console.error('Failed to resolve GDrive URL', err);
+          setHasError(true);
+        });
+    }
+  }, [gdriveId]);
+
+  const processedUrl = resolvedUrl || '';
 
 
   // --- FULLSCREEN HANDLING ---
@@ -388,7 +404,7 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
       )}
 
       {/* React Player Core */}
-      {!hasError && (
+      {!hasError && resolvedUrl && (
         <Player
           src={processedUrl}
           playing={playing}
@@ -403,6 +419,7 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
             file: {
               forceVideo: gdriveId ? true : undefined,
               attributes: {
+                crossOrigin: 'anonymous',
                 controlsList: 'nodownload',
                 playsInline: true
               }

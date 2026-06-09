@@ -308,9 +308,9 @@ router.get(
   },
 );
 
-// ── GET /drive-proxy/:id — public proxy for Google Drive videos ──────
+// ── GET /drive-url/:id — returns resolved direct CDN url for Google Drive videos ──────
 router.get(
-  '/drive-proxy/:id',
+  '/drive-url/:id',
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const fileId = req.params.id;
@@ -342,68 +342,15 @@ router.get(
           return res.status(404).json({ success: false, error: 'Not found or private' });
         }
         
-        // Detect if the client is a mobile device
-        const userAgent = req.headers['user-agent'] || '';
-        const isMobile = /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
-
-        if (!isMobile) {
-          // For Desktop: 302 Redirect directly to Google's CDN for instant, maximum-speed playback
-          return res.redirect(302, finalUrl);
-        }
-
-        // For Mobile: Stream the video directly to bypass iOS Safari's restrictive cross-site redirect policies
-        const videoRes = await fetch(finalUrl, {
-          headers: {
-            Range: req.headers.range || 'bytes=0-',
-            'User-Agent': 'Mozilla/5.0'
-          }
-        });
-        
-        res.status(videoRes.status);
-        videoRes.headers.forEach((val, key) => {
-          res.setHeader(key, val);
-        });
-        
-        if (videoRes.body) {
-          const readable = Readable.fromWeb(videoRes.body as any);
-          readable.pipe(res);
-          return;
-        } else {
-          return res.status(500).send('Error streaming video');
-        }
+        return res.json({ success: true, url: finalUrl });
       }
       
-      // Detect if the client is a mobile device
-      const userAgent = req.headers['user-agent'] || '';
-      const isMobile = /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
-
-      if (!isMobile) {
-        return res.redirect(302, url);
-      }
-
-      // If it's not an HTML page, it means there's no virus scan warning (e.g. file is small)
-      // Stream it directly for mobile
-      const videoRes = await fetch(url, {
-        headers: {
-          Range: req.headers.range || 'bytes=0-',
-          'User-Agent': 'Mozilla/5.0'
-        }
-      });
-      res.status(videoRes.status);
-      videoRes.headers.forEach((val, key) => {
-        res.setHeader(key, val);
-      });
-      if (videoRes.body) {
-        const readable = Readable.fromWeb(videoRes.body as any);
-        readable.pipe(res);
-        return;
-      } else {
-        return res.status(500).send('Error streaming video');
-      }
+      // If no virus scan page, the original URL is the direct stream
+      return res.json({ success: true, url });
       
     } catch (err) {
-      console.error('Drive proxy error:', err);
-      res.status(500).send('Error resolving video URL');
+      console.error('Drive resolve error:', err);
+      res.status(500).json({ success: false, error: 'Failed to resolve' });
     }
   }
 );
