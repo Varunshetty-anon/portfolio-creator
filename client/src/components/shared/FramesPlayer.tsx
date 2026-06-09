@@ -46,14 +46,14 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
 }) => {
   const [playing, setPlaying] = useState(autoplay);
   const [muted, setMuted] = useState(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && !minimalMode) {
       const saved = localStorage.getItem('frames_player_muted');
       if (saved !== null) return JSON.parse(saved);
     }
     return initialMuted;
   });
   const [volume, setVolume] = useState(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && !minimalMode) {
       const saved = localStorage.getItem('frames_player_volume');
       if (saved !== null) return parseFloat(saved);
     }
@@ -92,14 +92,18 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
     player.currentTime = Math.max(time, 0);
   }, []);
 
-  // Persist volume settings
+  // Persist volume settings only for full players
   useEffect(() => {
-    localStorage.setItem('frames_player_muted', JSON.stringify(muted));
-  }, [muted]);
+    if (!minimalMode) {
+      localStorage.setItem('frames_player_muted', JSON.stringify(muted));
+    }
+  }, [muted, minimalMode]);
 
   useEffect(() => {
-    localStorage.setItem('frames_player_volume', volume.toString());
-  }, [volume]);
+    if (!minimalMode) {
+      localStorage.setItem('frames_player_volume', volume.toString());
+    }
+  }, [volume, minimalMode]);
 
   const gdriveId = getGoogleDriveId(url);
 
