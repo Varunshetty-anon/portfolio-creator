@@ -308,8 +308,6 @@ router.get(
   },
 );
 
-import { Readable } from 'stream';
-
 // ── GET /drive-proxy/:id — public proxy for Google Drive videos ──────
 router.get(
   '/drive-proxy/:id',
