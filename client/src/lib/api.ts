@@ -40,6 +40,9 @@ async function request<T>(
   const response = await fetch(url, config);
 
   if (!response.ok) {
+    if (response.status === 401 && typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('auth:unauthorized'));
+    }
     const errorData = await response.json().catch(() => ({ error: 'Request failed' }));
     throw new ApiError(
       errorData.error || `HTTP ${response.status}`,
