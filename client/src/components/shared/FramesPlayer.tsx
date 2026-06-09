@@ -101,8 +101,10 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
 
   const gdriveId = getGoogleDriveId(url);
   const [gdriveError, setGdriveError] = useState(false);
+  
+  // Use our backend proxy to completely bypass mobile third-party cookie restrictions and Google Drive virus scan pages
   const processedUrl = gdriveId && !gdriveError 
-    ? `https://drive.google.com/uc?export=download&confirm=t&id=${gdriveId}` 
+    ? `/api/v1/portfolio/drive-proxy/${gdriveId}` 
     : url;
 
   useEffect(() => {
@@ -111,6 +113,7 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
       setIsReady(true);
     }
   }, [gdriveId, gdriveError]);
+
 
   // --- FULLSCREEN HANDLING ---
   useEffect(() => {

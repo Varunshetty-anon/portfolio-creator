@@ -3,6 +3,7 @@
  */
 
 import { Router, type Request, type Response, type NextFunction } from 'express';
+import { Readable } from 'stream';
 
 import Portfolio from '../models/Portfolio.js';
 import Project from '../models/Project.js';
@@ -305,6 +306,63 @@ router.get(
       next(err);
     }
   },
+);
+
+// ── GET /drive-proxy/:id — public proxy for Google Drive videos ──────
+router.get(
+  '/drive-proxy/:id',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const fileId = req.params.id;
+      const range = req.headers.range;
+      
+      let url = `https://drive.google.com/uc?export=download&id=${fileId}`;
+      const headers: Record<string, string> = { 'User-Agent': 'Mozilla/5.0' };
+      if (range) headers['Range'] = range;
+
+      let response = await fetch(url, { headers });
+      
+      // Handle Google Drive virus scan warning page (which returns 200 HTML)
+      if (response.status === 200 && response.headers.get('content-type')?.includes('text/html')) {
+        const text = await response.text();
+        const match = text.match(/confirm=([a-zA-Z0-9_-]+)/);
+        if (match) {
+          const confirmToken = match[1];
+          const cookies = response.headers.get('set-cookie') || '';
+          
+          headers['Cookie'] = cookies;
+          url = `${url}&confirm=${confirmToken}`;
+          
+          // Re-fetch with the confirm token and original Range header
+          response = await fetch(url, { headers });
+        } else {
+          return res.status(404).json({ success: false, error: 'Not found or private' });
+        }
+      }
+      
+      // Forward necessary headers
+      const headersToForward = ['content-type', 'content-length', 'accept-ranges', 'content-range'];
+      headersToForward.forEach(header => {
+        if (response.headers.has(header)) {
+          res.setHeader(header, response.headers.get(header)!);
+        }
+      });
+      
+      res.status(response.status);
+      
+      // Pipe the video stream directly to the client
+      if (response.body) {
+        // @ts-ignore
+        const readable = Readable.fromWeb(response.body);
+        readable.pipe(res);
+      } else {
+        res.end();
+      }
+    } catch (err) {
+      console.error('Drive proxy error:', err);
+      res.status(500).send('Error proxying video');
+    }
+  }
 );
 
 // ── GET /stats — analytics summary ──────────────────────────────────
