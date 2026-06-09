@@ -191,9 +191,9 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
                       <FramesPlayer 
                         url={showreelMedia} 
                         thumbnail={showreelThumbnail} 
-                        controls={isMobile}
-                        minimalMode={!isMobile} 
-                        autoplay={!isMobile} 
+                        controls={false}
+                        minimalMode={true} 
+                        autoplay={true} 
                         muted={true} 
                         loop={true} 
                         className="w-full h-full object-cover"
@@ -431,7 +431,7 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
                       url={selectedProject.videoUrl}
                       thumbnail={selectedProject.thumbnailUrl}
                       controls={true}
-                      autoplay={true}
+                      autoplay={!isMobile}
                       muted={false}
                       aspectRatio="16:9"
                       className="h-full w-full"
