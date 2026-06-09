@@ -472,7 +472,7 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
       )}
 
       {/* Minimalistic Cinematic Controls overlay */}
-      {!minimalMode && controls && !hasError && isReady && (!gdriveId || !gdriveError) && (
+      {!minimalMode && controls && !hasError && isReady && (
         <AnimatePresence>
           {isHovering && (
             <motion.div
