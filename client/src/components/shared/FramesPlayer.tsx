@@ -417,8 +417,8 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
             file: {
               forceVideo: gdriveId && !gdriveError ? true : undefined,
               attributes: {
-                crossOrigin: 'anonymous',
-                controlsList: 'nodownload'
+                controlsList: 'nodownload',
+                playsInline: true
               }
             },
             youtube: {
