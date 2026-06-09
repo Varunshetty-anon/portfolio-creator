@@ -73,9 +73,18 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
   if (loading || !data) return null;
 
   const projects = [...(data.projects || [])].sort((a, b) => a.order - b.order);
-  const heroProjectId = data.heroProjectId;
-  const heroProject = projects.find(p => (p._id || p.id) === heroProjectId) || null;
-  const heroVideoUrl = heroProject?.videoUrl || null;
+  const heroProject = React.useMemo(() => {
+    if (!projects || projects.length === 0) return null;
+    return projects.find(p => (p._id || p.id) === data?.heroProjectId) || projects[0];
+  }, [projects, data?.heroProjectId]);
+
+  const showreelMedia = data?.showreelUrl || heroProject?.videoUrl;
+  const showreelThumbnail = data?.showreelThumbnailUrl || heroProject?.thumbnailUrl || heroProject?.imageUrl;
+  const hasHeroMedia = Boolean(showreelMedia || showreelThumbnail);
+
+  const heroVideoUrl = React.useMemo(() => {
+    return heroProject?.videoUrl;
+  }, [heroProject]);
 
   const truncate = (str: string, length: number) => {
     if (str.length <= length) return str;
@@ -118,10 +127,10 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
       </nav>
 
       {/* HERO SECTION */}
-      <section className="relative min-h-[100dvh] flex flex-col items-center justify-center px-6 pt-24 pb-12 md:px-14">
-        <div className={`w-full max-w-[1600px] mx-auto flex flex-col xl:flex-row gap-12 xl:gap-20 items-center ${heroProject ? 'justify-between' : 'justify-center text-center'}`}>
+      <section className="relative min-h-[100dvh] flex flex-col items-center justify-center px-6 pt-24 pb-48 md:px-14">
+        <div className={`w-full max-w-[1600px] mx-auto flex flex-col xl:flex-row gap-12 xl:gap-20 items-center ${hasHeroMedia ? 'justify-between' : 'justify-center text-center'}`}>
           
-          <div className={`flex-1 w-full max-w-3xl shrink-0 flex flex-col ${!heroProject ? 'items-center text-center' : 'items-center text-center xl:items-start xl:text-left'}`}>
+          <div className={`flex-1 w-full max-w-3xl shrink-0 flex flex-col ${!hasHeroMedia ? 'items-center text-center' : 'items-center text-center xl:items-start xl:text-left'}`}>
             {data.profileImageUrl && (
               <div className="mb-6 md:mb-8 relative">
                 <img 
@@ -141,18 +150,18 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
             >
               {data.name}
             </h1>
-            <p className={`max-w-md font-light text-base md:text-lg text-white/50 leading-[1.7] mb-8 ${!heroProject ? 'mx-auto' : 'mx-auto xl:mx-0'}`}>
+            <p className={`max-w-md font-light text-base md:text-lg text-white/50 leading-[1.7] mb-8 ${!hasHeroMedia ? 'mx-auto' : 'mx-auto xl:mx-0'}`}>
               {data.bio}
             </p>
             
-            <div className={`flex flex-col gap-3 ${!heroProject ? 'items-center' : ''}`}>
+            <div className={`flex flex-col gap-3 ${!hasHeroMedia ? 'items-center' : ''}`}>
               {data.location && (
                 <div className="font-mono text-xs text-white/30 uppercase">
                   {data.location}
                 </div>
               )}
               {data.availability?.status && (
-                <div className="inline-flex items-center gap-2 bg-white/5 px-3 py-1.5 border border-white/10 rounded-full">
+                <div className="inline-flex items-center gap-2 bg-white/5 px-3 py-1.5 border border-white/10 rounded-full mt-2">
                   <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse shadow-[0_0_8px_rgba(74,222,128,0.6)]" />
                   <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-white/70">Available for hire</span>
                 </div>
@@ -160,32 +169,29 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
             </div>
           </div>
 
-          {heroProject && (
+          {hasHeroMedia && (
             <div className="w-full xl:w-[55%] shrink-0">
               <div 
-                className="w-full aspect-video relative rounded-xl overflow-hidden border border-white/10 shadow-2xl bg-[#0a0a0c] cursor-pointer group"
-                onClick={() => setSelectedProject(heroProject)}
+                className="w-full aspect-video relative rounded-xl overflow-hidden border border-white/10 shadow-2xl bg-[#0a0a0c] group"
               >
-                {heroVideoUrl ? (
+                {showreelMedia ? (
                   <>
-                    <div className="absolute inset-0 pointer-events-none scale-105 group-hover:scale-100 transition-transform duration-700 ease-out">
-                      <FramesPlayer url={heroVideoUrl} thumbnail={heroProject.thumbnailUrl} controls={false} autoplay={true} muted={true} loop={true} />
-                    </div>
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-60 group-hover:opacity-40 transition-opacity duration-300" />
-                    <div className="absolute bottom-6 left-6 flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-white border border-white/20 group-hover:scale-110 transition-transform duration-300">
-                        <svg className="w-5 h-5 ml-1 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
-                      </div>
-                      <div>
-                        <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#C0A36E] mb-1">Play Showreel</div>
-                        <h3 className="font-display font-bold text-white text-lg leading-none">{heroProject.title}</h3>
-                      </div>
+                    <div className="absolute inset-0 z-10">
+                      <FramesPlayer 
+                        url={showreelMedia} 
+                        thumbnail={showreelThumbnail} 
+                        controls={true} 
+                        autoplay={true} 
+                        muted={true} 
+                        loop={true} 
+                        className="w-full h-full"
+                      />
                     </div>
                   </>
                 ) : (
-                  <div className="absolute inset-0 flex items-center justify-center group-hover:scale-105 transition-transform duration-700 ease-out">
-                    {heroProject.imageUrl || heroProject.thumbnailUrl ? (
-                      <img src={heroProject.imageUrl || heroProject.thumbnailUrl} alt={heroProject.title} className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 flex items-center justify-center group-hover:scale-105 transition-transform duration-700 ease-out z-0">
+                    {showreelThumbnail ? (
+                      <img src={showreelThumbnail} alt={data.name || 'Showreel'} className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full bg-[#111] flex items-center justify-center">
                         <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/30">No Media</span>
@@ -202,7 +208,7 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
         {/* Scroll Down Indicator */}
         <div 
           className="absolute pointer-events-none"
-          style={{ bottom: '32px', left: '50%', transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}
+          style={{ bottom: '24px', left: '50%', transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}
         >
           <span className="font-mono text-[9px] tracking-[0.3em] uppercase text-white/30">EXPLORE</span>
           <motion.div
