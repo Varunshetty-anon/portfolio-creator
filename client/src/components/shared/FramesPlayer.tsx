@@ -106,27 +106,20 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
   }, [volume, minimalMode]);
 
   const gdriveId = getGoogleDriveId(url);
-  const [resolvedUrl, setResolvedUrl] = useState<string | null>(gdriveId ? null : url);
+  const [gdriveError, setGdriveError] = useState(false);
+
+  // We route all Google Drive videos through our smart backend proxy.
+  // Desktop will receive a 302 redirect. If the file is small, it plays instantly.
+  // If the file is large, it throws 403 on Desktop due to IP-binding, and we catch it to fallback to native iframe!
+  // Mobile will receive a piped stream to bypass Safari's iframe blocking.
+  const processedUrl = gdriveId && !gdriveError ? `/api/v1/portfolio/drive-proxy/${gdriveId}` : url;
 
   useEffect(() => {
-    if (gdriveId) {
-      fetch(`/api/v1/portfolio/drive-url/${gdriveId}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.success && data.url) {
-            setResolvedUrl(data.url);
-          } else {
-            setHasError(true);
-          }
-        })
-        .catch(err => {
-          console.error('Failed to resolve GDrive URL', err);
-          setHasError(true);
-        });
+    if (gdriveId && gdriveError) {
+      // GDrive iframe natively handles its own readiness
+      setIsReady(true);
     }
-  }, [gdriveId]);
-
-  const processedUrl = resolvedUrl || '';
+  }, [gdriveId, gdriveError]);
 
 
   // --- FULLSCREEN HANDLING ---
@@ -403,8 +396,18 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
         </div>
       )}
 
-      {/* React Player Core */}
-      {!hasError && resolvedUrl && (
+      {/* React Player Core or GDrive Iframe Fallback */}
+      {!hasError && gdriveId && gdriveError ? (
+        <div className="absolute inset-0 w-full h-full z-10 bg-black pointer-events-auto">
+          <iframe
+            src={`https://drive.google.com/file/d/${gdriveId}/preview?autoplay=${playing ? 1 : 0}`}
+            className="absolute inset-0 w-full h-full border-0 relative z-50"
+            style={{ pointerEvents: 'auto' }}
+            allow="autoplay; fullscreen"
+            onLoad={() => { setIsReady(true); setIsBuffering(false); }}
+          />
+        </div>
+      ) : !hasError && (
         <Player
           src={processedUrl}
           playing={playing}
@@ -417,9 +420,8 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
           playsInline={true}
           config={{
             file: {
-              forceVideo: gdriveId ? true : undefined,
+              forceVideo: gdriveId && !gdriveError ? true : undefined,
               attributes: {
-                crossOrigin: 'anonymous',
                 controlsList: 'nodownload',
                 playsInline: true
               }
@@ -475,7 +477,11 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
           onPlaying={() => setIsBuffering(false)}
           onError={(err: any) => {
             console.warn('FramesPlayer Error:', err);
-            setHasError(true);
+            if (gdriveId && !gdriveError) {
+              setGdriveError(true);
+            } else {
+              setHasError(true);
+            }
           }}
           ref={playerRef}
         />

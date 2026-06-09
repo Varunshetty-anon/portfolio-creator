@@ -308,9 +308,12 @@ router.get(
   },
 );
 
-// ── GET /drive-url/:id — returns resolved direct CDN url for Google Drive videos ──────
+import { Readable } from 'stream';
+import { pipeline } from 'stream/promises';
+
+// ── GET /drive-proxy/:id — public proxy for Google Drive videos ──────
 router.get(
-  '/drive-url/:id',
+  '/drive-proxy/:id',
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const fileId = req.params.id;
@@ -342,15 +345,69 @@ router.get(
           return res.status(404).json({ success: false, error: 'Not found or private' });
         }
         
-        return res.json({ success: true, url: finalUrl });
+        // Detect if the client is a mobile device
+        const userAgent = req.headers['user-agent'] || '';
+        const isMobile = /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
+
+        if (!isMobile) {
+          // For Desktop: 302 Redirect directly to Google's CDN.
+          // Small files will play instantly. Large files will 403 on client and trigger iframe fallback.
+          return res.redirect(302, finalUrl);
+        }
+
+        // For Mobile: Stream pipe to bypass iOS Safari restrictive cross-site redirect policies
+        const videoRes = await fetch(finalUrl, {
+          headers: {
+            Range: req.headers.range || 'bytes=0-',
+            'User-Agent': 'Mozilla/5.0'
+          }
+        });
+        
+        res.status(videoRes.status);
+        videoRes.headers.forEach((val, key) => res.setHeader(key, val));
+        
+        if (videoRes.body) {
+          try {
+            await pipeline(Readable.fromWeb(videoRes.body as any), res);
+          } catch (err: any) {
+            if (err.code !== 'ERR_STREAM_PREMATURE_CLOSE') console.error('Stream pipe error:', err);
+          }
+          return;
+        } else {
+          return res.status(500).send('Error streaming video');
+        }
       }
       
-      // If no virus scan page, the original URL is the direct stream
-      return res.json({ success: true, url });
+      // If no virus scan page
+      const userAgent = req.headers['user-agent'] || '';
+      const isMobile = /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
+
+      if (!isMobile) {
+        return res.redirect(302, url);
+      }
+
+      const videoRes = await fetch(url, {
+        headers: {
+          Range: req.headers.range || 'bytes=0-',
+          'User-Agent': 'Mozilla/5.0'
+        }
+      });
+      res.status(videoRes.status);
+      videoRes.headers.forEach((val, key) => res.setHeader(key, val));
+      if (videoRes.body) {
+        try {
+          await pipeline(Readable.fromWeb(videoRes.body as any), res);
+        } catch (err: any) {
+          if (err.code !== 'ERR_STREAM_PREMATURE_CLOSE') console.error('Stream pipe error:', err);
+        }
+        return;
+      } else {
+        return res.status(500).send('Error streaming video');
+      }
       
     } catch (err) {
-      console.error('Drive resolve error:', err);
-      res.status(500).json({ success: false, error: 'Failed to resolve' });
+      console.error('Drive proxy error:', err);
+      res.status(500).send('Error processing Google Drive video');
     }
   }
 );
