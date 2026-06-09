@@ -4,6 +4,7 @@
 
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { Readable } from 'stream';
+import { pipeline } from 'stream/promises';
 
 import Portfolio from '../models/Portfolio.js';
 import Project from '../models/Project.js';
@@ -307,9 +308,6 @@ router.get(
     }
   },
 );
-
-import { Readable } from 'stream';
-import { pipeline } from 'stream/promises';
 
 // ── GET /drive-proxy/:id — public proxy for Google Drive videos ──────
 router.get(
