@@ -3,7 +3,7 @@
 // ========================
 
 import React, { Suspense, lazy } from 'react';
-import { createBrowserRouter, Navigate, redirect } from 'react-router-dom';
+import { createBrowserRouter, Navigate, redirect, useRouteError } from 'react-router-dom';
 import { ProtectedRoute } from '@/components/layout/ProtectedRoute';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 
@@ -23,6 +23,7 @@ const SuspenseWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) 
 export const router = createBrowserRouter([
   {
     path: '/',
+    errorElement: <GlobalErrorBoundary />,
     element: (
       <SuspenseWrapper>
         <AuthPage />
@@ -31,6 +32,7 @@ export const router = createBrowserRouter([
   },
   {
     path: '/editor',
+    errorElement: <GlobalErrorBoundary />,
     element: (
       <ProtectedRoute requireOnboarded>
         <SuspenseWrapper>
@@ -41,6 +43,7 @@ export const router = createBrowserRouter([
   },
   {
     path: '/onboarding',
+    errorElement: <GlobalErrorBoundary />,
     element: (
       <ProtectedRoute>
         <SuspenseWrapper>
@@ -51,6 +54,7 @@ export const router = createBrowserRouter([
   },
   {
     path: '/portfolio/:username',
+    errorElement: <GlobalErrorBoundary />,
     element: (
       <SuspenseWrapper>
         <PortfolioLayout />
@@ -59,6 +63,7 @@ export const router = createBrowserRouter([
   },
   {
     path: '/audit-videos',
+    errorElement: <GlobalErrorBoundary />,
     element: (
       <SuspenseWrapper>
         <AuditMedia />
@@ -78,14 +83,10 @@ export const router = createBrowserRouter([
   // Anything else falls through to here, functioning as a native URL shortener.
   {
     path: '/:username',
+    errorElement: <GlobalErrorBoundary />,
     element: (
       <SuspenseWrapper>
         <PortfolioLayout />
-      </SuspenseWrapper>
-    ),
-    errorElement: (
-      <SuspenseWrapper>
-        <NotFound />
       </SuspenseWrapper>
     ),
   },
@@ -109,7 +110,29 @@ export const router = createBrowserRouter([
   },
 ]);
 
+// Automatically catch chunk loading errors and hard reload the page
+function GlobalErrorBoundary() {
+  const error = useRouteError() as any;
+  
+  // Detect chunk loading errors (Vite dynamic import failures after deployments)
+  const isChunkLoadError = 
+    error && 
+    (error.message?.includes('Failed to fetch dynamically imported module') ||
+     error.message?.includes('Importing a module script failed') ||
+     error.name === 'ChunkLoadError');
+     
+  if (isChunkLoadError) {
+    // Prevent infinite reload loop by setting a brief session storage flag
+    const hasReloaded = sessionStorage.getItem('chunk_reload');
+    if (!hasReloaded) {
+      sessionStorage.setItem('chunk_reload', 'true');
+      window.location.reload();
+      return null;
+    }
+  }
 
+  return <NotFound />;
+}
 
 // Simple 404 page
 function NotFound() {
