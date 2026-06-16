@@ -1,5 +1,5 @@
 const fileId = "1yvtfSktGTJa0rTdtzHPr90CcP5q11oFc"; // from the image
-const url = `https://frames-aivg.onrender.com/api/v1/portfolio/drive-proxy/${fileId}`;
+const url = `http://localhost:5000/api/v1/portfolio/drive-proxy/${fileId}`;
 
 async function test() {
   console.log("Testing without Range");

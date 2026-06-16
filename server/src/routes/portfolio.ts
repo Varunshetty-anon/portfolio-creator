@@ -309,100 +309,143 @@ router.get(
   },
 );
 
+// Cache for resolved Google Drive download URLs
+const driveUrlCache = new Map<string, { url: string; expiresAt: number }>();
+const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+
+async function getResolvedDriveUrl(fileId: string): Promise<string> {
+  const cached = driveUrlCache.get(fileId);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.url;
+  }
+
+  const ucUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+  const headers = { 'User-Agent': 'Mozilla/5.0' };
+
+  // Fetch only the first byte to check if it's a virus scan page or get the final redirect URL
+  const response = await fetch(ucUrl, {
+    headers: { ...headers, Range: 'bytes=0-0' }
+  });
+
+  let finalUrl = '';
+
+  if (response.status === 200 && response.headers.get('content-type')?.includes('text/html')) {
+    const text = await response.text();
+    
+    // Try new UUID format first (drive.usercontent.google.com)
+    const actionMatch = text.match(/action="([^"]+)"/);
+    const uuidMatch = text.match(/name="uuid" value="([^"]+)"/);
+    
+    // Try old confirm token format
+    const oldConfirmMatch = text.match(/confirm=([a-zA-Z0-9_-]+)/);
+    
+    if (actionMatch && uuidMatch) {
+      const actionUrl = actionMatch[1].startsWith('http') ? actionMatch[1] : `https://drive.google.com${actionMatch[1]}`;
+      finalUrl = `${actionUrl}?id=${fileId}&export=download&confirm=t&uuid=${uuidMatch[1]}`;
+    } else if (oldConfirmMatch) {
+      finalUrl = `${ucUrl}&confirm=${oldConfirmMatch[1]}`;
+    } else {
+      throw new Error('Google Drive file not found or private');
+    }
+  } else {
+    // If it's a 206 (or 200 direct file), follow the final redirect URL
+    finalUrl = response.url;
+  }
+
+  // Cache it
+  driveUrlCache.set(fileId, {
+    url: finalUrl,
+    expiresAt: Date.now() + CACHE_TTL
+  });
+
+  return finalUrl;
+}
+
 // ── GET /drive-proxy/:id — public proxy for Google Drive videos ──────
 router.get(
   '/drive-proxy/:id',
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const fileId = req.params.id;
-      let url = `https://drive.google.com/uc?export=download&id=${fileId}`;
-      const headers: Record<string, string> = { 'User-Agent': 'Mozilla/5.0' };
+      const fileId = req.params.id as string;
+      let finalUrl = '';
 
-      // We only fetch the HEAD or a tiny range to check if it's an HTML virus scan page
-      headers['Range'] = 'bytes=0-0';
-      const response = await fetch(url, { headers });
-      
-      // Handle Google Drive virus scan warning page (which returns 200 HTML)
-      if (response.status === 200 && response.headers.get('content-type')?.includes('text/html')) {
-        const text = await response.text();
-        
-        // Try new UUID format first (drive.usercontent.google.com)
-        const actionMatch = text.match(/action="([^"]+)"/);
-        const uuidMatch = text.match(/name="uuid" value="([^"]+)"/);
-        
-        // Try old confirm token format
-        const oldConfirmMatch = text.match(/confirm=([a-zA-Z0-9_-]+)/);
-        
-        let finalUrl = '';
-        if (actionMatch && uuidMatch) {
-          const actionUrl = actionMatch[1].startsWith('http') ? actionMatch[1] : `https://drive.google.com${actionMatch[1]}`;
-          finalUrl = `${actionUrl}?id=${fileId}&export=download&confirm=t&uuid=${uuidMatch[1]}`;
-        } else if (oldConfirmMatch) {
-          finalUrl = `${url}&confirm=${oldConfirmMatch[1]}`;
-        } else {
-          return res.status(404).json({ success: false, error: 'Not found or private' });
-        }
-        
-        // Detect if the client is a mobile device
-        const userAgent = req.headers['user-agent'] || '';
-        const isMobile = /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
-
-        if (!isMobile) {
-          // For Desktop: 302 Redirect directly to Google's CDN.
-          // Small files will play instantly. Large files will 403 on client and trigger iframe fallback.
-          return res.redirect(302, finalUrl);
-        }
-
-        // For Mobile: Stream pipe to bypass iOS Safari restrictive cross-site redirect policies
-        const videoRes = await fetch(finalUrl, {
-          headers: {
-            Range: req.headers.range || 'bytes=0-',
-            'User-Agent': 'Mozilla/5.0'
-          }
-        });
-        
-        res.status(videoRes.status);
-        videoRes.headers.forEach((val, key) => res.setHeader(key, val));
-        
-        if (videoRes.body) {
-          try {
-            await pipeline(Readable.fromWeb(videoRes.body as any), res);
-          } catch (err: any) {
-            if (err.code !== 'ERR_STREAM_PREMATURE_CLOSE') console.error('Stream pipe error:', err);
-          }
-          return;
-        } else {
-          return res.status(500).send('Error streaming video');
-        }
-      }
-      
-      // If no virus scan page
-      const userAgent = req.headers['user-agent'] || '';
-      const isMobile = /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
-
-      if (!isMobile) {
-        return res.redirect(302, url);
+      try {
+        finalUrl = await getResolvedDriveUrl(fileId);
+      } catch (err) {
+        return res.status(404).json({ success: false, error: 'File not found or private' });
       }
 
-      const videoRes = await fetch(url, {
+      const clientRange = req.headers.range;
+      const rangeHeader = Array.isArray(clientRange) ? clientRange[0] : (clientRange || 'bytes=0-');
+
+      // Fetch the requested range from Google Drive
+      let videoRes = await fetch(finalUrl, {
         headers: {
-          Range: req.headers.range || 'bytes=0-',
+          Range: rangeHeader,
           'User-Agent': 'Mozilla/5.0'
         }
       });
+
+      // If the cached URL returns 403 or 401, it might have expired. Clear cache and retry once.
+      if (videoRes.status === 403 || videoRes.status === 401) {
+        driveUrlCache.delete(fileId);
+        try {
+          finalUrl = await getResolvedDriveUrl(fileId);
+          videoRes = await fetch(finalUrl, {
+            headers: {
+              Range: rangeHeader,
+              'User-Agent': 'Mozilla/5.0'
+            }
+          });
+        } catch (err) {
+          return res.status(404).json({ success: false, error: 'File not found or private' });
+        }
+      }
+
+      // Forward status and safe streaming headers, stripping sandbox & same-site policies
       res.status(videoRes.status);
-      videoRes.headers.forEach((val, key) => res.setHeader(key, val));
+      
+      const headersToForward = [
+        'content-type',
+        'content-length',
+        'content-range',
+        'accept-ranges',
+        'last-modified',
+        'etag'
+      ];
+
+      for (const header of headersToForward) {
+        const val = videoRes.headers.get(header);
+        if (val) {
+          res.setHeader(header, val);
+        }
+      }
+
+      // Ensure Accept-Ranges is set to bytes (required for iOS Safari scrub controls)
+      res.setHeader('Accept-Ranges', 'bytes');
+
+      // Override global Express API prevent-caching headers specifically for this video stream
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      res.removeHeader('Pragma');
+      res.removeHeader('Expires');
+      res.removeHeader('Surrogate-Control');
+
       if (videoRes.body) {
         try {
           await pipeline(Readable.fromWeb(videoRes.body as any), res);
         } catch (err: any) {
-          if (err.code !== 'ERR_STREAM_PREMATURE_CLOSE') console.error('Stream pipe error:', err);
+          if (
+            err.code !== 'ERR_STREAM_PREMATURE_CLOSE' &&
+            err.code !== 'ECONNRESET' &&
+            err.code !== 'EPIPE'
+          ) {
+            console.error('Stream pipe error:', err);
+          }
         }
         return;
       } else {
         return res.status(500).send('Error streaming video');
       }
-      
     } catch (err) {
       console.error('Drive proxy error:', err);
       res.status(500).send('Error processing Google Drive video');
