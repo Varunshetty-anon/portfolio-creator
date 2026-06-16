@@ -107,26 +107,12 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
 
   const gdriveId = getGoogleDriveId(url);
   const [gdriveError, setGdriveError] = useState(false);
-  const [directUrl, setDirectUrl] = useState<string | null>(null);
 
   // We route all Google Drive videos through our smart backend proxy.
-  // We fetch the direct download URL from the backend and give it directly to the video tag!
-  useEffect(() => {
-    if (gdriveId && !gdriveError) {
-      fetch(`/api/v1/portfolio/drive-url/${gdriveId}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.success && data.url) {
-            setDirectUrl(data.url);
-          } else {
-            setGdriveError(true);
-          }
-        })
-        .catch(() => setGdriveError(true));
-    }
-  }, [gdriveId, gdriveError]);
-
-  const processedUrl = gdriveId ? (directUrl || '') : url;
+  // Desktop will receive a 302 redirect. If the file is small, it plays instantly.
+  // If the file is large, it throws 403 on Desktop due to IP-binding, and we catch it to fallback to native iframe!
+  // Mobile will receive a piped stream to bypass Safari's iframe blocking.
+  const processedUrl = gdriveId && !gdriveError ? `/api/v1/portfolio/drive-proxy/${gdriveId}` : url;
 
   useEffect(() => {
     if (gdriveId && gdriveError) {
@@ -421,7 +407,7 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
             onLoad={() => { setIsReady(true); setIsBuffering(false); }}
           />
         </div>
-      ) : !hasError && processedUrl && (
+      ) : !hasError && (
         <Player
           src={processedUrl}
           playing={playing}

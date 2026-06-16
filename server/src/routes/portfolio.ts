@@ -395,8 +395,9 @@ router.get(
       const rangeHeader = Array.isArray(clientRange) ? clientRange[0] : (clientRange || 'bytes=0-');
       const userAgent = req.headers['user-agent'] || 'Mozilla/5.0';
 
-      const makeRequest = (urlToFetch: string): Promise<any> => {
+      const makeRequest = (urlToFetch: string, redirectCount = 0): Promise<any> => {
         return new Promise((resolve, reject) => {
+          if (redirectCount > 5) return reject(new Error('Too many redirects'));
           const reqOpt = {
             headers: {
               'Range': rangeHeader,
@@ -404,7 +405,16 @@ router.get(
             }
           };
           const request = https.get(urlToFetch, reqOpt, (response) => {
-            resolve(response);
+            if (response.statusCode && response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+              // Follow redirect
+              let redirectUrl = response.headers.location;
+              if (!redirectUrl.startsWith('http')) {
+                 redirectUrl = new URL(redirectUrl, urlToFetch).toString();
+              }
+              resolve(makeRequest(redirectUrl, redirectCount + 1));
+            } else {
+              resolve(response);
+            }
           });
           request.on('error', reject);
         });
