@@ -362,6 +362,21 @@ async function getResolvedDriveUrl(fileId: string): Promise<string> {
   return finalUrl;
 }
 
+// ── GET /drive-url/:id — returns resolved direct download URL ────────
+router.get(
+  '/drive-url/:id',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const fileId = req.params.id as string;
+      const finalUrl = await getResolvedDriveUrl(fileId);
+      res.json({ success: true, url: finalUrl });
+    } catch (err) {
+      console.error('Drive URL resolve error:', err);
+      res.status(404).json({ success: false, error: 'File not found or private' });
+    }
+  }
+);
+
 // ── GET /drive-proxy/:id — public proxy for Google Drive videos ──────
 router.get(
   '/drive-proxy/:id',
