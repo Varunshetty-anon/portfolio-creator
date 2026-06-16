@@ -517,7 +517,10 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
               {/* Central Play/Pause (only visible when paused, purely aesthetic) */}
               {!playing && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="w-16 h-16 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-white/90">
+                  <div 
+                    onClick={handlePlayPause}
+                    className="w-16 h-16 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-white/90 cursor-pointer pointer-events-auto hover:bg-white/20 transition-colors"
+                  >
                     <Play className="w-6 h-6 fill-current ml-1" />
                   </div>
                 </div>

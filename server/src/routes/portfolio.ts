@@ -5,6 +5,7 @@
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { Readable } from 'stream';
 import { pipeline } from 'stream/promises';
+import https from 'https';
 
 import Portfolio from '../models/Portfolio.js';
 import Project from '../models/Project.js';
@@ -377,33 +378,43 @@ router.get(
 
       const clientRange = req.headers.range;
       const rangeHeader = Array.isArray(clientRange) ? clientRange[0] : (clientRange || 'bytes=0-');
+      const userAgent = req.headers['user-agent'] || 'Mozilla/5.0';
+
+      const makeRequest = (urlToFetch: string): Promise<any> => {
+        return new Promise((resolve, reject) => {
+          const reqOpt = {
+            headers: {
+              'Range': rangeHeader,
+              'User-Agent': userAgent
+            }
+          };
+          const request = https.get(urlToFetch, reqOpt, (response) => {
+            resolve(response);
+          });
+          request.on('error', reject);
+        });
+      };
 
       // Fetch the requested range from Google Drive
-      let videoRes = await fetch(finalUrl, {
-        headers: {
-          Range: rangeHeader,
-          'User-Agent': 'Mozilla/5.0'
-        }
-      });
+      let videoRes = await makeRequest(finalUrl);
 
       // If the cached URL returns 403 or 401, it might have expired. Clear cache and retry once.
-      if (videoRes.status === 403 || videoRes.status === 401) {
+      if (videoRes.statusCode === 403 || videoRes.statusCode === 401) {
         driveUrlCache.delete(fileId);
         try {
           finalUrl = await getResolvedDriveUrl(fileId);
-          videoRes = await fetch(finalUrl, {
-            headers: {
-              Range: rangeHeader,
-              'User-Agent': 'Mozilla/5.0'
-            }
-          });
+          videoRes = await makeRequest(finalUrl);
         } catch (err) {
           return res.status(404).json({ success: false, error: 'File not found or private' });
         }
       }
 
+      if (!videoRes.statusCode || videoRes.statusCode >= 400) {
+        return res.status(videoRes.statusCode || 500).json({ success: false, error: 'Drive returned ' + videoRes.statusCode });
+      }
+
       // Forward status and safe streaming headers, stripping sandbox & same-site policies
-      res.status(videoRes.status);
+      res.status(videoRes.statusCode);
       
       const headersToForward = [
         'content-type',
@@ -415,7 +426,7 @@ router.get(
       ];
 
       for (const header of headersToForward) {
-        const val = videoRes.headers.get(header);
+        const val = videoRes.headers[header];
         if (val) {
           res.setHeader(header, val);
         }
@@ -430,22 +441,17 @@ router.get(
       res.removeHeader('Expires');
       res.removeHeader('Surrogate-Control');
 
-      if (videoRes.body) {
-        try {
-          await pipeline(Readable.fromWeb(videoRes.body as any), res);
-        } catch (err: any) {
-          if (
-            err.code !== 'ERR_STREAM_PREMATURE_CLOSE' &&
-            err.code !== 'ECONNRESET' &&
-            err.code !== 'EPIPE'
-          ) {
-            console.error('Stream pipe error:', err);
-          }
-        }
-        return;
-      } else {
-        return res.status(500).send('Error streaming video');
-      }
+      videoRes.pipe(res);
+      
+      videoRes.on('error', (err: any) => {
+        console.error('Stream pipe error:', err);
+        if (!res.headersSent) res.status(500).end();
+      });
+      
+      res.on('close', () => {
+        videoRes.destroy();
+      });
+
     } catch (err) {
       console.error('Drive proxy error:', err);
       res.status(500).send('Error processing Google Drive video');
