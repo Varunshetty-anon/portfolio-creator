@@ -47,6 +47,14 @@ export default {
       headers.set('etag', object.httpEtag);
       headers.set('Accept-Ranges', 'bytes');
       
+      // Add required headers for 206 Partial Content
+      if (object.range) {
+        headers.set('Content-Range', `bytes ${object.range.offset}-${object.range.offset + object.range.length - 1}/${object.size}`);
+        headers.set('Content-Length', object.range.length.toString());
+      } else {
+        headers.set('Content-Length', object.size.toString());
+      }
+      
       // Cache heavily at the browser
       headers.set('Cache-Control', 'public, max-age=31536000, immutable');
       
