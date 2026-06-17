@@ -1,0 +1,7 @@
+name = "frames-video-worker"
+main = "src/index.js"
+compatibility_date = "2024-06-01"
+
+[[r2_buckets]]
+binding = "frames_videos_r2"
+bucket_name = "frames-videos-r2"

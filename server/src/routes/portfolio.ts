@@ -5,6 +5,7 @@
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { Readable } from 'stream';
 import { pipeline } from 'stream/promises';
+import { spawn } from 'child_process';
 import https from 'https';
 
 import Portfolio from '../models/Portfolio.js';
@@ -192,6 +193,20 @@ router.put('/', authenticateToken, async (req: Request, res: Response, next: Nex
         } else {
           await Project.create(projectData);
         }
+
+        // Trigger background migration if it's a Google Drive video
+        if (projectData.videoSource === 'gdrive' && projectData.videoUrl) {
+          const match = projectData.videoUrl.match(/[-\w]{25,}/);
+          if (match) {
+            const fileId = match[0];
+            const CLOUDFLARE_API_TOKEN = process.env.CLOUDFLARE_API_TOKEN as string;
+            const CLOUDFLARE_ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID as string;
+            getResolvedDriveUrl(fileId)
+              .then(url => streamToR2(url, fileId, CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID))
+              .then(() => console.log(`[R2 Migration] Successfully migrated ${fileId} on save`))
+              .catch(err => console.error(`[R2 Migration] Failed for ${fileId}:`, err));
+          }
+        }
       }
     }
 
@@ -314,52 +329,67 @@ router.get(
 const driveUrlCache = new Map<string, { url: string; expiresAt: number }>();
 const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
 
+const resolveFlight = new Map<string, Promise<string>>();
+
 async function getResolvedDriveUrl(fileId: string): Promise<string> {
   const cached = driveUrlCache.get(fileId);
   if (cached && cached.expiresAt > Date.now()) {
     return cached.url;
   }
 
-  const ucUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
-  const headers = { 'User-Agent': 'Mozilla/5.0' };
-
-  // Fetch only the first byte to check if it's a virus scan page or get the final redirect URL
-  const response = await fetch(ucUrl, {
-    headers: { ...headers, Range: 'bytes=0-0' }
-  });
-
-  let finalUrl = '';
-
-  if (response.status === 200 && response.headers.get('content-type')?.includes('text/html')) {
-    const text = await response.text();
-    
-    // Try new UUID format first (drive.usercontent.google.com)
-    const actionMatch = text.match(/action="([^"]+)"/);
-    const uuidMatch = text.match(/name="uuid" value="([^"]+)"/);
-    
-    // Try old confirm token format
-    const oldConfirmMatch = text.match(/confirm=([a-zA-Z0-9_-]+)/);
-    
-    if (actionMatch && uuidMatch) {
-      const actionUrl = actionMatch[1].startsWith('http') ? actionMatch[1] : `https://drive.google.com${actionMatch[1]}`;
-      finalUrl = `${actionUrl}?id=${fileId}&export=download&confirm=t&uuid=${uuidMatch[1]}`;
-    } else if (oldConfirmMatch) {
-      finalUrl = `${ucUrl}&confirm=${oldConfirmMatch[1]}`;
-    } else {
-      throw new Error('Google Drive file not found or private');
-    }
-  } else {
-    // If it's a 206 (or 200 direct file), follow the final redirect URL
-    finalUrl = response.url;
+  if (resolveFlight.has(fileId)) {
+    return resolveFlight.get(fileId)!;
   }
 
-  // Cache it
-  driveUrlCache.set(fileId, {
-    url: finalUrl,
-    expiresAt: Date.now() + CACHE_TTL
-  });
+  const promise = (async () => {
+    try {
+      const ucUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+      const headers = { 'User-Agent': 'Mozilla/5.0' };
 
-  return finalUrl;
+      // Fetch only the first byte to check if it's a virus scan page or get the final redirect URL
+      const response = await fetch(ucUrl, {
+        headers: { ...headers, Range: 'bytes=0-0' }
+      });
+
+      let finalUrl = '';
+
+      if (response.status === 200 && response.headers.get('content-type')?.includes('text/html')) {
+        const text = await response.text();
+        
+        // Try new UUID format first (drive.usercontent.google.com)
+        const actionMatch = text.match(/action="([^"]+)"/);
+        const uuidMatch = text.match(/name="uuid" value="([^"]+)"/);
+        
+        // Try old confirm token format
+        const oldConfirmMatch = text.match(/confirm=([a-zA-Z0-9_-]+)/);
+        
+        if (actionMatch && uuidMatch) {
+          const actionUrl = actionMatch[1].startsWith('http') ? actionMatch[1] : `https://drive.google.com${actionMatch[1]}`;
+          finalUrl = `${actionUrl}?id=${fileId}&export=download&confirm=t&uuid=${uuidMatch[1]}`;
+        } else if (oldConfirmMatch) {
+          finalUrl = `${ucUrl}&confirm=${oldConfirmMatch[1]}`;
+        } else {
+          throw new Error('Google Drive file not found or private');
+        }
+      } else {
+        // If it's a 206 (or 200 direct file), follow the final redirect URL
+        finalUrl = response.url;
+      }
+
+      // Cache it
+      driveUrlCache.set(fileId, {
+        url: finalUrl,
+        expiresAt: Date.now() + CACHE_TTL
+      });
+
+      return finalUrl;
+    } finally {
+      resolveFlight.delete(fileId);
+    }
+  })();
+
+  resolveFlight.set(fileId, promise);
+  return promise;
 }
 
 // ── GET /drive-url/:id — returns resolved direct download URL ────────
@@ -377,95 +407,103 @@ router.get(
   }
 );
 
-// ── GET /drive-proxy/:id — public proxy for Google Drive videos ──────
-router.get(
-  '/drive-proxy/:id',
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const fileId = req.params.id as string;
-      let finalUrl = '';
+const keepAliveAgent = new https.Agent({ keepAlive: true });
 
+// ── GET & HEAD /drive-proxy/:id — public proxy for Google Drive videos ──────
+const driveProxyHandler = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const fileId = req.params.id as string;
+    let finalUrl = '';
+
+    try {
+      finalUrl = await getResolvedDriveUrl(fileId);
+    } catch (err) {
+      return res.status(404).json({ success: false, error: 'File not found or private' });
+    }
+
+    const clientRange = req.headers.range;
+    const rangeHeader = Array.isArray(clientRange) ? clientRange[0] : (clientRange || 'bytes=0-');
+    const userAgent = req.headers['user-agent'] || 'Mozilla/5.0';
+    const isHead = req.method === 'HEAD';
+
+    const makeRequest = (urlToFetch: string, redirectCount = 0): Promise<any> => {
+      return new Promise((resolve, reject) => {
+        if (redirectCount > 5) return reject(new Error('Too many redirects'));
+        const reqOpt = {
+          method: isHead ? 'HEAD' : 'GET',
+          agent: keepAliveAgent,
+          headers: {
+            'Range': rangeHeader,
+            'User-Agent': userAgent
+          }
+        };
+        const request = https.request(urlToFetch, reqOpt, (response) => {
+          if (response.statusCode && response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+            // Follow redirect
+            let redirectUrl = response.headers.location;
+            if (!redirectUrl.startsWith('http')) {
+               redirectUrl = new URL(redirectUrl, urlToFetch).toString();
+            }
+            resolve(makeRequest(redirectUrl, redirectCount + 1));
+          } else {
+            resolve(response);
+          }
+        });
+        request.on('error', reject);
+        request.end(); // Needed for https.request
+      });
+    };
+
+    // Fetch the requested range from Google Drive
+    let videoRes = await makeRequest(finalUrl);
+
+    // If the cached URL returns 403 or 401, it might have expired. Clear cache and retry once.
+    if (videoRes.statusCode === 403 || videoRes.statusCode === 401) {
+      driveUrlCache.delete(fileId);
       try {
         finalUrl = await getResolvedDriveUrl(fileId);
+        videoRes = await makeRequest(finalUrl);
       } catch (err) {
         return res.status(404).json({ success: false, error: 'File not found or private' });
       }
+    }
 
-      const clientRange = req.headers.range;
-      const rangeHeader = Array.isArray(clientRange) ? clientRange[0] : (clientRange || 'bytes=0-');
-      const userAgent = req.headers['user-agent'] || 'Mozilla/5.0';
+    if (!videoRes.statusCode || videoRes.statusCode >= 400) {
+      return res.status(videoRes.statusCode || 500).json({ success: false, error: 'Drive returned ' + videoRes.statusCode });
+    }
 
-      const makeRequest = (urlToFetch: string, redirectCount = 0): Promise<any> => {
-        return new Promise((resolve, reject) => {
-          if (redirectCount > 5) return reject(new Error('Too many redirects'));
-          const reqOpt = {
-            headers: {
-              'Range': rangeHeader,
-              'User-Agent': userAgent
-            }
-          };
-          const request = https.get(urlToFetch, reqOpt, (response) => {
-            if (response.statusCode && response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
-              // Follow redirect
-              let redirectUrl = response.headers.location;
-              if (!redirectUrl.startsWith('http')) {
-                 redirectUrl = new URL(redirectUrl, urlToFetch).toString();
-              }
-              resolve(makeRequest(redirectUrl, redirectCount + 1));
-            } else {
-              resolve(response);
-            }
-          });
-          request.on('error', reject);
-        });
-      };
+    // Forward status and safe streaming headers, stripping sandbox & same-site policies
+    res.status(videoRes.statusCode);
+    
+    const headersToForward = [
+      'content-type',
+      'content-length',
+      'content-range',
+      'accept-ranges',
+      'last-modified',
+      'etag'
+    ];
 
-      // Fetch the requested range from Google Drive
-      let videoRes = await makeRequest(finalUrl);
-
-      // If the cached URL returns 403 or 401, it might have expired. Clear cache and retry once.
-      if (videoRes.statusCode === 403 || videoRes.statusCode === 401) {
-        driveUrlCache.delete(fileId);
-        try {
-          finalUrl = await getResolvedDriveUrl(fileId);
-          videoRes = await makeRequest(finalUrl);
-        } catch (err) {
-          return res.status(404).json({ success: false, error: 'File not found or private' });
-        }
+    for (const header of headersToForward) {
+      const val = videoRes.headers[header];
+      if (val) {
+        res.setHeader(header, val);
       }
+    }
 
-      if (!videoRes.statusCode || videoRes.statusCode >= 400) {
-        return res.status(videoRes.statusCode || 500).json({ success: false, error: 'Drive returned ' + videoRes.statusCode });
-      }
+    // Ensure Accept-Ranges is set to bytes (required for iOS Safari scrub controls)
+    res.setHeader('Accept-Ranges', 'bytes');
 
-      // Forward status and safe streaming headers, stripping sandbox & same-site policies
-      res.status(videoRes.statusCode);
-      
-      const headersToForward = [
-        'content-type',
-        'content-length',
-        'content-range',
-        'accept-ranges',
-        'last-modified',
-        'etag'
-      ];
+    // Override global Express API prevent-caching headers specifically for this video stream
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    res.removeHeader('Pragma');
+    res.removeHeader('Expires');
+    res.removeHeader('Surrogate-Control');
 
-      for (const header of headersToForward) {
-        const val = videoRes.headers[header];
-        if (val) {
-          res.setHeader(header, val);
-        }
-      }
-
-      // Ensure Accept-Ranges is set to bytes (required for iOS Safari scrub controls)
-      res.setHeader('Accept-Ranges', 'bytes');
-
-      // Override global Express API prevent-caching headers specifically for this video stream
-      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-      res.removeHeader('Pragma');
-      res.removeHeader('Expires');
-      res.removeHeader('Surrogate-Control');
-
+    if (isHead) {
+      res.end();
+      videoRes.destroy();
+    } else {
       videoRes.pipe(res);
       
       videoRes.on('error', (err: any) => {
@@ -476,13 +514,16 @@ router.get(
       res.on('close', () => {
         videoRes.destroy();
       });
-
-    } catch (err) {
-      console.error('Drive proxy error:', err);
-      res.status(500).send('Error processing Google Drive video');
     }
+
+  } catch (err) {
+    console.error('Drive proxy error:', err);
+    res.status(500).send('Error processing Google Drive video');
   }
-);
+};
+
+router.get('/drive-proxy/:id', driveProxyHandler);
+router.head('/drive-proxy/:id', driveProxyHandler);
 
 // ── GET /stats — analytics summary ──────────────────────────────────
 router.get(
@@ -512,5 +553,91 @@ router.get(
     }
   },
 );
+
+// ── POST /migrate-to-r2/:id — trigger migration asynchronously ────
+router.post('/migrate-to-r2/:id', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const fileId = req.params.id as string;
+    if (!fileId) throw new AppError('Missing file ID', 400);
+
+    const CLOUDFLARE_API_TOKEN = process.env.CLOUDFLARE_API_TOKEN as string;
+    const CLOUDFLARE_ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID as string;
+
+    const finalUrl = await getResolvedDriveUrl(fileId);
+
+    // Run asynchronously, don't wait for completion to respond
+    streamToR2(finalUrl, fileId, CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID)
+      .then(() => console.log(`[R2 Migration] Successfully migrated ${fileId}`))
+      .catch((err) => console.error(`[R2 Migration] Failed for ${fileId}:`, err));
+
+    res.json({ success: true, message: 'Migration triggered' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+function streamToR2(url: string, fileId: string, token: string, accountId: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const makeRequest = (urlToFetch: string, redirectCount = 0) => {
+      if (redirectCount > 5) return reject(new Error('Too many redirects'));
+      const reqOpt = {
+        method: 'GET',
+        agent: keepAliveAgent,
+        headers: { 'User-Agent': 'Mozilla/5.0' }
+      };
+      
+      const request = https.request(urlToFetch, reqOpt, (response) => {
+        if (response.statusCode && response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+          let redirectUrl = response.headers.location;
+          if (!redirectUrl.startsWith('http')) {
+             redirectUrl = new URL(redirectUrl, urlToFetch).toString();
+          }
+          makeRequest(redirectUrl, redirectCount + 1);
+        } else if (response.statusCode && response.statusCode >= 200 && response.statusCode < 300) {
+          const contentType = response.headers['content-type'] || 'video/mp4';
+          const isWin = process.platform === 'win32';
+          const wranglerCmd = isWin ? 'cmd.exe' : 'npx';
+          const wranglerArgs = isWin 
+            ? ['/c', `npx -y wrangler@latest r2 object put frames-videos-r2/${fileId} --remote --pipe --content-type "${contentType}"`]
+            : ['-y', 'wrangler@latest', 'r2', 'object', 'put', `frames-videos-r2/${fileId}`, '--remote', '--pipe', '--content-type', contentType];
+
+          const wrangler = spawn(wranglerCmd, wranglerArgs, {
+            env: {
+              ...process.env,
+              CLOUDFLARE_API_TOKEN: token,
+              CLOUDFLARE_ACCOUNT_ID: accountId
+            }
+          });
+
+          let stderrData = '';
+          wrangler.stderr.on('data', (d: any) => stderrData += d.toString());
+
+          wrangler.on('error', (err: Error) => {
+            response.destroy();
+            reject(new Error(`Wrangler spawn failed: ${err.message}`));
+          });
+
+          wrangler.on('close', (code: number) => {
+            if (code === 0) resolve();
+            else reject(new Error(`Wrangler exited with code ${code}. Stderr: ${stderrData}`));
+          });
+
+          response.pipe(wrangler.stdin);
+
+          response.on('error', (err: Error) => {
+            wrangler.kill();
+            reject(new Error(`Download stream error: ${err.message}`));
+          });
+        } else {
+          response.destroy();
+          reject(new Error(`Drive returned ${response.statusCode}`));
+        }
+      });
+      request.on('error', reject);
+      request.end();
+    };
+    makeRequest(url);
+  });
+}
 
 export default router;

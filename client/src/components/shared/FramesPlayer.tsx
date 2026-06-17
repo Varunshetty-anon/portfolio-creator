@@ -112,7 +112,7 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
   // Desktop will receive a 302 redirect. If the file is small, it plays instantly.
   // If the file is large, it throws 403 on Desktop due to IP-binding, and we catch it to fallback to native iframe!
   // Mobile will receive a piped stream to bypass Safari's iframe blocking.
-  const processedUrl = gdriveId && !gdriveError ? `/api/v1/portfolio/drive-proxy/${gdriveId}` : url;
+  const processedUrl = gdriveId && !gdriveError ? `https://frames-video-worker.varunshettyv7.workers.dev/api/v1/portfolio/drive-proxy/${gdriveId}?fallbackOrigin=${encodeURIComponent(window.location.origin)}` : url;
 
   useEffect(() => {
     if (gdriveId && gdriveError) {

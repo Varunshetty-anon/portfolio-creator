@@ -39,3 +39,5 @@ client/playwright-report/
 .cache/
 *.mp4
 *.tmp
+.wrangler/
+**/.wrangler/
