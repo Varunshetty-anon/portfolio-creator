@@ -303,7 +303,7 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
       )}
       <div
         ref={containerRef}
-        className={`relative overflow-hidden bg-black group focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50 ${
+        className={`relative overflow-hidden bg-black group focus:outline-none focus-visible:ring-2 focus-visible:ring-white/50 will-change-transform ${
           !isFullscreen ? aspectClasses[aspectRatio] : 'w-full h-full'
         } ${className} ${minimalMode ? 'frames-player-minimal' : ''}`}
       onMouseMove={minimalMode ? undefined : handleMouseMove}
@@ -457,21 +457,15 @@ export const FramesPlayer: React.FC<FramesPlayerProps> = ({
             }
             if (onReady) onReady();
           }}
-          onTimeUpdate={(event: React.SyntheticEvent<HTMLVideoElement>) => {
-            const media = event.currentTarget;
-            if (!isScrubbing && media.duration) {
-              setPlayed(media.currentTime / media.duration);
+          progressInterval={100}
+          onProgress={(state: { played: number, loaded: number }) => {
+            if (!isScrubbing) {
+              setPlayed(state.played);
+              setLoaded(state.loaded);
             }
           }}
-          onProgress={(event: React.SyntheticEvent<HTMLVideoElement>) => {
-            const media = event.currentTarget;
-            if (media.buffered.length && media.duration) {
-              const end = media.buffered.end(media.buffered.length - 1);
-              setLoaded(Math.min(end / media.duration, 1));
-            }
-          }}
-          onDurationChange={(event: React.SyntheticEvent<HTMLVideoElement>) => {
-            setDuration(event.currentTarget.duration || 0);
+          onDuration={(duration: number) => {
+            setDuration(duration);
           }}
           onWaiting={() => setIsBuffering(true)}
           onPlaying={() => setIsBuffering(false)}
