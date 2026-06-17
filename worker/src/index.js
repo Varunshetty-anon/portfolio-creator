@@ -37,6 +37,13 @@ export default {
     if (object !== null) {
       const headers = new Headers();
       object.writeHttpMetadata(headers);
+      
+      // Fix quoted Content-Type
+      const contentType = headers.get('Content-Type');
+      if (contentType && contentType.startsWith('"') && contentType.endsWith('"')) {
+        headers.set('Content-Type', contentType.slice(1, -1));
+      }
+      
       headers.set('etag', object.httpEtag);
       headers.set('Accept-Ranges', 'bytes');
       
