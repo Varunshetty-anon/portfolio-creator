@@ -1,17 +1,29 @@
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Range',
+  'Access-Control-Expose-Headers': 'Accept-Ranges, Content-Encoding, Content-Length, Content-Range',
+};
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const method = request.method;
 
+    // Handle CORS preflight requests
+    if (method === 'OPTIONS') {
+      return new Response(null, { headers: corsHeaders });
+    }
+
     // Only handle GET and HEAD requests
     if (method !== 'GET' && method !== 'HEAD') {
-      return new Response('Method Not Allowed', { status: 405 });
+      return new Response('Method Not Allowed', { status: 405, headers: corsHeaders });
     }
 
     // Expected path: /api/v1/portfolio/drive-proxy/:id
     const match = url.pathname.match(/\/api\/v1\/portfolio\/drive-proxy\/([a-zA-Z0-9_-]+)/);
     if (!match) {
-      return new Response('Not Found', { status: 404 });
+      return new Response('Not Found', { status: 404, headers: corsHeaders });
     }
 
     const fileId = match[1];
@@ -30,6 +42,9 @@ export default {
       
       // Cache heavily at the browser
       headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+      
+      // ADD CORS
+      Object.entries(corsHeaders).forEach(([k, v]) => headers.set(k, v));
 
       const status = object.range ? 206 : 200;
       
@@ -45,7 +60,7 @@ export default {
     // Cache miss - fallback to origin
     const fallbackOrigin = url.searchParams.get('fallbackOrigin');
     if (!fallbackOrigin) {
-      return new Response('File not found in edge cache and no fallbackOrigin provided', { status: 404 });
+      return new Response('File not found in edge cache and no fallbackOrigin provided', { status: 404, headers: corsHeaders });
     }
 
     const fallbackUrl = `${fallbackOrigin}${url.pathname}`;
@@ -57,6 +72,16 @@ export default {
     );
 
     // Proxy the request to the origin
-    return fetch(fallbackUrl, request);
+    const originResponse = await fetch(fallbackUrl, request);
+    
+    // Add CORS to fallback response
+    const responseHeaders = new Headers(originResponse.headers);
+    Object.entries(corsHeaders).forEach(([k, v]) => responseHeaders.set(k, v));
+    
+    return new Response(originResponse.body, {
+      status: originResponse.status,
+      statusText: originResponse.statusText,
+      headers: responseHeaders
+    });
   },
 };
