@@ -383,6 +383,7 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
               <button 
                 onClick={() => setContactOpen(false)}
                 className="absolute top-4 right-6 font-mono text-xs text-white/40 hover:text-white cursor-pointer"
+                aria-label="Close panel"
               >
                 ✕ CLOSE
               </button>
@@ -448,6 +449,7 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
               <button
                 onClick={() => setSelectedProject(null)}
                 className="absolute top-4 right-4 z-50 font-mono text-xs text-white/40 hover:text-white"
+                aria-label="Close modal"
               >
                 <X size={18} />
               </button>
