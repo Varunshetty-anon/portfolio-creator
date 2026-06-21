@@ -555,10 +555,10 @@ router.get(
 );
 
 // ── POST /migrate-to-r2/:id — trigger migration asynchronously ────
-router.post('/migrate-to-r2/:id', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/migrate-to-r2/:id', authenticateToken, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const fileId = req.params.id as string;
-    if (!fileId) throw new AppError('Missing file ID', 400);
+    if (!fileId || !/^[a-zA-Z0-9_-]+$/.test(fileId)) throw new AppError('Invalid file ID', 400);
 
     const CLOUDFLARE_API_TOKEN = process.env.CLOUDFLARE_API_TOKEN as string;
     const CLOUDFLARE_ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID as string;
