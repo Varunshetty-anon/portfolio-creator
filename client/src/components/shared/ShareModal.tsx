@@ -72,6 +72,8 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, usernam
                 </h3>
                 <button 
                   onClick={onClose}
+                  className="p-2 -mr-2 bg-transparent hover:bg-bg-floating transition-colors text-text-muted hover:text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-text-primary rounded"
+                  aria-label="Close share modal"
                   className="p-2 -mr-2 bg-transparent hover:bg-bg-floating transition-colors text-text-muted hover:text-text-primary"
                   aria-label="Close modal"
                 >

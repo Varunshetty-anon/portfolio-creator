@@ -394,6 +394,8 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
             >
               <button 
                 onClick={() => setContactOpen(false)}
+                className="absolute top-4 right-6 font-mono text-xs text-white/40 hover:text-white cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-white rounded px-2 py-1"
+                aria-label="Close contact details"
                 className="absolute top-4 right-6 font-mono text-xs text-white/40 hover:text-white cursor-pointer"
                 aria-label="Close panel"
               >
@@ -460,6 +462,8 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
             >
               <button
                 onClick={() => setSelectedProject(null)}
+                className="absolute top-4 right-4 z-50 font-mono text-xs text-white/40 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white rounded p-1"
+                aria-label="Close project details"
                 className="absolute top-4 right-4 z-50 font-mono text-xs text-white/40 hover:text-white"
                 aria-label="Close modal"
               >
