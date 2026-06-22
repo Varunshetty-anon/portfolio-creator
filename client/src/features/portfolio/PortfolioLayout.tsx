@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Instagram, Mail, ArrowUpRight, X, MapPin } from 'lucide-react';
@@ -85,13 +85,16 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  if (loading || !data) return null;
+  const { projects, heroProject } = useMemo(() => {
+    if (!data) return { projects: [], heroProject: null };
+    const sortedProjects = [...(data.projects || [])].sort((a, b) => a.order - b.order);
+    const hero = sortedProjects.length > 0
+      ? (sortedProjects.find(p => (p._id || p.id) === data?.heroProjectId) || sortedProjects[0])
+      : null;
+    return { projects: sortedProjects, heroProject: hero };
+  }, [data]);
 
-  const projects = [...(data.projects || [])].sort((a, b) => a.order - b.order);
-  
-  const heroProject = projects.length > 0 
-    ? (projects.find(p => (p._id || p.id) === data?.heroProjectId) || projects[0]) 
-    : null;
+  if (loading || !data) return null;
 
   const showreelMedia = data?.showreelUrl || heroProject?.videoUrl;
   const showreelThumbnail = data?.showreelThumbnailUrl || heroProject?.thumbnailUrl || heroProject?.imageUrl;
