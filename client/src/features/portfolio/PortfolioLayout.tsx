@@ -85,6 +85,17 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
+  const projects = useMemo(() => {
+    if (!data) return [];
+    return [...(data.projects || [])].sort((a, b) => a.order - b.order);
+  }, [data]);
+  
+  const heroProject = useMemo(() => {
+    if (!data) return null;
+    return projects.length > 0
+      ? (projects.find(p => (p._id || p.id) === data.heroProjectId) || projects[0])
+      : null;
+  }, [projects, data]);
   const { projects, heroProject } = useMemo(() => {
     if (!data) return { projects: [], heroProject: null };
     const sortedProjects = [...(data.projects || [])].sort((a, b) => a.order - b.order);
@@ -99,8 +110,6 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
   const showreelMedia = data?.showreelUrl || heroProject?.videoUrl;
   const showreelThumbnail = data?.showreelThumbnailUrl || heroProject?.thumbnailUrl || heroProject?.imageUrl;
   const hasHeroMedia = Boolean(showreelMedia || showreelThumbnail);
-
-  const heroVideoUrl = heroProject?.videoUrl;
 
   const truncate = (str: string, length: number) => {
     if (str.length <= length) return str;
