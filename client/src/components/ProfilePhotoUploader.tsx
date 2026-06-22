@@ -196,6 +196,7 @@ export const ProfilePhotoUploader: React.FC<ProfilePhotoUploaderProps> = ({
                 <button 
                   onClick={() => { setStatus('idle'); setImgSrc(''); }}
                   className="text-text-muted hover:text-text-primary transition-colors p-1"
+                  aria-label="Close modal"
                 >
                   <X size={20} />
                 </button>
