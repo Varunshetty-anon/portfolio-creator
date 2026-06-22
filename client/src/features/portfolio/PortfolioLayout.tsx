@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Instagram, Mail, ArrowUpRight, X, MapPin } from 'lucide-react';
@@ -85,19 +85,31 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  if (loading || !data) return null;
-
-  const projects = [...(data.projects || [])].sort((a, b) => a.order - b.order);
+  const projects = useMemo(() => {
+    if (!data) return [];
+    return [...(data.projects || [])].sort((a, b) => a.order - b.order);
+  }, [data]);
   
-  const heroProject = projects.length > 0 
-    ? (projects.find(p => (p._id || p.id) === data?.heroProjectId) || projects[0]) 
-    : null;
+  const heroProject = useMemo(() => {
+    if (!data) return null;
+    return projects.length > 0
+      ? (projects.find(p => (p._id || p.id) === data.heroProjectId) || projects[0])
+      : null;
+  }, [projects, data]);
+  const { projects, heroProject } = useMemo(() => {
+    if (!data) return { projects: [], heroProject: null };
+    const sortedProjects = [...(data.projects || [])].sort((a, b) => a.order - b.order);
+    const hero = sortedProjects.length > 0
+      ? (sortedProjects.find(p => (p._id || p.id) === data?.heroProjectId) || sortedProjects[0])
+      : null;
+    return { projects: sortedProjects, heroProject: hero };
+  }, [data]);
+
+  if (loading || !data) return null;
 
   const showreelMedia = data?.showreelUrl || heroProject?.videoUrl;
   const showreelThumbnail = data?.showreelThumbnailUrl || heroProject?.thumbnailUrl || heroProject?.imageUrl;
   const hasHeroMedia = Boolean(showreelMedia || showreelThumbnail);
-
-  const heroVideoUrl = heroProject?.videoUrl;
 
   const truncate = (str: string, length: number) => {
     if (str.length <= length) return str;
@@ -384,6 +396,8 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
                 onClick={() => setContactOpen(false)}
                 className="absolute top-4 right-6 font-mono text-xs text-white/40 hover:text-white cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-white rounded px-2 py-1"
                 aria-label="Close contact details"
+                className="absolute top-4 right-6 font-mono text-xs text-white/40 hover:text-white cursor-pointer"
+                aria-label="Close panel"
               >
                 ✕ CLOSE
               </button>
@@ -450,6 +464,8 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
                 onClick={() => setSelectedProject(null)}
                 className="absolute top-4 right-4 z-50 font-mono text-xs text-white/40 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white rounded p-1"
                 aria-label="Close project details"
+                className="absolute top-4 right-4 z-50 font-mono text-xs text-white/40 hover:text-white"
+                aria-label="Close modal"
               >
                 <X size={18} />
               </button>
