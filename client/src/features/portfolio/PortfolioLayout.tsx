@@ -96,6 +96,14 @@ export default function PortfolioLayout({ isPreviewMode = false, draftData = nul
       ? (projects.find(p => (p._id || p.id) === data.heroProjectId) || projects[0])
       : null;
   }, [projects, data]);
+  const { projects, heroProject } = useMemo(() => {
+    if (!data) return { projects: [], heroProject: null };
+    const sortedProjects = [...(data.projects || [])].sort((a, b) => a.order - b.order);
+    const hero = sortedProjects.length > 0
+      ? (sortedProjects.find(p => (p._id || p.id) === data?.heroProjectId) || sortedProjects[0])
+      : null;
+    return { projects: sortedProjects, heroProject: hero };
+  }, [data]);
 
   if (loading || !data) return null;
 
