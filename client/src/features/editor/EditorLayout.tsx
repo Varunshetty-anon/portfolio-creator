@@ -290,7 +290,9 @@ export default function EditorLayout() {
             
             <button
               onClick={() => setIsRightSidebarOpen(!isRightSidebarOpen)}
-              className="p-2 ml-1 text-text-subtle hover:text-white transition-colors"
+              className="p-2 ml-1 text-text-subtle hover:text-white transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white rounded-md"
+              aria-label={isRightSidebarOpen ? "Close properties sidebar" : "Open properties sidebar"}
+              title={isRightSidebarOpen ? "Close properties" : "Open properties"}
             >
               {isRightSidebarOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
             </button>
@@ -331,7 +333,9 @@ export default function EditorLayout() {
               </h2>
               <button 
                 onClick={() => setIsRightSidebarOpen(false)}
-                className="text-text-muted hover:text-text-primary transition-colors"
+                className="text-text-muted hover:text-text-primary transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white rounded-md p-1"
+                aria-label="Close properties sidebar"
+                title="Close properties"
               >
                 <PanelRightClose size={16} />
               </button>

@@ -10,6 +10,7 @@
 
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import passport from 'passport';
+import rateLimit from 'express-rate-limit';
 
 import User, { type IUser } from '../models/User.js';
 import Portfolio from '../models/Portfolio.js';
@@ -56,8 +57,17 @@ function setTokenCookies(res: Response, tokens: TokenPair): void {
   res.cookie('frames_refresh', tokens.refreshToken, cookieOptions(30 * 24 * 60 * 60 * 1000));
 }
 
+// ── Rate Limiting ───────────────────────────────────────────────────
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // Limit each IP to 10 requests per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: 'Too many authentication attempts, please try again later.' },
+});
+
 // ── POST /signup ────────────────────────────────────────────────────
-router.post('/signup', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/signup', authLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email, password, displayName } = req.body;
 
@@ -91,7 +101,7 @@ router.post('/signup', async (req: Request, res: Response, next: NextFunction) =
 });
 
 // ── POST /login ─────────────────────────────────────────────────────
-router.post('/login', (req: Request, res: Response, next: NextFunction) => {
+router.post('/login', authLimiter, (req: Request, res: Response, next: NextFunction) => {
   passport.authenticate(
     'local',
     { session: false },
